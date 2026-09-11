@@ -252,3 +252,91 @@ test('links: host aprovado exato e HTTPS, sem credenciais, porta, fragmentos ou 
   await assert.rejects(as(alice, 'select * from private.product_links'), { code: '42501' })
   await assert.rejects(as(bob, "insert into private.partner_hosts values ('amazon','evil.test','inventado')"), { code: '42501' })
 })
+
+async function family(event, names = ['Ana', 'Pedro'], user = alice) {
+  return (await as(user, 'select public.create_family_invitation($1,$2,$3,null) value', [event.id, 'Família teste', names])).rows[0].value
+}
+async function guestSession(invitation) {
+  const { rows } = await admin.query("select encode(sha256(convert_to($1,'UTF8')),'hex') token_hash, encode(sha256(convert_to(gen_random_uuid()::text,'UTF8')),'hex') session_hash", [invitation.token])
+  await admin.query('select public.exchange_guest_invitation($1,$2)', [rows[0].token_hash, rows[0].session_hash])
+  return rows[0]
+}
+async function readInvitation(session) {
+  return (await admin.query('select public.get_guest_invitation($1) value', [session.session_hash])).rows[0].value
+}
+async function respond(session, person, value) {
+  return (await admin.query('select public.set_guest_rsvp($1,$2,$3,$4) value', [session.session_hash, person.id, value, person.version])).rows[0].value
+}
+test('convites: proprietário e família isolados; segredos e RPCs inacessíveis aos clientes', async () => {
+  const event = await transition(await save(await create()), 'published')
+  const invitation = await family(event)
+  assert.equal(invitation.expires_at, null)
+  assert.match(invitation.token, /^[a-f0-9]{64}$/)
+  await assert.rejects(family(event, ['Outra pessoa'], bob), /EVENT_NOT_FOUND/)
+  for (const table of ['invitations', 'invitation_people', 'rsvps']) {
+    assert.equal((await as(bob, `select * from public.${table}`)).rowCount, 0)
+    await assert.rejects(as(null, `select * from public.${table}`, [], 'anon'), { code: '42501' })
+    await assert.rejects(as(alice, `delete from public.${table}`), { code: '42501' })
+  }
+  for (const role of ['anon', 'authenticated']) {
+    for (const signature of ['exchange_guest_invitation(text,text)', 'get_guest_invitation(text)', 'set_guest_rsvp(text,uuid,text,integer)', 'allow_guest_request(text,text)']) {
+      const { rows } = await admin.query('select has_function_privilege($1,$2,\'execute\') allowed', [role, `public.${signature}`])
+      assert.equal(rows[0].allowed, false)
+    }
+  }
+  const session = await guestSession(invitation)
+  const view = await readInvitation(session)
+  assert.deepEqual(view.people.map(person => person.name), ['Ana', 'Pedro'])
+  const other = await readInvitation(await guestSession(await family(event, ['Luiza'])))
+  await assert.rejects(respond(session, other.people[0], 'yes'), /PERSON_NOT_FOUND/)
+  const changed = await respond(session, view.people[0], 'yes')
+  assert.equal(changed.response, 'yes')
+  await assert.rejects(respond(session, view.people[0], 'no'), /RSVP_VERSION_CONFLICT/)
+  assert.equal((await respond(session, changed, 'maybe')).response, 'maybe')
+  const reopened = await readInvitation(await guestSession(invitation))
+  assert.deepEqual(reopened.people.map(person => person.response), ['maybe', 'pending'])
+})
+test('convites: início e encerramento bloqueiam escrita e preservam reabertura para consulta', async () => {
+  const event = await transition(await save(await create()), 'published')
+  const invitation = await family(event)
+  const session = await guestSession(invitation)
+  const view = await readInvitation(session)
+  assert.equal(view.read_only, false)
+  await admin.query("update public.events set starts_at=clock_timestamp()-interval '1 second' where id=$1", [event.id])
+  await assert.rejects(respond(session, view.people[0], 'yes'), /RSVP_CLOSED/)
+  assert.equal((await readInvitation(await guestSession(invitation))).read_only, true)
+  await assert.rejects(family(event), /EVENT_NOT_PUBLISHED/)
+  await transition(event, 'closed')
+  assert.equal((await readInvitation(await guestSession(invitation))).read_only, true)
+  await assert.rejects(respond(session, view.people[0], 'yes'), /RSVP_CLOSED/)
+})
+test('convites: revogação invalida sessões emitidas e impede reabertura', async () => {
+  const event = await transition(await save(await create()), 'published')
+  const invitation = await family(event)
+  const session = await guestSession(invitation)
+  const view = await readInvitation(session)
+  await assert.rejects(as(bob, 'select public.revoke_family_invitation($1,$2)', [event.id, invitation.id]), /EVENT_NOT_FOUND/)
+  await as(alice, 'select public.revoke_family_invitation($1,$2)', [event.id, invitation.id])
+  await assert.rejects(readInvitation(session), /GUEST_SESSION_INVALID/)
+  await assert.rejects(respond(session, view.people[0], 'yes'), /GUEST_SESSION_INVALID/)
+  await assert.rejects(guestSession(invitation), /GUEST_SESSION_INVALID/)
+})
+test('convites: sessão expirada pode ser renovada usando o mesmo link', async () => {
+  const invitation = await family(await transition(await save(await create()), 'published'))
+  const session = await guestSession(invitation)
+  await admin.query("update private.guest_sessions set expires_at=now()-interval '1 second' where session_hash=$1", [session.session_hash])
+  await assert.rejects(readInvitation(session), /GUEST_SESSION_INVALID/)
+  assert.equal((await readInvitation(await guestSession(invitation))).read_only, false)
+})
+test('convites: respostas concorrentes preservam uma única alteração por versão', async () => {
+  const invitation = await family(await transition(await save(await create()), 'published'))
+  const session = await guestSession(invitation)
+  const person = (await readInvitation(session)).people[0]
+  const clients = [server.getPgClient(), server.getPgClient()]
+  await Promise.all(clients.map(client => client.connect()))
+  try {
+    const results = await Promise.allSettled(clients.map((client, index) => client.query('select public.set_guest_rsvp($1,$2,$3,$4)', [session.session_hash, person.id, index ? 'no' : 'yes', person.version])))
+    assert.equal(results.filter(result => result.status === 'fulfilled').length, 1)
+    assert.match(results.find(result => result.status === 'rejected').reason.message, /RSVP_VERSION_CONFLICT/)
+  } finally { await Promise.all(clients.map(client => client.end())) }
+})

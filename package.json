@@ -20,7 +20,9 @@
     "db:test": "supabase test db --local",
     "test:db:portable": "node --test tests/database/*.integration.mjs",
     "test:e2e": "playwright test",
-    "test:api": "node --test tests/api/*.integration.mjs"
+    "test:api": "node --test tests/api/*.integration.mjs",
+    "test:auth:local": "node --test tests/local/email-login.test.mjs",
+    "test:invites:local": "node --test tests/local/family-invitation.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",

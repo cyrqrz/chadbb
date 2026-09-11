@@ -26,7 +26,20 @@ Encerramento: evento `FOR UPDATE`; transição `published` → `closed`, sem rea
 Publicação: `draft` → `published`, título não vazio e data futura. Bloqueios de
 edição/adição da lista são incompatíveis com o encerramento.
 
-## Propostos para implementação com convites e reservas
+## Convites e RSVP implementados
+
+`create_family_invitation` e `revoke_family_invitation` exigem proprietário.
+As RPCs `exchange_guest_invitation`, `get_guest_invitation`, `set_guest_rsvp`
+e `allow_guest_request` são executáveis somente pelo servidor (`service_role`).
+A Edge Function `guest` recebe token via POST e sessão em Authorization.
+
+Ordem de bloqueios: evento → convite → RSVP. A atualização exige pessoa da
+família, versão atual e evento publicado com início ainda no futuro, revalidado
+após obter o bloqueio do RSVP. Revogação exclui todas as sessões da família.
+O mesmo link emite novas sessões de 2 horas; o link criado pela interface não
+expira automaticamente. Evento iniciado ou encerrado continua legível.
+
+## Propostos para implementação com reservas
 
 Nomes abaixo são contratos de planejamento, **não funções já disponíveis**.
 
@@ -56,6 +69,5 @@ zero somente enquanto a tabela não existe; com tabela presente falha explicitam
 Não é evidência de proteção contra excesso de reservas. Executar os cenários
 concorrentes do plano com conexões independentes e início coordenado.
 
-Duração de sessão, limites por convite e ações depois de encerramento ainda seguem
-as propostas do contrato do piloto. Resolver essas decisões antes de implementar os
-respectivos fluxos. Até lá, nenhuma exceção de encerramento está habilitada.
+As regras de reservas depois do encerramento e os limites por pedido ainda seguem
+as propostas do contrato do piloto. Resolver antes de implementar esses fluxos.

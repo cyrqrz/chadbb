@@ -23,23 +23,24 @@ capacidade da equipe e serão registradas quando informadas, com revisão após 
 | Eventos | Listar os próprios eventos; criar rascunho | Lista carregando; primeiro evento com ação de criar; falha com retentativa |
 | Editor | Título, descrição pública, data/hora, local privado e imagem pública; salvar e publicar | Rascunho incompleto pode ser salvo; publicação exige título e data futura; erros junto aos campos; confirmação de encerramento |
 | Lista | Selecionar catálogo e quantidades positivas | Catálogo vazio; carregamento; erro de rede; redução abaixo do comprometido informa limite |
-| Convites | Nome mínimo, emitir link individual, copiar e revogar | Sem convites; emissão em andamento; link só apresentado na emissão; perda exige revogar e reemitir |
+| Convites | Nome da família e integrantes, emitir link familiar, copiar e revogar | Sem convites; emissão em andamento; link só apresentado na emissão; perda exige revogar e reemitir |
 | Convite no celular | Trocar token do fragmento via POST; limpar fragmento; mostrar evento autorizado | Troca em andamento sem analytics; token inválido, expirado ou revogado orienta procurar organizador; recarga orienta reabrir convite |
-| RSVP | Sim, não ou talvez; alterar resposta atual | Sem resposta; salvando; falha mantém escolha para retentativa |
+| RSVP | Sim, não ou talvez por pessoa; alterar até o início do evento | Sem resposta; salvando; falha mantém escolha para retentativa |
 | Presentes | Consultar disponibilidade, reservar, cancelar ou declarar compra | Lista vazia; carregamento; última unidade indisponível atualiza lista; retentativa usa a mesma chave; compra identificada como autodeclarada |
 | Painel | Confirmações e quantidades solicitadas, comprometidas e disponíveis | Sem respostas/reservas; carregamento; erro recuperável; paginação |
 | Prévia pública | Título e descrição pública de evento publicado | Não publicado/inexistente retorna página genérica sem dados privados |
 
 Acesso, listagem e editor de eventos estão implementados na segunda entrega.
-Catálogo, convites, RSVP, reservas, painel agregado e prévia seguem como contratos
-das próximas etapas. Evidências e limites em EXECUCAO-ORGANIZADOR.md.
+Catálogo, convites familiares e RSVP estão implementados e validados localmente.
+Reservas, painel agregado e prévia continuam pendentes. Evidências atuais em
+VALIDACAO-LOCAL-2026-09-11.md.
 
 ## Classificação de dados (P0.3)
 
 | Acesso | Campos permitidos |
 | --- | --- |
 | Público, somente evento publicado | ID público, título escolhido para divulgação, descrição pública e imagem explicitamente publicada |
-| Portador de convite válido | Campos públicos, data/hora, endereço e instruções privadas, catálogo do evento e disponibilidade agregada, sua própria resposta e reservas |
+| Portador de convite válido | Campos públicos, data/hora, endereço e instruções privadas, catálogo do evento e disponibilidade agregada, respostas dos integrantes de sua família e suas reservas |
 | Organizador proprietário | Seu evento, lista, identificação mínima dos seus convidados, expiração/revogação, respostas e reservas do evento, métricas agregadas |
 | Servidor restrito | Hashes de tokens e sessões, contadores de abuso, credenciais administrativas |
 
@@ -49,14 +50,17 @@ precisam de escolha explícita; arquivos privados ficam em bucket separado.
 
 ## Decisões em acompanhamento (P0.4–P0.6)
 
-Estas são propostas, a resolver nos marcos indicados; não são aprovações inferidas.
+Unidade familiar e prazo do RSVP foram confirmados pelo usuário em 2026-09-11.
+Sessão em memória e limite de 20 integrantes são configurações técnicas atuais.
+As demais propostas permanecem a resolver nos marcos indicados.
 
 | Decisão | Proposta inicial | Responsável | Marco |
 | --- | --- | --- | --- |
-| Unidade do convite | Uma pessoa por convite; sem acompanhantes no RSVP | Produto | Antes de schema de RSVP (etapa 4) |
+| Unidade do convite | Confirmado: uma família por convite, integrantes cadastrados pelo organizador; sem login do convidado | Produto | Antes de schema de RSVP (etapa 4) |
 | Sessão | 2 horas, em memória; reabrir convite após recarga | Produto + engenharia | Etapa 4 |
-| Expiração do convite | Até 7 dias após a data do evento; configurável | Produto | Etapa 4 |
-| Limites | RSVP individual; até 10 unidades por pedido, limitado ao disponível; limites de abuso distintos | Produto + engenharia | Etapas 4–5 |
+| Expiração do convite | Sem expiração automática; link reabrível até revogação | Produto | Etapa 4 |
+| Prazo do RSVP | Confirmado: editável até o início; depois somente consulta; encerramento manual também bloqueia escrita | Produto | Etapa 4 |
+| Limites | Até 20 integrantes por convite na implementação; RSVP por pessoa; até 10 unidades por pedido, limitado ao disponível; limites de abuso distintos | Produto + engenharia | Etapas 4–5 |
 | Recuperação | Organizador revoga convite perdido e emite outro | Produto + operação | Etapa 4 |
 | Encerramento | Bloquear novas reservas; cancelamento e declaração permitidos por 7 dias com convite válido | Produto | Antes das funções da etapa 5 |
 | Retenção | Excluir dados pessoais 90 dias após evento; definir cópias de backup | Produto + operação | Antes de dados reais |

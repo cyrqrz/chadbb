@@ -72,6 +72,7 @@ function EventEditor({ initial }: { initial: EventRecord }) {
     <Link to="/eventos" className="text-link">← Seus eventos</Link>
     <div className="mt-7 flex flex-wrap items-center gap-4"><h1 className="page-title">Detalhes do evento</h1><span className="badge">{statusLabels[record.status]}</span></div>
     <Link to={`/eventos/${record.id}/presentes`} className="secondary mt-6 inline-block">Lista de presentes →</Link>
+    <Link to={`/eventos/${record.id}/convites`} className="secondary mt-6 ml-3 inline-block">Convites e presença →</Link>
     {closed && <p className="notice mt-6">Este evento foi encerrado. Os detalhes estão disponíveis apenas para consulta.</p>}
     <form onSubmit={save} className="mt-8 space-y-8">
       <fieldset disabled={busy || closed} className="space-y-5">

@@ -2,13 +2,13 @@
 
 Data: 2026-09-09
 Base: [ADR 001 — Arquitetura do MVP de eventos e listas de presentes](ADR-001-arquitetura-mvp-eventos-presentes.md)
-Status: execução iniciada em 2026-09-09; base e fluxo do organizador implementados; validação integrada ainda pendente.
+Status: execução iniciada em 2026-09-09; base, organizador, catálogo/lista e convites familiares/RSVP (etapa 4) implementados. APIs Supabase locais e navegador com APIs simuladas validados em 2026-09-11; login por e-mail e convite familiar de ponta a ponta validados localmente; aceite remoto e completo permanece pendente. Evidências: [validação local](VALIDACAO-LOCAL-2026-09-11.md).
 
 Acompanhamento: [contrato inicial](CONTRATO-PILOTO.md) e [evidências da base](EXECUCAO-BASE.md). Segunda entrega: [organizador e testes](EXECUCAO-ORGANIZADOR.md). O aceite do piloto permanece pendente.
 
 ## Objetivo e ponto de partida
 
-Entregar um piloto de chá de bebê no qual o organizador publica o evento, monta a lista e compartilha convites individuais. Pelo celular, o convidado confirma presença, reserva presentes, acessa a loja e pode declarar a compra. O organizador acompanha confirmações e quantidades comprometidas.
+Entregar um piloto de chá de bebê no qual o organizador publica o evento, monta a lista e compartilha convites familiares. Pelo celular, o convidado confirma presença, reserva presentes, acessa a loja e pode declarar a compra. O organizador acompanha confirmações e quantidades comprometidas.
 
 Na elaboração deste plano, o repositório continha somente o ADR. A execução da base começou em 2026-09-09; os itens concluídos estão assinalados abaixo. A sequência usa React, Vite, TypeScript, Tailwind, React Router, TanStack Query, Supabase e Cloudflare Pages conforme o ADR; não pressupõe infraestrutura já criada.
 
@@ -29,7 +29,7 @@ Dependência: nenhuma. Responsáveis: produto e engenharia.
 - [x] P0.1 Registrar concordância com a stack proposta ou revisar o ADR antes de implementar uma alternativa.
 - [x] P0.2 Descrever a jornada de organizador e convidado, com telas e estados de erro, vazio e carregamento.
 - [x] P0.3 Separar campos públicos do evento, campos restritos ao convite e dados exclusivos do organizador. Endereço privado e identificação dos convidados nunca entram na prévia pública.
-- [ ] P0.4 Confirmar convite por pessoa ou grupo familiar. Usar uma pessoa por convite como premissa inicial; resolver antes de concluir schema e interface de RSVP.
+- [x] P0.4 Confirmado: convite por família, integrantes cadastrados pelo organizador e RSVP por pessoa sem login.
 - [x] P0.5 Abrir registros de decisão para duração da sessão, expiração do convite, limites por convite, recuperação de acesso, ações após encerramento e retenção/exclusão de dados.
 - [ ] P0.6 Listar parceiros pretendidos e a validação necessária para links, imagens, preços e rastreamento. Cada parceiro só é habilitado publicamente após validação própria.
 
@@ -78,14 +78,16 @@ Aceite: organizador monta a lista com produtos do catálogo; usuário comum não
 
 Dependência: etapa 2, unidade de convite definida e contratos da etapa 3. Responsável: engenharia.
 
-- [ ] P4.1 Criar `invitations`, `guest_sessions` e `rsvps`. Manter hashes e dados de sessão fora da área exposta aos clientes; garantir uma resposta atual por convite.
-- [ ] P4.2 Implementar emissão, expiração e revogação de convites em operações autorizadas para o proprietário. Gerar tokens criptográficos e armazenar apenas hashes.
-- [ ] P4.3 Implementar troca do token no fragmento por sessão via POST; remover o segredo da URL e manter a credencial de sessão em memória, enviada em cabeçalho de autorização.
-- [ ] P4.4 Resolver identidade e evento pela sessão no servidor. Verificar expiração e revogação do convite a cada ação; nunca confiar em identidade livremente enviada pelo cliente.
-- [ ] P4.5 Criar Edge Functions para consulta autorizada do evento e atualização do RSVP; retornar apenas dados permitidos e permitir alterar a resposta atual.
-- [ ] P4.6 Implementar limitação de tentativas por IP e convite com estado compartilhado, validação de payload e origens permitidas. Reutilizar essa proteção nas mutações da etapa 5.
-- [ ] P4.7 Criar telas de convites do organizador e fluxo móvel do convidado, incluindo link inválido, sessão expirada e orientação para reabrir o convite após recarregar a página.
-- [ ] P4.8 Testar token inválido, expirado e revogado, sessão expirada, revogação de sessões existentes, acesso entre eventos e ausência de leitura direta de dados privados.
+- [x] P4.1 Criar `invitations`, `guest_sessions` e `rsvps`. Manter hashes e dados de sessão fora da área exposta aos clientes; garantir uma resposta atual por pessoa da família.
+- [x] P4.2 Implementar emissão, expiração e revogação de convites em operações autorizadas para o proprietário. Gerar tokens criptográficos e armazenar apenas hashes.
+- [x] P4.3 Implementar troca do token no fragmento por sessão via POST; remover o segredo da URL e manter a credencial de sessão em memória, enviada em cabeçalho de autorização.
+- [x] P4.4 Resolver identidade e evento pela sessão no servidor. Verificar expiração e revogação do convite a cada ação; nunca confiar em identidade livremente enviada pelo cliente.
+- [x] P4.5 Criar Edge Functions para consulta autorizada do evento e atualização do RSVP; retornar apenas dados permitidos e permitir alterar a resposta atual até o início do evento; depois somente consulta.
+- [x] P4.6 Implementar limitação de tentativas por IP e convite com estado compartilhado, validação de payload e origens permitidas. Reutilizar essa proteção nas mutações da etapa 5.
+- [x] P4.7 Criar telas de convites do organizador e fluxo móvel do convidado, incluindo link inválido, sessão expirada e orientação para reabrir o convite após recarregar a página.
+- [x] P4.8 Testar token inválido, expirado e revogado, sessão expirada, revogação de sessões existentes, acesso entre eventos e ausência de leitura direta de dados privados.
+
+Validação local: 24 testes de banco (`test:db:portable`), 48 asserções pgTAP (`db:test`, `supabase/tests/invitations.test.sql`) e 6 cenários de integração contra a Edge Function real (`test:api`, `tests/api/guest.integration.mjs`), além do ensaio com navegador/Edge Function reais; evidências em `VALIDACAO-LOCAL-2026-09-11.md`. Os testes pgTAP e de Edge Function fecham os cenários que restavam: convite com prazo explícito vencido, formato de credencial inválido, limite de 60 requisições por minuto por IP, origem não autorizada, método/`Content-Type`/tamanho de payload inválidos e ausência de leitura direta do schema privado mesmo por `service_role`.
 
 Aceite: convite permite acessar o evento e responder RSVP; revogação bloqueia sessões já emitidas; nenhuma URL, log ou captura de analytics revela a credencial.
 

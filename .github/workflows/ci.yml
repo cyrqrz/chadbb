@@ -40,5 +40,11 @@ jobs:
       - run: npm run db:reset
       - run: npm run db:test
       - run: npm run test:api
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:auth:local
+      - name: Convites com navegador e backend locais
+        run: |
+          node_modules/.bin/supabase functions serve guest > /tmp/chadbb-guest-runtime.log 2>&1 &
+          npm run test:invites:local
       - if: always()
         run: npm run db:stop

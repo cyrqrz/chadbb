@@ -1,6 +1,16 @@
 export function errorMessage(error: unknown): string {
   const object = error && typeof error === 'object' ? error as { message?: string; code?: string; status?: number } : {}
   const messages: Record<string, string> = {
+    RSVP_CLOSED: 'O evento já começou ou foi encerrado. As respostas estão disponíveis somente para consulta.',
+    REOPEN_INVITATION: 'Reabra o link original do convite para acessar.',
+    GUEST_SESSION_INVALID: 'Este acesso expirou ou foi revogado. Reabra o convite ou peça um novo à organização.',
+    EVENT_NOT_PUBLISHED: 'Este evento não está aberto para convites e respostas.',
+    INVALID_FAMILY: 'Informe o nome do grupo e de 1 a 20 pessoas, com nomes de até 100 caracteres.',
+    INVALID_INVITATION_EXPIRY: 'Se informado, o prazo do convite precisa estar no futuro.',
+    INVITATION_NOT_FOUND: 'Convite não encontrado ou sem permissão.',
+    PERSON_NOT_FOUND: 'Esta pessoa não pertence ao seu convite.',
+    RSVP_VERSION_CONFLICT: 'Esta resposta mudou em outro acesso. Confira a resposta atual e tente novamente.',
+    RATE_LIMITED: 'Muitas tentativas. Aguarde um minuto e tente novamente.',
     AUTH_REQUIRED: 'Sua sessão expirou. Entre novamente.',
     EVENT_NOT_FOUND: 'Evento não encontrado ou sem permissão de acesso.',
     EVENT_CLOSED: 'Este evento está encerrado e não pode ser alterado.',

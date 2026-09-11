@@ -12,15 +12,20 @@ const EventPage = lazy(() => import('./features/events/EventPage').then(m => ({ 
 
 const GiftListPage = lazy(() => import('./features/gifts/GiftListPage').then(m => ({ default: m.GiftListPage })))
 
+const InvitationsPage = lazy(() => import('./features/invitations/InvitationsPage').then(m => ({ default: m.InvitationsPage })))
+const GuestPage = lazy(() => import('./features/invitations/GuestPage').then(m => ({ default: m.GuestPage })))
+
 export function App() {
   return <QueryClientProvider client={queryClient}><BrowserRouter><AuthProvider>
     <Suspense fallback={<p role="status" className="p-10">Carregando…</p>}>
       <Routes><Route element={<Layout />}>
         <Route path="/" element={<HomePage />} />
+        <Route path="/convite" element={<GuestPage />} />
         <Route path="/entrar" element={<LoginPage />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route element={<RequireAuth />}>
           <Route path="/eventos" element={<EventsPage />} />
+          <Route path="/eventos/:id/convites" element={<InvitationsPage />} />
           <Route path="/eventos/:id/presentes" element={<GiftListPage />} />
           <Route path="/eventos/:id" element={<EventPage />} />
         </Route>

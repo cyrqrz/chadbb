@@ -3,8 +3,8 @@
 Aplicação de chá de bebê e lista de presentes. Implementação iniciada pelo
 [plano de execução](docs/PLANO-EXECUCAO-MVP.md), com a stack do ADR 001.
 Já estão implementados acesso por link de e-mail, criação/edição/publicação/encerramento
-de eventos e envio de capa, com permissões por proprietário. Convites e reservas
-ainda não estão implementados. A validação integrada com Supabase está pendente.
+de eventos, capa, catálogo, lista de presentes e convites familiares com RSVP por pessoa.
+Reservas ainda não estão implementadas. As APIs Supabase locais e os testes de navegador com APIs simuladas foram validados; o login por link de e-mail também foi validado de ponta a ponta no ambiente local. Veja as [evidências atuais](docs/VALIDACAO-LOCAL-2026-09-11.md).
 Veja o [contrato do piloto](docs/CONTRATO-PILOTO.md).
 
 ## Desenvolvimento
@@ -41,7 +41,7 @@ npm run check
 Reset e testes usam explicitamente `--local`; não há comandos destrutivos para
 banco remoto nos scripts. Não vincule este ambiente local à produção nem troque
 os scripts por `--linked`/`--db-url`. A migration inicial estabelece permissões;
-`seed.sql` permanece vazio; os testes criam e removem seus próprios dados fictícios.
+`seed.sql` contém apenas produtos fictícios locais; os testes criam e removem seus próprios dados fictícios.
 Nenhuma pessoa/evento real deve ser cadastrada nesta fase.
 
 A CI foi configurada para lint, TypeScript, testes, build, PostgreSQL temporário,
@@ -130,3 +130,36 @@ validação em celular/WhatsApp precisam das etapas previstas no plano.
 Referências técnicas: [Vite](https://vite.dev/guide/),
 [Tailwind com Vite](https://tailwindcss.com/docs/installation/using-vite),
 [Supabase local](https://supabase.com/docs/guides/local-development/cli/getting-started).
+
+## Testar login por e-mail local
+
+Com Supabase iniciado e Chromium instalado, execute `npm run test:auth:local`.
+O teste inicia Vite em `127.0.0.1:5173` (a porta precisa estar livre), usa a
+configuração pública da stack local e solicita acesso pela interface. Lê somente
+a mensagem fictícia correspondente no Mailpit, abre o link no mesmo navegador,
+verifica PKCE, sessão após recarregar, logout e proteção da rota.
+Não usa mocks nem envia e-mail externo; remove o usuário e a mensagem de teste.
+Não grava traces ou capturas que possam conter credenciais. A CI executa esse
+ensaio após os testes de API.
+
+## Testar convites familiares locais
+
+Com Supabase iniciado, aplique migrations pendentes sem resetar os dados:
+
+```sh
+npx supabase migration up --local
+npx supabase functions serve guest
+```
+
+Mantenha a função rodando e, em outro terminal com a porta 5173 livre, execute
+`npm run test:invites:local`. O teste usa organizador autenticado, Chromium
+(desktop e celular emulado), PostgREST e Edge Function reais. Cria suas próprias
+famílias fictícias e verifica respostas individuais, reabertura na mesma aba,
+bloqueio no início, revogação e troca de família. Remove seus dados ao terminar.
+
+O organizador cadastra até 20 integrantes por convite em **Convites e presença**.
+O link não exige login e pode ser reaberto; a sessão dura 2 horas em memória.
+Respostas podem mudar até o início do evento. Depois, ou após encerramento manual,
+o convite permanece disponível para consulta até ser revogado. Não há expiração
+automática do link emitido pela interface. Configuração da função em
+[supabase/functions/README.md](supabase/functions/README.md).

@@ -16,8 +16,8 @@ frontend executável e preparação de ambiente e CI. Não equivale ao MVP compl
   Região remota e execução local de banco pendentes.
 - P1.5 parcial: workflow CI e comandos locais; testes de configuração e SQL de
   permissões. Execução remota de CI e migration em banco limpo ainda pendentes.
-- P1.6 parcial: instruções Pages, fallback SPA e cabeçalhos estáticos; deploy
-  de preview ainda pendente.
+- P1.6: instruções Pages, fallback SPA e cabeçalhos estáticos; deploy de
+  preview concluído (ver atualização de 2026-09-11).
 
 ## Verificação
 
@@ -37,6 +37,16 @@ do projeto e não está versionada.
 
 Não há dados pessoais nem credenciais reais configurados. A validação de
 configuração do frontend não substitui a proteção de segredos no ambiente de build.
+
+## Atualização — 2026-09-11
+
+Projeto Cloudflare Pages de desenvolvimento criado e conectado a
+`github.com/cyrqrz/chadbb` (branch `main`, build `npm run build`, saída `dist`,
+`NODE_VERSION=22`, sem variáveis Supabase). Deploy de preview verificado:
+página inicial carrega, fallback SPA responde em rota inexistente e os
+cabeçalhos de `public/_headers` (incluindo CSP) aparecem na resposta.
+Preview remoto do M1 fica assim concluído; falta apenas habilitar Docker no
+WSL para fechar `db:start`/`db:reset`/`db:test` e a CI remota.
 
 ## Próxima entrega e marcos pendentes
 
