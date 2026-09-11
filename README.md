@@ -1,10 +1,15 @@
 # chadbb
 
-Aplicação de chá de bebê e lista de presentes. Implementação iniciada pelo
+MVP para o chá de bebê do irmão do solicitante, com cerca de 50 convidados.
+Prioridades: uso simples no celular, design profissional, acessibilidade e dados
+confiáveis e atualizados. Entrega planejada para a segunda semana de outubro de
+2026; evolução comercial fica para depois do evento. Implementação guiada pelo
 [plano de execução](docs/PLANO-EXECUCAO-MVP.md), com a stack do ADR 001.
 Já estão implementados acesso por link de e-mail, criação/edição/publicação/encerramento
-de eventos e envio de capa, com permissões por proprietário. Convites e reservas
-ainda não estão implementados. A validação integrada com Supabase está pendente.
+de eventos e envio de capa, com permissões por proprietário, além de catálogo e
+lista de presentes. Convites e reservas ainda não estão implementados.
+Testes SQL e de API do organizador passaram no Supabase local; o ensaio de login
+por link de e-mail no navegador permanece pendente.
 Veja o [contrato do piloto](docs/CONTRATO-PILOTO.md).
 
 ## Desenvolvimento
@@ -41,7 +46,7 @@ npm run check
 Reset e testes usam explicitamente `--local`; não há comandos destrutivos para
 banco remoto nos scripts. Não vincule este ambiente local à produção nem troque
 os scripts por `--linked`/`--db-url`. A migration inicial estabelece permissões;
-`seed.sql` permanece vazio; os testes criam e removem seus próprios dados fictícios.
+o catálogo do chá — 4 tamanhos de fralda e os 23 mimos de [FRALDAS-E-MIMOS](docs/FRALDAS-E-MIMOS.md) — entra por migration, sem marcas, preços ou links; `seed.sql` permanece vazio e os testes criam e removem seus próprios dados fictícios.
 Nenhuma pessoa/evento real deve ser cadastrada nesta fase.
 
 A CI foi configurada para lint, TypeScript, testes, build, PostgreSQL temporário,
@@ -89,6 +94,13 @@ mesmo navegador para concluir o PKCE. O callback local está configurado para
 `http://localhost:5173/auth/callback` e `http://127.0.0.1:5173/auth/callback`.
 Em ambientes remotos, cadastre a URL correspondente no Auth antes de usar.
 
+As telas seguem o contrato de atualização do plano: nenhuma resposta em cache é
+apresentada como nova. Eventos, detalhe e lista reconsultam o servidor ao abrir,
+ao voltar para a aba, ao reconectar e a cada 5 segundos com a aba visível, com
+recuo progressivo enquanto a consulta falhar e indicação “Atualizando…”. O que
+está digitado nunca é substituído por uma atualização recebida: o formulário
+avisa que existe versão mais recente e oferece recarregar.
+
 Em `/eventos`, crie um rascunho, salve título e data futura e publique. O encerramento
 é definitivo nesta etapa. Campos privados não têm leitura anônima. Edições usam
 versão para detectar conflitos entre abas; o botão de recarregar permite recuperar.
@@ -123,7 +135,8 @@ foi criado: depende de acesso às contas e repositório remoto.
 
 ## Evidências e pendências
 
-Consulte [execução da base](docs/EXECUCAO-BASE.md) e [execução do organizador](docs/EXECUCAO-ORGANIZADOR.md). Não há aprovação de piloto.
+Consulte [execução da base](docs/EXECUCAO-BASE.md), [execução do organizador](docs/EXECUCAO-ORGANIZADOR.md)
+e [validação local de 11/09](docs/VALIDACAO-LOCAL-2026-09-11.md). Não há aprovação de piloto.
 Docker, contas de hospedagem, orçamento, restauração, regras comerciais e
 validação em celular/WhatsApp precisam das etapas previstas no plano.
 

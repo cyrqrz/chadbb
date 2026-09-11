@@ -143,10 +143,13 @@ test('imagens: proprietário, bucket privado, extensão, caminho e troca de obje
   assert.equal(buckets.find(b => b.id === 'event-public').file_size_limit, '5242880')
 })
 
-async function product(active = true, platform = 'manual') {
-  return (await admin.query('insert into public.products(title,platform,external_reference,active) values ($1,$2,gen_random_uuid()::text,$3) returning *', ['Presente fictício', platform, active])).rows[0]
+async function product(active = true, platform = 'manual', size = null) {
+  return (await admin.query('insert into public.products(title,platform,external_reference,active,category,diaper_size) values ($1,$2,gen_random_uuid()::text,$3,$4,$5) returning *',
+    [size ? `Fraldas tamanho ${size}` : 'Mimo fictício', platform, active, size ? 'fralda' : 'mimo', size])).rows[0]
 }
-async function addGift(event, gift, quantity = 1, user = alice) {
+async function diaper(size = 'P', active = true) { return product(active, 'manual', size) }
+// Fralda exige limite; mimo nunca tem limite. O padrão segue a categoria do produto.
+async function addGift(event, gift, quantity = gift.category === 'fralda' ? 1 : null, user = alice) {
   return (await as(user, 'select * from public.add_event_item($1,$2,$3)', [event.id, gift.id, quantity])).rows[0]
 }
 async function updateGift(item, quantity, user = alice, eventId = item.event_id) {
@@ -165,7 +168,7 @@ test('catálogo: somente administração escreve; usuários leem produtos ativos
 })
 test('lista: leitura e mutações exigem proprietário e vínculo com evento', async () => {
   const event = await create(); const other = await create(bob); const ownOther = await create()
-  const gift = await product(); const item = await addGift(event, gift, 2)
+  const gift = await diaper(); const item = await addGift(event, gift, 2)
   assert.equal((await as(bob, 'select * from public.event_items where id=$1', [item.id])).rowCount, 0)
   assert.equal((await as(alice, 'select * from public.event_items where id=$1', [item.id])).rowCount, 1)
   await assert.rejects(addGift(other, gift), /EVENT_NOT_FOUND/)
@@ -186,16 +189,16 @@ test('lista: nenhuma escrita direta, exclusão ou troca de produto/evento', asyn
   await assert.rejects(admin.query('delete from public.products where id=$1', [gift.id]), { code: '23503' })
 })
 test('quantidade: nulo, zero, negativo, excesso e fração são rejeitados pelo banco', async () => {
-  const event = await create(); const gift = await product()
-  for (const quantity of [null, 0, -1, 10001]) await assert.rejects(addGift(event, gift, quantity), /INVALID_QUANTITY/)
+  const event = await create(); const gift = await diaper('M')
+  for (const quantity of [0, -1, 10001]) await assert.rejects(addGift(event, gift, quantity), /INVALID_QUANTITY/)
   await assert.rejects(addGift(event, gift, '1.5'), { code: '22P02' })
   const item = await addGift(event, gift, 5)
-  for (const quantity of [null, 0, -1, 10001]) await assert.rejects(updateGift(item, quantity), /INVALID_QUANTITY/)
+  for (const quantity of [0, -1, 10001]) await assert.rejects(updateGift(item, quantity), /INVALID_QUANTITY/)
   assert.equal((await updateGift(item, 2)).quantity_requested, 2)
   await assert.rejects(admin.query('update public.event_items set quantity_requested=0 where id=$1', [item.id]), { code: '23514' })
 })
 test('adição concorrente do mesmo produto não duplica nem soma unidades', async () => {
-  const event = await create(); const gift = await product()
+  const event = await create(); const gift = await diaper('G')
   const results = await Promise.all([addGift(event, gift, 2), addGift(event, gift, 2)])
   assert.equal(results[0].id, results[1].id)
   assert.equal((await admin.query('select count(*) from public.event_items where event_id=$1', [event.id])).rows[0].count, '1')
@@ -203,13 +206,13 @@ test('adição concorrente do mesmo produto não duplica nem soma unidades', asy
   assert.equal((await admin.query('select quantity_requested from public.event_items where id=$1', [results[0].id])).rows[0].quantity_requested, 2)
 })
 test('edição concorrente de quantidade exige versão e preserva exatamente uma alteração', async () => {
-  const item = await addGift(await create(), await product(), 2)
+  const item = await addGift(await create(), await diaper('XG'), 2)
   const results = await Promise.allSettled([updateGift(item, 3), updateGift(item, 4)])
   assert.equal(results.filter(r => r.status === 'fulfilled').length, 1)
   assert.match(results.find(r => r.status === 'rejected').reason.message, /ITEM_VERSION_CONFLICT/)
 })
 test('produto desativado permanece legível só nas listas dos proprietários e não pode ser adicionado', async () => {
-  const gift = await product(); const event = await create(); const item = await addGift(event, gift)
+  const gift = await diaper(); const event = await create(); const item = await addGift(event, gift)
   await admin.query('update public.products set active=false where id=$1', [gift.id])
   assert.equal((await as(alice, 'select * from public.products where id=$1', [gift.id])).rowCount, 1)
   assert.equal((await as(bob, 'select * from public.products where id=$1', [gift.id])).rowCount, 0)
@@ -218,7 +221,7 @@ test('produto desativado permanece legível só nas listas dos proprietários e 
 })
 test('encerramento impede adicionar/editar; edição respeita bloqueio evento antes do item', async () => {
   let event = await transition(await save(await create()), 'published')
-  const gift = await product(); const item = await addGift(event, gift)
+  const gift = await diaper(); const item = await addGift(event, gift)
   const closer = await connectAs(alice); const writer = await connectAs(alice)
   try {
     await closer.query('begin')
@@ -230,11 +233,9 @@ test('encerramento impede adicionar/editar; edição respeita bloqueio evento an
     await assert.rejects(addGift(event, await product()), /EVENT_CLOSED/)
   } finally { await closer.query('rollback'); await closer.end(); await writer.end() }
 })
-test('integração de reservas incompleta bloqueia edição em vez de assumir zero comprometido', async () => {
-  const item = await addGift(await create(), await product(), 5)
-  await admin.query('create table public.reservations (id uuid)')
-  try { await assert.rejects(updateGift(item, 1), /RESERVATION_INTEGRATION_REQUIRED/) }
-  finally { await admin.query('drop table public.reservations') }
+test('integração de reservas calcula zero quando não há comprometimento', async () => {
+  const item = await addGift(await create(), await diaper(), 5)
+  assert.equal((await updateGift(item, 1)).quantity_requested, 1)
 })
 test('links: host aprovado exato e HTTPS, sem credenciais, porta, fragmentos ou bypass', async () => {
   const gift = await product(true, 'amazon')
@@ -251,4 +252,238 @@ test('links: host aprovado exato e HTTPS, sem credenciais, porta, fragmentos ou 
   await assert.rejects(admin.query("update public.products set platform='shopee' where id=$1", [gift.id]), /PRODUCT_IDENTITY_IMMUTABLE/)
   await assert.rejects(as(alice, 'select * from private.product_links'), { code: '42501' })
   await assert.rejects(as(bob, "insert into private.partner_hosts values ('amazon','evil.test','inventado')"), { code: '42501' })
+})
+
+test('evento: qualquer escrita avança versão e updated_at; identidade é imutável', async () => {
+  const event = await create()
+  // O updated_at enviado pela escrita é descartado: o relógio é o da transação.
+  await admin.query("update public.events set title='ajuste administrativo', updated_at='2000-01-01T00:00:00Z' where id=$1", [event.id])
+  const after = (await admin.query('select * from public.events where id=$1', [event.id])).rows[0]
+  assert.equal(after.version, event.version + 1)
+  assert.ok(after.updated_at >= event.updated_at && after.updated_at.getUTCFullYear() > 2000)
+  // A aba que leu a versão anterior não sobrescreve silenciosamente a correção.
+  await assert.rejects(save(event), /VERSION_CONFLICT/)
+  await assert.rejects(admin.query('update public.events set owner_id=$1 where id=$2', [bob, event.id]), /EVENT_IDENTITY_IMMUTABLE/)
+  await assert.rejects(admin.query("update public.events set type='casamento' where id=$1", [event.id]), /EVENT_IDENTITY_IMMUTABLE/)
+  await assert.rejects(admin.query('update public.events set created_at=now() where id=$1', [event.id]), /EVENT_IDENTITY_IMMUTABLE/)
+  // Versão não retrocede nem quando a escrita pede explicitamente um número menor.
+  await admin.query('update public.events set version=1 where id=$1', [event.id])
+  assert.equal((await admin.query('select version from public.events where id=$1', [event.id])).rows[0].version, after.version + 1)
+})
+test('item: escrita direta avança versão e vínculos são imutáveis', async () => {
+  const event = await create(); const gift = await diaper(); const item = await addGift(event, gift, 2)
+  await admin.query("update public.event_items set quantity_requested=7, updated_at='2000-01-01T00:00:00Z' where id=$1", [item.id])
+  const after = (await admin.query('select * from public.event_items where id=$1', [item.id])).rows[0]
+  assert.equal(after.version, item.version + 1)
+  assert.ok(after.updated_at >= item.updated_at && after.updated_at.getUTCFullYear() > 2000)
+  await assert.rejects(updateGift(item, 3), /ITEM_VERSION_CONFLICT/)
+  await assert.rejects(admin.query('update public.event_items set product_id=$1 where id=$2', [(await product()).id, item.id]), /ITEM_IDENTITY_IMMUTABLE/)
+  await assert.rejects(admin.query('update public.event_items set event_id=$1 where id=$2', [(await create()).id, item.id]), /ITEM_IDENTITY_IMMUTABLE/)
+})
+test('produto revisado registra updated_at e mantém identidade e data de cadastro', async () => {
+  const gift = await product()
+  await admin.query("update public.products set title='Presente revisado', updated_at='2000-01-01T00:00:00Z' where id=$1", [gift.id])
+  const after = (await admin.query('select * from public.products where id=$1', [gift.id])).rows[0]
+  assert.ok(after.updated_at >= gift.updated_at && after.updated_at.getUTCFullYear() > 2000)
+  await assert.rejects(admin.query('update public.products set created_at=now() where id=$1', [gift.id]), /PRODUCT_IDENTITY_IMMUTABLE/)
+  await assert.rejects(admin.query("update public.products set external_reference='outro' where id=$1", [gift.id]), /PRODUCT_IDENTITY_IMMUTABLE/)
+})
+test('lista paginada do evento é servida por índice, sem ordenação adicional', async () => {
+  const event = await create()
+  // Em tabela pequena o planejador prefere varredura; desabilitar as alternativas
+  // comprova que existe caminho indexado capaz de entregar a ordem já pronta.
+  await admin.query('set enable_seqscan = off; set enable_bitmapscan = off')
+  const explained = await admin.query('explain (format json) select * from public.event_items where event_id=$1 order by created_at, id limit 12', [event.id])
+  await admin.query('reset enable_seqscan; reset enable_bitmapscan')
+  const plan = JSON.stringify(explained.rows[0]['QUERY PLAN'])
+  assert.match(plan, /event_items_event_created_idx/)
+  assert.doesNotMatch(plan, /"Node Type": ?"Sort"/)
+})
+test('chave de servidor lê, mas não escreve, eventos e itens', async () => {
+  for (const [table, privilege] of [['events', 'INSERT'], ['events', 'UPDATE'], ['events', 'DELETE'],
+    ['event_items', 'INSERT'], ['event_items', 'UPDATE'], ['event_items', 'DELETE']]) {
+    const { rows } = await admin.query('select has_table_privilege($1,$2,$3) allowed', ['service_role', `public.${table}`, privilege])
+    assert.equal(rows[0].allowed, false, `service_role não deve ter ${privilege} em ${table}`)
+  }
+  for (const table of ['events', 'event_items', 'products']) {
+    const { rows } = await admin.query('select has_table_privilege($1,$2,$3) allowed', ['service_role', `public.${table}`, 'SELECT'])
+    assert.equal(rows[0].allowed, true, `service_role precisa ler ${table}`)
+  }
+})
+
+test('categoria e tamanho vêm do cadastro e são imutáveis depois dele', async () => {
+  const sized = await diaper(); const treat = await product()
+  assert.equal(sized.category, 'fralda'); assert.equal(sized.diaper_size, 'P')
+  assert.equal(treat.category, 'mimo'); assert.equal(treat.diaper_size, null)
+  await assert.rejects(admin.query("update public.products set category='mimo', diaper_size=null where id=$1", [sized.id]), /PRODUCT_IDENTITY_IMMUTABLE/)
+  await assert.rejects(admin.query("update public.products set diaper_size='G' where id=$1", [sized.id]), /PRODUCT_IDENTITY_IMMUTABLE/)
+  // Categoria não se infere pelo título: "Toalha fralda" é mimo.
+  const named = (await admin.query("insert into public.products(title,platform,external_reference,category) values ('Toalha fralda','manual',gen_random_uuid()::text,'mimo') returning *")).rows[0]
+  assert.equal(named.category, 'mimo'); assert.equal(named.diaper_size, null)
+  await assert.rejects(admin.query("insert into public.products(title,platform,external_reference,category) values ('Sem tamanho','manual',gen_random_uuid()::text,'fralda')"), { code: '23514' })
+  await assert.rejects(admin.query("insert into public.products(title,platform,external_reference,category,diaper_size) values ('Mimo com tamanho','manual',gen_random_uuid()::text,'mimo','P')"), { code: '23514' })
+})
+test('um tamanho de fralda ocupa um único item por evento', async () => {
+  const event = await create()
+  await addGift(event, await diaper(), 6)
+  // Dois produtos "P" no mesmo evento criariam dois saldos para o mesmo limite.
+  await assert.rejects(addGift(event, await diaper(), 6), /DIAPER_SIZE_ALREADY_LISTED/)
+  // O mesmo tamanho em outro evento é um limite legítimo e independente.
+  assert.equal((await addGift(await create(), await diaper(), 6)).diaper_size, 'P')
+  const item = await addGift(event, await product(), null)
+  await assert.rejects(admin.query("update public.event_items set diaper_size='M', category='fralda' where id=$1", [item.id]), /ITEM_IDENTITY_IMMUTABLE/)
+})
+test('mimo nunca tem limite; fralda sempre tem limite por tamanho', async () => {
+  const event = await create(); const treat = await product(); const size = await diaper('M')
+  const free = await addGift(event, treat, null)
+  assert.equal(free.quantity_requested, null)
+  assert.equal(free.category, 'mimo')
+  // Repetir a inclusão sem limite devolve a mesma linha em vez de conflitar com NULL.
+  assert.equal((await addGift(event, treat, null)).id, free.id)
+  // Número num mimo viraria cota fantasma e apareceria como esgotado ao convidado.
+  await assert.rejects(addGift(event, treat, 3), /TREAT_HAS_NO_LIMIT/)
+  await assert.rejects(updateGift(free, 3), /TREAT_HAS_NO_LIMIT/)
+  await assert.rejects(admin.query('update public.event_items set quantity_requested=3 where id=$1', [free.id]), { code: '23514' })
+  await assert.rejects(addGift(event, size, null), /DIAPER_LIMIT_REQUIRED/)
+  const limited = await addGift(event, size, 19)
+  assert.equal(limited.quantity_requested, 19)
+  await assert.rejects(updateGift(limited, null), /DIAPER_LIMIT_REQUIRED/)
+  await assert.rejects(admin.query('update public.event_items set quantity_requested=null where id=$1', [limited.id]), { code: '23514' })
+  assert.equal((await updateGift(limited, 18)).quantity_requested, 18)
+})
+test('cada tamanho de fralda tem um limite próprio e independente dos mimos', async () => {
+  const event = await create()
+  const sizes = { P: 6, M: 19, G: 19, XG: 6 }
+  const items = {}
+  for (const [size, limit] of Object.entries(sizes)) items[size] = await addGift(event, await diaper(size), limit)
+  const treat = await addGift(event, await product())
+  assert.equal((await updateGift(items.M, 18)).quantity_requested, 18)
+  const { rows } = await admin.query(`select p.diaper_size, i.quantity_requested from public.event_items i
+    join public.products p on p.id = i.product_id where i.event_id=$1 and p.category='fralda' order by p.diaper_size`, [event.id])
+  assert.deepEqual(rows, [{ diaper_size: 'G', quantity_requested: 19 }, { diaper_size: 'M', quantity_requested: 18 },
+    { diaper_size: 'P', quantity_requested: 6 }, { diaper_size: 'XG', quantity_requested: 6 }])
+  // Mimo na mesma lista não tem limite e não interfere em nenhum tamanho.
+  assert.equal((await admin.query('select quantity_requested from public.event_items where id=$1', [treat.id])).rows[0].quantity_requested, null)
+})
+
+async function organizerAction(event, action, payload = {}, user = alice) {
+  return (await as(user, 'select public.organizer_invitations($1,$2,$3) data', [event.id, action, payload])).rows[0].data
+}
+async function guestAction(token, action, payload = {}, client = admin) {
+  return (await client.query('select public.guest_action($1,$2,$3) data', [token, action, payload])).rows[0].data
+}
+async function familyFixture(capacity = 3) {
+  const event = await transition(await save(await create()), 'published')
+  assert.equal((await as(alice, 'select public.prepare_family_list($1) n', [event.id])).rows[0].n, 27)
+  assert.equal((await as(alice, 'select public.prepare_family_list($1) n', [event.id])).rows[0].n, 0)
+  const invite = await organizerAction(event, 'create', { name: 'Família fictícia', kind: capacity === 1 ? 'individual' : 'family', capacity })
+  const access = await guestAction(invite.token, 'exchange')
+  return { event, invite, token: access.session_token, snapshot: access.snapshot }
+}
+function request(payload) { return { ...payload, request_id: crypto.randomUUID() } }
+
+test('lista familiar: quatro cotas, 23 mimos ilimitados; preparação repetida não duplica', async () => {
+  const f = await familyFixture()
+  assert.equal(f.snapshot.items.length, 27)
+  assert.deepEqual(Object.fromEntries(f.snapshot.items.filter(i => i.category === 'fralda').map(i => [i.diaper_size, i.limit])), { G: 19, M: 19, P: 6, XG: 6 })
+  assert.equal(f.snapshot.items.filter(i => i.category === 'mimo' && i.limit === null).length, 23)
+  await assert.rejects(organizerAction(f.event, 'list', {}, bob), /EVENT_NOT_FOUND/)
+  const listed = await organizerAction(f.event, 'list')
+  assert.equal(JSON.stringify(listed).includes(f.invite.token), false)
+  for (const role of ['anon', 'authenticated']) {
+    assert.equal((await admin.query("select has_function_privilege($1,'public.guest_action(text,text,jsonb)','EXECUTE') allowed", [role])).rows[0].allowed, false)
+    assert.equal((await admin.query("select has_table_privilege($1,'public.reservations','SELECT') allowed", [role])).rows[0].allowed, false)
+  }
+})
+test('RSVP: limites familiares, resposta atual e total do painel, sem multiplicar presentes', async () => {
+  const f = await familyFixture()
+  await assert.rejects(guestAction(f.token, 'rsvp', request({ response: 'yes', attending: 4, version: 1 })), { code: '23514' })
+  const payload = request({ response: 'yes', attending: 3, version: 1 })
+  const confirmed = await guestAction(f.token, 'rsvp', payload)
+  const replay = await guestAction(f.token, 'rsvp', payload)
+  assert.deepEqual(replay.result, confirmed.result)
+  assert.equal(confirmed.snapshot.invitation.attending, 3)
+  assert.equal(confirmed.snapshot.items.every(i => i.committed === 0), true)
+  await assert.rejects(guestAction(f.token, 'rsvp', request({ response: 'no', attending: 0, version: 1 })), /RESPONSE_VERSION_CONFLICT/)
+  await guestAction(f.token, 'rsvp', request({ response: 'no', attending: 0, version: 2 }))
+  assert.equal((await organizerAction(f.event, 'list')).invitations[0].attending, 0)
+  const individual = await familyFixture(1)
+  await assert.rejects(guestAction(individual.token, 'rsvp', request({ response: 'yes', attending: 2, version: 1 })), { code: '23514' })
+})
+test('mimos sem limite: repetição idempotente, compras e cancelamentos não alteram fraldas', async () => {
+  const f = await familyFixture()
+  const item = f.snapshot.items.find(i => i.title === 'Aspirador nasal bebê')
+  const payload = request({ item_id: item.id, quantity: 12, version: null })
+  const first = await guestAction(f.token, 'reserve', payload)
+  assert.deepEqual((await guestAction(f.token, 'reserve', payload)).result, first.result)
+  await assert.rejects(guestAction(f.token, 'reserve', { ...payload, quantity: 13 }), /IDEMPOTENCY_CONFLICT/)
+  const purchased = await guestAction(f.token, 'purchase', request({ item_id: item.id, version: 1 }))
+  assert.equal(purchased.snapshot.items.find(i => i.id === item.id).committed, 12)
+  const cancelled = await guestAction(f.token, 'cancel', request({ item_id: item.id, version: 2 }))
+  assert.equal(cancelled.snapshot.items.find(i => i.id === item.id).committed, 0)
+  assert.equal(cancelled.snapshot.items.filter(i => i.category === 'fralda').every(i => i.committed === 0), true)
+})
+test('fraldas: pedidos simultâneos disputam última unidade sem excesso', async () => {
+  const f = await familyFixture()
+  const second = await organizerAction(f.event, 'create', { name: 'Outra pessoa', kind: 'individual', capacity: 1 })
+  const token2 = (await guestAction(second.token, 'exchange')).session_token
+  const item = f.snapshot.items.find(i => i.diaper_size === 'P')
+  const stock = (await admin.query('select * from public.event_items where id=$1', [item.id])).rows[0]
+  await updateGift(stock, 1)
+  const c1 = server.getPgClient(); const c2 = server.getPgClient(); const blocker = server.getPgClient()
+  await Promise.all([c1.connect(), c2.connect(), blocker.connect()])
+  try {
+    await blocker.query('begin'); await blocker.query('select 1 from public.event_items where id=$1 for update', [item.id])
+    const attempts = Promise.allSettled([
+      guestAction(f.token, 'reserve', request({ item_id: item.id, quantity: 1, version: null }), c1),
+      guestAction(token2, 'reserve', request({ item_id: item.id, quantity: 1, version: null }), c2),
+    ])
+    await blocker.query('commit')
+    const results = await attempts
+    assert.equal(results.filter(r => r.status === 'fulfilled').length, 1)
+    assert.match(results.find(r => r.status === 'rejected').reason.message, /INSUFFICIENT_QUANTITY/)
+    assert.equal((await guestAction(f.token, 'read')).snapshot.items.find(i => i.id === item.id).committed, 1)
+  } finally { await blocker.query('rollback'); await Promise.all([c1.end(), c2.end(), blocker.end()]) }
+})
+test('reserva impede redução abaixo do comprometido e acesso entre eventos', async () => {
+  const f = await familyFixture(); const other = await familyFixture()
+  const item = f.snapshot.items.find(i => i.diaper_size === 'M')
+  await guestAction(f.token, 'reserve', request({ item_id: item.id, quantity: 3, version: null }))
+  await assert.rejects(guestAction(other.token, 'reserve', request({ item_id: item.id, quantity: 1, version: null })), /ITEM_NOT_FOUND/)
+  const stored = (await admin.query('select * from public.event_items where id=$1', [item.id])).rows[0]
+  await assert.rejects(updateGift(stored, 2), /QUANTITY_BELOW_COMMITTED/)
+  await transition(f.event, 'closed')
+  await assert.rejects(guestAction(f.token, 'reserve', request({ item_id: item.id, quantity: 4, version: 1 })), /EVENT_CLOSED/)
+  const cancelled = await guestAction(f.token, 'cancel', request({ item_id: item.id, version: 1 }))
+  assert.equal(cancelled.snapshot.items.find(i => i.id === item.id).committed, 0)
+})
+test('revogação/rotação preservam respostas e invalidam tokens e sessões anteriores', async () => {
+  const f = await familyFixture()
+  await guestAction(f.token, 'rsvp', request({ response: 'yes', attending: 2, version: 1 }))
+  await organizerAction(f.event, 'revoke', { id: f.invite.id })
+  await assert.rejects(guestAction(f.token, 'read'), /GUEST_SESSION_INVALID/)
+  await assert.rejects(guestAction(f.invite.token, 'exchange'), /GUEST_SESSION_INVALID/)
+  const newInvite = await organizerAction(f.event, 'rotate', { id: f.invite.id })
+  assert.equal((await guestAction(newInvite.token, 'exchange')).snapshot.invitation.attending, 2)
+  await assert.rejects(guestAction(f.invite.token, 'exchange'), /GUEST_SESSION_INVALID/)
+  await admin.query("update private.invitations set expires_at=now()-interval '1 second' where id=$1", [f.invite.id])
+  await assert.rejects(guestAction(newInvite.token, 'exchange'), /GUEST_SESSION_INVALID/)
+})
+
+test('troca de tamanho é atômica: destino esgotado preserva origem; sucesso transfere', async () => {
+  const f = await familyFixture()
+  const from = f.snapshot.items.find(i => i.diaper_size === 'M')
+  const to = f.snapshot.items.find(i => i.diaper_size === 'P')
+  await guestAction(f.token, 'reserve', request({ item_id: from.id, quantity: 7, version: null }))
+  await assert.rejects(guestAction(f.token, 'swap', request({ from_item_id: from.id, item_id: to.id, version: 1, destination_version: null })), /INSUFFICIENT_QUANTITY/)
+  let current = (await guestAction(f.token, 'read')).snapshot
+  assert.equal(current.items.find(i => i.id === from.id).committed, 7)
+  assert.equal(current.items.find(i => i.id === to.id).committed, 0)
+  await guestAction(f.token, 'reserve', request({ item_id: from.id, quantity: 3, version: 1 }))
+  const payload = request({ from_item_id: from.id, item_id: to.id, version: 2, destination_version: null })
+  const moved = await guestAction(f.token, 'swap', payload)
+  assert.deepEqual((await guestAction(f.token, 'swap', payload)).result, moved.result)
+  current = moved.snapshot
+  assert.equal(current.items.find(i => i.id === from.id).committed, 0)
+  assert.equal(current.items.find(i => i.id === to.id).committed, 3)
 })

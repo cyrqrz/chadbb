@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
+import { cleanupUsers, localConfig } from '../support/local.mjs'
 
 // Somente a stack local do CLI: nenhuma URL ou credencial remota é aceita.
 let admin, alice, bob, guest, event, aliceId, bobId
@@ -35,8 +36,7 @@ after(async () => {
     for (const bucket of ['event-public', 'event-private']) await admin.storage.from(bucket).remove(objects)
   }
   if (userIds.length) {
-    await admin.from('events').delete().in('owner_id', userIds)
-    for (const id of userIds) await admin.auth.admin.deleteUser(id)
+    await cleanupUsers(localConfig(), userIds)
   }
 })
 test('API real: organizador cria evento e RLS impede leitura e escritas cruzadas', async () => {

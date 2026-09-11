@@ -1,6 +1,8 @@
 export function errorMessage(error: unknown): string {
   const object = error && typeof error === 'object' ? error as { message?: string; code?: string; status?: number } : {}
   const messages: Record<string, string> = {
+    EVENT_NOT_PUBLISHED: 'Publique o evento antes de criar convites.',
+    INVITATION_NOT_FOUND: 'Convite não encontrado ou sem permissão.',
     AUTH_REQUIRED: 'Sua sessão expirou. Entre novamente.',
     EVENT_NOT_FOUND: 'Evento não encontrado ou sem permissão de acesso.',
     EVENT_CLOSED: 'Este evento está encerrado e não pode ser alterado.',
@@ -14,6 +16,9 @@ export function errorMessage(error: unknown): string {
     ITEM_VERSION_CONFLICT: 'A quantidade mudou em outra aba. Recarregue a versão salva antes de tentar novamente.',
     QUANTITY_BELOW_COMMITTED: 'A quantidade não pode ser menor que o total já reservado.',
     RESERVATION_INTEGRATION_REQUIRED: 'A alteração de quantidades está temporariamente indisponível.',
+    DIAPER_LIMIT_REQUIRED: 'Cada tamanho de fralda precisa de um limite de pacotes.',
+    TREAT_HAS_NO_LIMIT: 'Mimos não têm limite de quantidade: o convidado informa quanto vai levar.',
+    DIAPER_SIZE_ALREADY_LISTED: 'Este tamanho de fralda já está na lista deste evento.',
     INVALID_COVER: 'Imagem inválida para este evento. Envie a imagem novamente.',
   }
   if (object.message && messages[object.message]) return messages[object.message]

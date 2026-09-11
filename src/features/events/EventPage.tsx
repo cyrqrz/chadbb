@@ -6,20 +6,23 @@ import { coverUrl, eventKeys, getEvent, saveEvent, transitionEvent, uploadCover 
 import { statusLabels, toDraft, validateDraft, validateImage } from './model'
 import type { EventDraft, EventRecord } from './model'
 import { errorMessage } from '../../lib/errors'
+import { live } from '../../lib/query'
 import { useAuth } from '../auth/context'
 
 export function EventPage() {
   const { id = '' } = useParams()
   const { session } = useAuth()
-  const query = useQuery({ queryKey: [...eventKeys.detail(id), session?.user.id], queryFn: () => getEvent(id), retry: false, refetchOnWindowFocus: false })
+  const query = useQuery({ queryKey: [...eventKeys.detail(id), session?.user.id], queryFn: () => getEvent(id), retry: false, ...live })
   if (query.isPending) return <p role="status" className="py-12">Carregando evento…</p>
   if (query.isError) return <section className="page"><p role="alert">{errorMessage(query.error)}</p><button className="secondary mt-5" onClick={() => void query.refetch()}>Tentar novamente</button></section>
   if (!query.data) return <section className="page"><h1 className="page-title">Evento não encontrado</h1><p className="mt-4">Confira o endereço e se está na conta correta.</p><Link className="text-link mt-5 inline-block" to="/eventos">Voltar aos eventos</Link></section>
-  return <EventEditor key={query.data.id} initial={query.data} />
+  return <EventEditor key={query.data.id} server={query.data} refreshing={query.isFetching} />
 }
-function EventEditor({ initial }: { initial: EventRecord }) {
-  const [record, setRecord] = useState(initial)
-  const [draft, setDraft] = useState(() => toDraft(initial))
+// `server` acompanha a consulta; `record` é a versão que este formulário editou.
+// O rascunho digitado nunca é substituído por uma atualização recebida.
+function EventEditor({ server, refreshing }: { server: EventRecord; refreshing: boolean }) {
+  const [record, setRecord] = useState(server)
+  const [draft, setDraft] = useState(() => toDraft(server))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState('')
@@ -27,11 +30,18 @@ function EventEditor({ initial }: { initial: EventRecord }) {
   const [publicConsent, setPublicConsent] = useState(false)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const cache = useQueryClient()
+  const { session } = useAuth()
   const closed = record.status === 'closed'
+  // Comparação por maior, e não por diferente: resposta antiga que chegue fora de
+  // ordem depois de salvar não deve ser anunciada como alteração de outra sessão.
+  const outdated = server.version > record.version
   const dirty = JSON.stringify(draft) !== JSON.stringify(toDraft(record)) || imageFile !== null
   const update = (name: keyof EventDraft, value: string) => { setDraft(current => ({ ...current, [name]: value })); setMessage('') }
   async function accept(event: EventRecord) {
     setRecord(event); setDraft(toDraft(event)); setImageFile(null); setPublicConsent(false)
+    // Resultado confirmado pelo servidor entra no cache antes da reconsulta, para
+    // a tela não voltar por um instante ao estado anterior.
+    cache.setQueryData([...eventKeys.detail(event.id), session?.user.id], event)
     await cache.invalidateQueries({ queryKey: eventKeys.all })
   }
   async function save(e: FormEvent) {
@@ -70,8 +80,10 @@ function EventEditor({ initial }: { initial: EventRecord }) {
   }
   return <section className="page max-w-3xl">
     <Link to="/eventos" className="text-link">← Seus eventos</Link>
-    <div className="mt-7 flex flex-wrap items-center gap-4"><h1 className="page-title">Detalhes do evento</h1><span className="badge">{statusLabels[record.status]}</span></div>
+    <div className="mt-7 flex flex-wrap items-center gap-4"><h1 className="page-title">Detalhes do evento</h1><span className="badge">{statusLabels[record.status]}</span>{refreshing && <span className="text-sm text-stone-600">Atualizando…</span>}</div>
+    {outdated && <div role="status" className="notice mt-6"><p>Este evento mudou em outra sessão. O que você digitou continua aqui.</p><button className="text-link mt-3" disabled={busy} onClick={() => void reload()}>Recarregar dados</button></div>}
     <Link to={`/eventos/${record.id}/presentes`} className="secondary mt-6 inline-block">Lista de presentes →</Link>
+    <Link to={`/eventos/${record.id}/convites`} className="secondary mt-6 ml-3 inline-block">Convites e confirmações →</Link>
     {closed && <p className="notice mt-6">Este evento foi encerrado. Os detalhes estão disponíveis apenas para consulta.</p>}
     <form onSubmit={save} className="mt-8 space-y-8">
       <fieldset disabled={busy || closed} className="space-y-5">

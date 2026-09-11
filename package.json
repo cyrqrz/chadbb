@@ -20,7 +20,9 @@
     "db:test": "supabase test db --local",
     "test:db:portable": "node --test tests/database/*.integration.mjs",
     "test:e2e": "playwright test",
-    "test:api": "node --test tests/api/*.integration.mjs"
+    "test:api": "node --test tests/api/*.integration.mjs",
+    "test:browser:local": "node --test tests/browser/*.integration.mjs",
+    "guest:serve": "supabase functions serve guest"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",
@@ -30,6 +32,7 @@
     "react-router-dom": "^7.18.3"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/vite": "^4.3.3",

@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createEvent, eventKeys, listEvents } from './api'
 import { statusLabels } from './model'
 import { errorMessage } from '../../lib/errors'
+import { live } from '../../lib/query'
 import { useAuth } from '../auth/context'
 
 export function EventsPage() {
@@ -14,14 +15,14 @@ export function EventsPage() {
   const [title, setTitle] = useState('')
   const navigate = useNavigate()
   const cache = useQueryClient()
-  const query = useQuery({ queryKey: [...eventKeys.all, session?.user.id, page], queryFn: () => listEvents(page) })
+  const query = useQuery({ queryKey: [...eventKeys.all, session?.user.id, page], queryFn: () => listEvents(page), ...live })
   const create = useMutation({ mutationFn: createEvent, onSuccess: async event => {
     await cache.invalidateQueries({ queryKey: eventKeys.all })
     navigate(`/eventos/${event.id}`)
   } })
   function submit(e: FormEvent) { e.preventDefault(); if (!create.isPending) create.mutate(title) }
   return <section className="page">
-    <div className="flex flex-wrap items-center justify-between gap-6"><div><p className="eyebrow">Organize com carinho</p><h1 className="page-title">Seus eventos</h1></div><button className="button" onClick={() => setCreating(!creating)}>{creating ? 'Fechar formulário' : 'Criar evento'}</button></div>
+    <div className="flex flex-wrap items-center justify-between gap-6"><div><p className="eyebrow">Organize com carinho</p><h1 className="page-title">Seus eventos</h1>{query.isFetching && <p className="mt-2 text-sm text-stone-600">Atualizando…</p>}</div><button className="button" onClick={() => setCreating(!creating)}>{creating ? 'Fechar formulário' : 'Criar evento'}</button></div>
     {creating && <form onSubmit={submit} className="card mt-8 space-y-4"><label className="field">Nome do evento<input autoFocus maxLength={120} placeholder="Chá de bebê da família" value={title} onChange={e => setTitle(e.target.value)} /></label><p className="text-sm text-stone-600">Você pode completar os detalhes depois.</p><button className="button" disabled={create.isPending}>{create.isPending ? 'Criando…' : 'Criar rascunho'}</button>{create.error && <p role="alert" className="error">{errorMessage(create.error)}</p>}</form>}
     {query.isPending ? <p role="status" className="mt-10">Carregando eventos…</p> : query.isError ? <div role="alert" className="notice mt-10"><p>{errorMessage(query.error)}</p><button className="text-link mt-3" onClick={() => void query.refetch()}>Tentar novamente</button></div> : <>
       {query.data.events.length === 0 ? <div className="card mt-10"><h2 className="text-xl font-semibold">Seu primeiro encontro começa aqui.</h2><p className="mt-3 text-stone-600">Crie um evento para preparar os detalhes do chá de bebê.</p></div> :
