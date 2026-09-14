@@ -1,173 +1,237 @@
-# Plano de execução do MVP do chadbb
+# Plano de entrega — chá de bebê da família
 
-Data: 2026-09-09
-Base: [ADR 001 — Arquitetura do MVP de eventos e listas de presentes](ADR-001-arquitetura-mvp-eventos-presentes.md)
-Status: execução iniciada em 2026-09-09; base, organizador, catálogo/lista e convites familiares/RSVP (etapa 4) implementados. APIs Supabase locais e navegador com APIs simuladas validados em 2026-09-11; login por e-mail e convite familiar de ponta a ponta validados localmente; aceite remoto e completo permanece pendente. Evidências: [validação local](VALIDACAO-LOCAL-2026-09-11.md).
+Revisado em 2026-09-14 por solicitação do idealizador.
 
-Acompanhamento: [contrato inicial](CONTRATO-PILOTO.md) e [evidências da base](EXECUCAO-BASE.md). Segunda entrega: [organizador e testes](EXECUCAO-ORGANIZADOR.md). O aceite do piloto permanece pendente.
+Data do chá: **01/11/2026**. Horário: **12h, horário de Brasília**. Título: **Chá de bebê da Liz**.
+Confirmação solicitada até **18/10/2026**. Local recebido no convite e mantido
+fora do repositório público. Suporte técnico: Leonardo Martins (solicitante). Limites globais: P 6 / M 19 / G 19 / XG 6; sem cota
+comercial adicional por convite.
 
-## Objetivo e ponto de partida
+## Objetivo e prioridade
 
-Entregar um piloto de chá de bebê no qual o organizador publica o evento, monta a lista e compartilha convites familiares. Pelo celular, o convidado confirma presença, reserva presentes, acessa a loja e pode declarar a compra. O organizador acompanha confirmações e quantidades comprometidas.
+Entregar uma ferramenta pronta para o irmão do solicitante organizar seu chá de
+bebê e para os convidados usarem pelo celular, principalmente via WhatsApp.
+O sucesso desta entrega é o evento funcionar: convidados entendem o convite,
+confirmam presença e escolhem presentes; o organizador acompanha informações
+corretas sem precisar atualizar planilhas ou recarregar a página manualmente.
 
-Na elaboração deste plano, o repositório continha somente o ADR. A execução da base começou em 2026-09-09; os itens concluídos estão assinalados abaixo. A sequência usa React, Vite, TypeScript, Tailwind, React Router, TanStack Query, Supabase e Cloudflare Pages conforme o ADR; não pressupõe infraestrutura já criada.
+Design profissional, acessibilidade, privacidade e integridade do banco fazem
+parte do MVP. A transformação em produto comercial começa após o uso pela família.
+Este plano substitui o [plano anterior](PLANO-PRODUTO-HISTORICO.md) no escopo e na
+ordem de execução. O ADR continua como base técnica, com o adendo de escopo atual.
 
-O MVP estará concluído quando o fluxo completo funcionar no ambiente do piloto e os critérios de segurança, concorrência e recuperação deste plano tiverem evidências de aprovação.
+## Escopo da primeira entrega
 
-## Escopo e organização
-
-Inclui autenticação do organizador, eventos, catálogo manual, itens, convites, sessões de convidados, RSVP, reservas, declaração de compra, prévia pública, links de afiliados e métricas mínimas. Catálogo será mantido inicialmente por operação administrativa restrita, sem exigir um painel administrativo próprio.
-
-Ficam fora: pagamentos, checkout, aplicativo nativo, importação automática de produtos, atualização de preços/estoque, compra verificada, notificações automáticas, outbox, broker, API Python e fluxos específicos de outros tipos de evento.
-
-Cada identificador abaixo pode virar uma tarefa no backlog. Uma etapa só está pronta quando sua entrega e seus critérios de aceite forem atendidos. Produto resolve regras e conteúdo; engenharia implementa e verifica; operação prepara ambiente, recuperação e suporte. Uma mesma pessoa pode assumir mais de um papel, mas os responsáveis devem ser nomeados ao iniciar o trabalho.
-
-## Etapa 0 — Fechar o contrato do piloto
-
-Dependência: nenhuma. Responsáveis: produto e engenharia.
-
-- [x] P0.1 Registrar concordância com a stack proposta ou revisar o ADR antes de implementar uma alternativa.
-- [x] P0.2 Descrever a jornada de organizador e convidado, com telas e estados de erro, vazio e carregamento.
-- [x] P0.3 Separar campos públicos do evento, campos restritos ao convite e dados exclusivos do organizador. Endereço privado e identificação dos convidados nunca entram na prévia pública.
-- [x] P0.4 Confirmado: convite por família, integrantes cadastrados pelo organizador e RSVP por pessoa sem login.
-- [x] P0.5 Abrir registros de decisão para duração da sessão, expiração do convite, limites por convite, recuperação de acesso, ações após encerramento e retenção/exclusão de dados.
-- [ ] P0.6 Listar parceiros pretendidos e a validação necessária para links, imagens, preços e rastreamento. Cada parceiro só é habilitado publicamente após validação própria.
-
-Aceite: jornada e classificação de dados registradas; pendências com responsável e marco de resolução. Pendências comerciais não bloqueiam a base técnica.
-
-## Etapa 1 — Preparar projeto e ambientes
-
-Dependência: escolha da stack em P0.1. Responsável: engenharia.
-
-- [x] P1.1 Criar aplicação com React, Vite e TypeScript; configurar Tailwind, Router e Query.
-- [x] P1.2 Adotar estrutura inicial: `src/features/` para fluxos, `src/components/` para componentes compartilhados, `src/lib/` para integrações, `supabase/migrations/`, `supabase/functions/`, `functions/` para a prévia no Pages e `tests/` para verificações de integração e ponta a ponta.
-- [ ] P1.3 Configurar ambiente local reproduzível e dados fictícios; separar desenvolvimento do projeto de produção. Escolher região considerando banco, funções e público do piloto.
-- [x] P1.4 Criar `.env.example` com nomes e instruções, sem valores secretos. Variáveis expostas ao frontend contêm apenas configuração pública e chave de cliente apropriada; credenciais privilegiadas ficam no servidor.
-- [ ] P1.5 Configurar lint, checagem de tipos, build e execução dos testes existentes em CI. Validar migrations em banco limpo e impedir testes destrutivos contra produção.
-- [ ] P1.6 Preparar deploy de preview no Cloudflare Pages, fallback das rotas da SPA e documentação de execução local.
-
-Aceite: outra pessoa consegue iniciar a aplicação e o banco seguindo o README; CI e preview funcionam; segredos não aparecem no repositório ou bundle.
-
-## Etapa 2 — Organizador, eventos e isolamento de dados
-
-Dependência: etapa 1 e classificação de dados de P0.3. Responsável: engenharia.
-
-- [x] P2.1 Implementar migrations de `events`, proprietário, tipo, campos do evento e estados `draft`, `published` e `closed`, com restrições e índices.
-- [ ] P2.2 Implementar login, logout e tratamento de sessão expirada via Supabase Auth; configurar URLs de retorno por ambiente e o mecanismo de acesso escolhido para o piloto.
-- [x] P2.3 Criar telas para listar, criar, editar, publicar e encerrar eventos. Validar os campos obrigatórios na publicação.
-- [x] P2.4 Ativar RLS e permissões mínimas; proteger inserção e atualização contra troca indevida de proprietário. Usar operações controladas para transições que participam das regras transacionais.
-- [ ] P2.5 Implementar upload de imagens com políticas por proprietário, limites de tamanho/tipo e separação entre arquivos públicos e privados.
-- [ ] P2.6 Criar testes de API com dois organizadores, cobrindo leitura, inserção, edição e exclusão cruzadas, inclusive adulteração de IDs.
-
-Aceite: o organizador gerencia seu evento; chamadas diretas não acessam nem alteram eventos ou arquivos de outro proprietário; encerramento possui operação compatível com o protocolo de bloqueios do ADR.
-
-## Etapa 3 — Catálogo e lista de presentes
-
-Dependência: etapa 2. Responsável: engenharia; produto prepara catálogo.
-
-- [ ] P3.1 Criar `products` e `event_items` com chaves estrangeiras, quantidades positivas e índices de consulta por evento.
-- [ ] P3.2 Disponibilizar procedimento administrativo documentado para cadastrar produtos e links oficiais. Restringir escrita do catálogo à administração.
-- [ ] P3.3 Validar URLs HTTPS e destinos aprovados no servidor; não buscar URLs arbitrárias nem criar redirecionamento aberto. Usar apenas conteúdo e imagens autorizados.
-- [ ] P3.4 Criar interface para selecionar produtos e definir quantidades no evento; permitir leitura do catálogo necessária a esse fluxo.
-- [ ] P3.5 Definir contratos das funções transacionais de reserva, cancelamento, declaração de compra, alteração de quantidade e encerramento: entrada, ator, saída e erros de domínio.
-- [ ] P3.6 Preparar alteração de quantidade com bloqueio de evento e item. Concluir e testar a verificação do total comprometido quando `reservations` existir na etapa 5; impedir exclusões ou outras escritas que contornem essa regra.
-
-Aceite: organizador monta a lista com produtos do catálogo; usuário comum não altera produtos; quantidade inválida é rejeitada também fora da interface. A proteção contra redução abaixo do comprometido é aceite obrigatório da etapa 5.
-
-## Etapa 4 — Convites, sessões e RSVP
-
-Dependência: etapa 2, unidade de convite definida e contratos da etapa 3. Responsável: engenharia.
-
-- [x] P4.1 Criar `invitations`, `guest_sessions` e `rsvps`. Manter hashes e dados de sessão fora da área exposta aos clientes; garantir uma resposta atual por pessoa da família.
-- [x] P4.2 Implementar emissão, expiração e revogação de convites em operações autorizadas para o proprietário. Gerar tokens criptográficos e armazenar apenas hashes.
-- [x] P4.3 Implementar troca do token no fragmento por sessão via POST; remover o segredo da URL e manter a credencial de sessão em memória, enviada em cabeçalho de autorização.
-- [x] P4.4 Resolver identidade e evento pela sessão no servidor. Verificar expiração e revogação do convite a cada ação; nunca confiar em identidade livremente enviada pelo cliente.
-- [x] P4.5 Criar Edge Functions para consulta autorizada do evento e atualização do RSVP; retornar apenas dados permitidos e permitir alterar a resposta atual até o início do evento; depois somente consulta.
-- [x] P4.6 Implementar limitação de tentativas por IP e convite com estado compartilhado, validação de payload e origens permitidas. Reutilizar essa proteção nas mutações da etapa 5.
-- [x] P4.7 Criar telas de convites do organizador e fluxo móvel do convidado, incluindo link inválido, sessão expirada e orientação para reabrir o convite após recarregar a página.
-- [x] P4.8 Testar token inválido, expirado e revogado, sessão expirada, revogação de sessões existentes, acesso entre eventos e ausência de leitura direta de dados privados.
-
-Validação local: 24 testes de banco (`test:db:portable`), 48 asserções pgTAP (`db:test`, `supabase/tests/invitations.test.sql`) e 6 cenários de integração contra a Edge Function real (`test:api`, `tests/api/guest.integration.mjs`), além do ensaio com navegador/Edge Function reais; evidências em `VALIDACAO-LOCAL-2026-09-11.md`. Os testes pgTAP e de Edge Function fecham os cenários que restavam: convite com prazo explícito vencido, formato de credencial inválido, limite de 60 requisições por minuto por IP, origem não autorizada, método/`Content-Type`/tamanho de payload inválidos e ausência de leitura direta do schema privado mesmo por `service_role`.
-
-Aceite: convite permite acessar o evento e responder RSVP; revogação bloqueia sessões já emitidas; nenhuma URL, log ou captura de analytics revela a credencial.
-
-## Etapa 5 — Reservas e integridade sob concorrência
-
-Dependência: etapas 3 e 4. Responsável: engenharia.
-
-- [ ] P5.1 Criar `reservations` com quantidade positiva, vínculos, estados `reserved`, `purchase_declared`, `cancelled` e unicidade por convite/chave de idempotência.
-- [ ] P5.2 Implementar reserva em uma única função SQL: validar vínculos, bloquear evento em modo compartilhado, confirmar publicação, bloquear item, resolver idempotência, calcular comprometimento e inserir.
-- [ ] P5.3 Tratar repetição concorrente da chave: mesmo payload retorna o resultado anterior; payload diferente retorna conflito. Comparar todos os campos relevantes, inclusive item e quantidade, e recuperar o resultado em conflito de unicidade.
-- [ ] P5.4 Implementar cancelamento, declaração de compra e alteração de quantidade obedecendo à ordem evento → item → reserva, quando aplicável. `reserved` e `purchase_declared` consomem disponibilidade; `cancelled` libera uma única vez.
-- [ ] P5.5 Garantir que encerramento obtenha bloqueio incompatível com novas reservas. Formalizar transições permitidas e as ações autorizadas após encerramento conforme P0.5.
-- [ ] P5.6 Proibir escrita direta em reservas, inclusive pelo organizador. Revisar grants, RLS e execução de funções: operações exclusivas do servidor inacessíveis a `anon` e `authenticated`; funções privilegiadas com `search_path` fixo e objetos qualificados.
-- [ ] P5.7 Integrar Edge Functions, validação de sessão e interface. Tratar indisponibilidade e conflito com mensagens claras; manter a mesma chave de idempotência nas retentativas do mesmo pedido.
-- [ ] P5.8 Cobrir as invariantes com testes reais de banco e chamadas concorrentes, usando conexões independentes e início coordenado. Não depender de mocks para comprovar bloqueios.
-
-Aceite obrigatório:
-
-| Cenário | Resultado esperado |
+| Entregar para o evento | Deixar para depois do evento |
 | --- | --- |
-| Dois convidados disputam a última unidade | Exatamente uma reserva bem-sucedida; total comprometido não excede o solicitado |
-| Mesma chave e mesmo pedido, inclusive simultâneos | Uma reserva e o mesmo resultado lógico nas respostas |
-| Mesma chave com item ou quantidade diferente | Conflito, sem nova reserva |
-| Cancelamento repetido ou concorrente | Disponibilidade liberada uma única vez |
-| Redução de quantidade concorrente com reserva | Quantidade solicitada nunca fica abaixo do comprometido |
-| Encerramento concorrente com reserva | Operações serializadas pelos bloqueios; reserva rejeitada se o encerramento prevalecer |
-| Convite de outro evento ou alteração de reserva alheia | Acesso negado sem alteração de dados |
-| Declaração de compra | Quantidade continua comprometida e interface informa que é autodeclarada |
+| Acesso do organizador, edição, publicação e encerramento do chá | Cadastro comercial, planos, cobrança e aquisição de clientes |
+| Convite compartilhável no WhatsApp e acesso simples sem conta para convidados | Outros tipos de evento e personalização por cliente |
+| Confirmação de presença e alteração da resposta | Campanhas, notificações automáticas e automações de marketing |
+| Lista com descrição clara, unidade e quantidade desejada | Catálogo de marketplace, importação e sincronização de preços/estoque |
+| Reserva, cancelamento e indicação opcional de presente comprado | Compra verificada, checkout, pagamentos e comissões |
+| Painel com confirmações, pessoas confirmadas conforme unidade do convite e presentes comprometidos/disponíveis | Analytics de produto, funil comercial e relatórios de afiliados |
+| Identidade visual do chá, interface acessível e responsiva | Editor de temas e sistema de identidade visual para vários clientes |
+| Hospedagem, backup recuperável e suporte simples para a família | Estrutura operacional para escala e vários clientes |
 
-## Etapa 6 — Experiência completa, compartilhamento e métricas
+A lista inicial pode ser preparada com apoio técnico usando o catálogo manual
+existente; não exige painel administrativo de produtos. Links de loja e prévia
+personalizada por evento são opcionais e não bloqueiam a entrega. O convite terá
+uma prévia genérica bem apresentada se a prévia personalizada ficar para depois.
+Links opcionais serão HTTPS revisados, sem rastreamento comercial; reservar um
+presente não dependerá de acessar uma loja. Não remover as proteções existentes.
 
-Dependência: etapas 4 e 5; parceiros aprovados para habilitar seus links publicamente. Responsáveis: engenharia e produto.
+## Presença, fraldas e mimos
 
-- [ ] P6.1 Concluir a página móvel com detalhes autorizados, RSVP, lista, disponibilidade indicativa, reservas próprias, cancelamento e declaração de compra.
-- [ ] P6.2 Concluir painel do organizador com confirmações, reservas e quantidades solicitadas, comprometidas e disponíveis, com paginação onde necessário.
-- [ ] P6.3 Implementar rota pequena em Pages Functions com HTML e metadados públicos de evento publicado. A prévia funciona sem o segredo do convite; escape de conteúdo e projeção explícita impedem vazamento de dados.
-- [ ] P6.4 Validar navegação e compartilhamento no WhatsApp, inclusive comportamento do fragmento, prévia, retorno da loja e sessão mantida ou expirada.
-- [ ] P6.5 Criar `affiliate_clicks` e registro de cliques que não bloqueie a navegação se falhar. Abrir link oficial diretamente, sem identificadores pessoais ou transição de estado da reserva.
-- [ ] P6.6 Registrar eventos publicados, convites acessados, RSVP, reservas e cliques por plataforma com identificadores mínimos. Definir deduplicação de acessos para distinguir convites únicos de trocas de sessão repetidas.
-- [ ] P6.7 Documentar comparação manual com relatórios dos parceiros: comissão confirmada separada de cliques e declarações; receita por evento apenas se houver atribuição permitida e demonstrável.
-- [ ] P6.8 Revisar acessibilidade básica, navegação por teclado, rótulos, contraste e estados de carregamento/erro. Executar fluxo completo em celular e navegador interno do WhatsApp.
+O fluxo do convidado terá áreas **Presença**, **Fraldas** e **Mimos**. Fraldas têm
+limites de pacotes por tamanho: **P: 6, M: 19, G: 19, XG: 6**. Cada convite
+pode escolher vários pacotes, respeitando os saldos por tamanho. Mimos são
+opcionais, em aba própria, com seleção de itens e quantidade por item, sem alterar
+limites de fraldas ou número de pessoas confirmadas.
 
-Aceite: organizador e convidado completam a jornada; prévia contém somente conteúdo aprovado; falha de métricas não impede abrir a loja; clique nunca aparece como compra confirmada.
+A [especificação de fraldas e mimos](FRALDAS-E-MIMOS.md) registra os 23 mimos,
+a ausência de limite para todos eles e os testes de independência. Os números
+originais dos mimos são referências sugeridas, não cotas. Cada unidade de fralda representa um pacote.
+Esses requisitos passam a integrar M1–M5 dentro do prazo já planejado.
 
-## Etapa 7 — Preparação operacional e liberação do piloto
+## Estado de partida em 11/09 (histórico)
 
-Dependência: etapas anteriores e pendências pré-piloto resolvidas. Responsáveis: engenharia, operação e produto.
+Avanço em 14/09: M2–M4 implementados e testes locais/CI aprovados conforme
+a [revisão técnica](REVISAO-TECNICA-2026-09-14.md). M5 segue com ensaios de
+falha de rede, reabertura e acessibilidade; M6 depende de configuração do
+ambiente do evento, recuperação e aceite da família. A tabela abaixo preserva
+o diagnóstico inicial, não representa o estado atual.
 
-- [ ] P7.1 Conferir condições atuais de hospedagem, banco, e-mail e backup; registrar orçamento, cotas, disponibilidade e responsáveis pelas contas. Os valores do ADR são referências a revalidar.
-- [ ] P7.2 Configurar produção, domínio, Auth, origens, segredos e políticas de segurança de conteúdo. Inspecionar bundle, logs e prévias para credenciais e dados privados.
-- [ ] P7.3 Definir rotina de backup, acesso às cópias, perda de dados tolerável e tempo de recuperação. Restaurar em ambiente separado e registrar evidência antes de cadastrar dados reais.
-- [ ] P7.4 Implementar e testar retenção/exclusão de convidados, sessões e dados relacionados; documentar também o tratamento de cópias de backup.
-- [ ] P7.5 Monitorar erros, latência, contenção de reservas, consumo de banco/arquivos/saída e limitação de abuso. Definir quem verifica os indicadores durante o evento.
-- [ ] P7.6 Documentar suporte para convite perdido, revogação, expiração e ações após encerramento; aplicar limites e prazos definidos em P0.5.
-- [ ] P7.7 Preparar roteiro de implantação: migrations compatíveis, deploy de funções e frontend, verificação com dados fictícios e procedimento de recuperação. Reverter frontend não implica desfazer migrations; mudanças de dados exigem correção compatível ou restauração planejada.
-- [ ] P7.8 Executar ensaio com dois organizadores e convidados fictícios, cobrindo matriz de autorização, concorrência e jornada móvel. Registrar resultados e corrigir falhas impeditivas.
-- [ ] P7.9 Revisar critérios de liberação com o responsável do piloto; cadastrar o evento real e compartilhar convites após aprovação dos critérios.
-
-Aceite: restauração demonstrada, decisões operacionais registradas e nenhum defeito conhecido que permita acesso indevido, exposição de segredos, excesso de reservas ou bloqueio do fluxo principal.
-
-## Dependências e marcos de acompanhamento
-
-| Marco | Entregas | Evidência |
+| Área | Evidência atual | Falta para entregar |
 | --- | --- | --- |
-| M1 — Base executável | Etapas 0–1 | Ambiente reproduzível, CI e preview |
-| M2 — Organizador funcional | Etapas 2–3 | Evento com lista e isolamento entre proprietários |
-| M3 — Convite funcional | Etapa 4 | RSVP móvel e revogação testada |
-| M4 — Reserva consistente | Etapa 5 | Testes concorrentes e de autorização aprovados |
-| M5 — Jornada completa | Etapa 6 | Ensaio de compartilhamento, reserva e saída para loja |
-| M6 — Piloto liberado | Etapa 7 | Checklist, restauração e operação aprovados |
+| Aplicação e organizador | Implementados login, eventos e capas; lint, tipos, 40 testes unitários e build aprovados | Ensaio de login por e-mail no navegador com backend real; acabamento visual |
+| Banco e isolamento | 28 testes PostgreSQL portátil aprovados; versão/relógio impostos por trigger e identidade imutável | Reservas e convites ainda precisam de schema, autorização e testes; pgTAP e API por reexecutar com Docker |
+| API e arquivos | 3 testes reais aprovados para organizador e Storage | Testes reais da lista e fluxo completo do convidado |
+| Catálogo e lista | Categoria fralda/mimo, tamanho, limite por tamanho e ausência de limite nos mimos no schema, nas funções e no catálogo aplicado por migration | Abas e resumo separado na interface; validar API; conectar comprometimento às reservas |
+| Atualização da interface | Contrato implementado: sem cache apresentado como novo, reconsulta ao abrir/focar/reconectar, consulta de segurança de 5 s com recuo e respostas fora de ordem tratadas | Canal autorizado de notificação; medir as metas de p95 e propagação |
+| Convites, presença e reservas | Contratos de planejamento existentes | Implementação e ensaio completos |
+| Hospedagem e uso externo | Supabase local funcionando | Ambiente do evento, CI remota, acesso pelo celular e recuperação |
 
-O caminho crítico passa por ambiente → autorização → convites e itens → transações → jornada completa → liberação. Após a etapa 2, catálogo e convites podem avançar em paralelo se os contratos estiverem definidos. Validação de parceiros, conteúdo público e regras operacionais podem avançar desde a etapa 0. Limites de abuso entram com as primeiras operações de convidados, antes de exposição pública.
+Evidências: [validação local](VALIDACAO-LOCAL-2026-09-11.md).
+Testes antigos de navegador usaram APIs simuladas; não comprovam a jornada real.
 
-Não há datas ou capacidade de equipe informadas. Estimar esforço e atribuir datas por tarefa ao iniciar M1; revisar a previsão após M3, quando autorização e sessões estiverem demonstradas. Segurança, concorrência e restauração são condições de liberação, não itens opcionais para acomodar prazo.
+## M1 — Fechar a experiência e o visual
 
-## Avaliação após o piloto
+- [x] Registrar data do evento: **01/11/2026**.
+- [x] Definir quem prestará suporte: Leonardo Martins (solicitante). Volume confirmado: cerca de 50 convidados. Prazo informado: segunda semana de outubro de 2026, com aproximadamente 20 dias de desenvolvimento; dia exato ainda a confirmar.
+- [x] Escopo confirmado: o organizador escolhe individual ou familiar em cada convite.
+- [x] Implementar convite individual com uma pessoa e familiar com nome de referência e limite de pessoas definido pelo organizador. RSVP familiar informa quantas vão dentro desse limite; painel distingue convites respondidos de pessoas confirmadas.
+- [ ] Reunir título, data/hora, local, instruções, imagem autorizada e lista desejada. Usar dados fictícios durante desenvolvimento.
+- [x] Criar uma direção visual única: acolhedora, limpa, com tipografia legível, hierarquia, espaçamentos e cores consistentes. Paleta rosa alinhada ao convite recebido em 14/09, sem construir um editor de temas.
+- [ ] Aplicar o visual às telas de convite, confirmação, presentes e painel; mostrar estados de vazio, carregamento, sucesso e erro com a mesma qualidade.
+- [ ] Manter uma ação principal clara por etapa e linguagem simples: “Confirmar presença”, “Escolher presente”, “Cancelar reserva”. Explicar reserva e compra autodeclarada.
 
-- [ ] Registrar convites acessados, confirmações, reservas, cliques, erros e solicitações de suporte, com as limitações de medição documentadas.
-- [ ] Conversar com organizador e convidados sobre dificuldades de acesso, reserva, abertura de loja e entendimento da declaração de compra.
-- [ ] Comparar comissões confirmadas com relatórios permitidos dos parceiros; não usar o evento familiar isolado como comprovação da hipótese de receita.
-- [ ] Priorizar correções para o próximo evento. Reavaliar arquitetura somente com evidências de limites, custos, integrações ou necessidade de identidade mais forte, conforme o ADR.
+Aceite: revisão das telas principais em celular e desktop; nenhuma informação
+provisória confundida com informação real; caminho principal compreensível para
+o irmão e um convidado sem orientação técnica. O visual será implementado junto
+com cada fluxo, sem deixá-lo como acabamento opcional ao final.
 
-Primeira execução sugerida: concluir P0.1–P0.3 e P1.1–P1.5 para estabelecer a base verificável; manter as demais decisões da etapa 0 em acompanhamento até seus marcos obrigatórios.
+## M2 — Concluir organizador e lista com dados atuais
+
+- [x] Testar login por e-mail, callback, logout e sessão expirada com Supabase real.
+- [ ] Validar criação/edição/publicação do evento e lista pela API real, incluindo tentativa de outro usuário acessar ou alterar os dados.
+- [x] Preparar catálogo com fraldas P/M/G/XG e os 23 mimos da especificação; usar pacotes para fraldas, ausência explícita de limite em todos os mimos, inclusive os originalmente numerados.
+- [x] Implementar abas Fraldas e Mimos, quantidades por mimo e resumo separado; adaptar schema/API para categorias e política de limite própria por item.
+- [ ] Implementar a política de atualização abaixo em eventos, lista e futuros painéis.
+- [ ] Preservar alterações de formulário ainda não salvas quando chegar uma atualização; detectar conflito de versão e oferecer recarregar/revisar.
+
+Aceite: o organizador salva, recebe confirmação do banco e vê o resultado
+persistido; outra sessão vê a atualização sem precisar de recarga manual.
+
+### Contrato de atualização dos dados
+
+“Atualizado assim que chamado” significa buscar o estado persistido no servidor
+em cada consulta explicitamente solicitada. Cache não será apresentado como uma
+resposta nova. O banco é a fonte de verdade; a disponibilidade na tela é indicativa
+até a transação da reserva confirmar o resultado.
+
+- [ ] Ao abrir uma tela, trocar evento, solicitar atualização, recuperar a conexão ou retornar à aba, consultar novamente os dados dinâmicos. Tratar respostas fora de ordem para uma resposta antiga não substituir uma mais recente.
+- [ ] Dados em cache podem aparecer durante a consulta com indicação “Atualizando…”. Em falha, informar que não foi possível atualizar e oferecer tentar novamente; nunca apresentar sucesso falso ou falha como lista vazia.
+- [ ] Após salvar, reservar, cancelar ou confirmar presença, aplicar o resultado confirmado pelo servidor e reconsultar as listas e totais afetados. Confirmar salvamento apenas após a transação; se a reconsulta falhar, distinguir “salvo” de “painel ainda não atualizado”.
+- [ ] Para mudanças feitas por outras pessoas, usar notificação autorizada de alteração para disparar nova consulta. Não transmitir nomes, endereços, tokens ou reservas individuais em canais públicos. A consulta do convidado continua passando pelo servidor autorizado.
+- [ ] Manter consulta periódica de segurança a cada 5 segundos nas telas dinâmicas visíveis, com pausa em segundo plano e recuo em falhas; reconsultar imediatamente ao reconectar. Se o canal de notificações não estiver pronto, essa consulta será a estratégia inicial do MVP, com o limite comunicado.
+- [ ] Não cachear respostas privadas em CDN nem em service worker; isolar o cache por evento e identidade e limpar dados privados ao sair ou perder autorização. Configurar respostas privadas para não armazenamento HTTP.
+- [ ] Mostrar perda de conexão e impedir confirmação fictícia. Repetir uma reserva com a mesma chave de idempotência quando o resultado da tentativa anterior for desconhecido.
+
+Metas de aceite no ambiente do evento: resultado da própria ação aparece assim
+que a resposta confirmada chegar; consulta ou mutação com p95 de até 2 segundos
+na carga esperada; alterações de outra sessão aparecem em até 2 segundos com
+notificação e em até 7 segundos com consulta periódica, em rede normal. Medir e
+registrar essas metas com duas sessões e com a carga de 50 convidados ativos, além dos testes coordenados de disputa pela última unidade.
+São metas a validar, não garantias de instantaneidade sob falha de rede.
+
+## M3 — Convites e confirmação de presença
+
+- [x] Criar convites, sessões e respostas com tipo individual ou familiar selecionado pelo organizador. Permitir ambos no mesmo evento.
+- [x] Validar no banco: individual confirma exatamente uma pessoa; familiar confirma de 1 até o limite do convite; resposta negativa conta zero; “talvez” e ausência de resposta não entram em pessoas confirmadas. Atualizar resposta e quantidade na mesma transação.
+- [x] Usar um link por convite e um responsável de referência por família, sem exigir cadastro nominal de cada integrante. Reservas pertencem ao convite e são compartilhadas pela família; alterações concorrentes da resposta devem detectar conflito de versão.
+- [x] Impedir redução do limite abaixo da quantidade já confirmada e mudança de tipo incompatível com respostas existentes; orientar ajuste explícito sem descartar dados silenciosamente.
+- [x] Emitir, copiar, revogar e reemitir links pelo organizador; compartilhar manualmente no WhatsApp.
+- [x] Trocar token do convite por sessão, remover segredo da URL e validar expiração/revogação em toda leitura ou alteração. Guardar somente hashes no banco para credenciais.
+- [x] Permitir confirmar, recusar ou deixar “talvez” e alterar a resposta, sem exigir criação de conta do convidado.
+- [x] Mostrar apenas dados do evento e da própria resposta/reservas; não expor outros convidados.
+- [x] Aplicar limites de abuso, validação de entrada e recuperação compreensível para convite inválido ou sessão expirada.
+- [ ] Testar acesso cruzado, revogação, expiração, reabertura do link no WhatsApp, convite individual, família, limites e contagem de pessoas ao alterar uma resposta.
+
+Aceite: um convidado abre o link no celular, responde e vê sua resposta persistida;
+o painel do organizador atualiza conforme o contrato de dados. O fluxo de retorno
+à página precisa funcionar ou orientar claramente a reabertura do convite.
+
+## M4 — Reservas corretas no banco
+
+- [x] Implementar reservas com quantidades positivas, vínculos obrigatórios e chave de idempotência única por convite.
+- [x] Garantir limites P=6, M=19, G=19 e XG=6 separadamente no banco; mimos nunca alteram esses totais. Validar quantidade inteira positiva em todos os mimos, sem teto comercial por convite ou evento; não exibir esgotamento de mimos.
+- [x] Implementar troca de tamanho atômica, preservando escolha anterior se o destino não estiver disponível; testar reservas e cancelamentos nas duas categorias.
+- [x] Calcular e validar disponibilidade dentro da mesma transação SQL da reserva, com bloqueio evento → item → reserva quando aplicável. Não confiar na quantidade mostrada pelo navegador.
+- [x] Integrar `private.committed_quantity` na migration de reservas; nunca assumir zero quando já houver comprometimento.
+- [x] Permitir cancelar e indicar “Já comprei”, mantendo quantidade comprometida enquanto reservado/comprado; deixar claro que a compra é informada pelo convidado.
+- [x] Impedir escrita direta em reservas e alteração de identidade/evento pelo cliente. Preservar RLS, grants mínimos e funções privilegiadas restritas.
+- [ ] Integrar encerramento e regras pós-evento do contrato familiar.
+- [x] Cobrir os cenários abaixo com PostgreSQL real, conexões independentes e API autorizada. Evidências: revisão técnica e continuação M4/M5 no registro de execução.
+
+| Cenário obrigatório | Resultado |
+| --- | --- |
+| Duas pessoas disputam a última unidade | Exatamente uma reserva; nenhum excesso |
+| Clique duplo ou reenvio após timeout | Uma reserva e resultado recuperável para a mesma chave/pedido |
+| Mesma chave com item ou quantidade diferente | Conflito, sem segunda reserva |
+| Cancelamento repetido | Quantidade liberada uma única vez |
+| Redução de quantidade enquanto alguém reserva | Total solicitado nunca abaixo do comprometido |
+| Encerramento enquanto alguém reserva | Ordem definida pelos bloqueios; reserva recusada se encerramento prevalecer |
+| Acesso a reserva ou convite de outra pessoa | Negado, sem expor dados ou alterar registros |
+| Marcar como comprado | Continua consumindo disponibilidade; nenhuma confirmação de pagamento |
+
+Aceite: todas as invariantes passam no banco e na API; testes com duas telas
+confirmam atualização, mensagens de conflito e totais coerentes.
+
+## M5 — Acessibilidade e ensaio completo
+
+Estes requisitos acompanham M1–M4; esta etapa confirma o conjunto.
+
+- [ ] Navegação completa por teclado, ordem de foco previsível, foco visível e retorno correto após fechar diálogos; nenhuma armadilha de foco.
+- [ ] HTML semântico, títulos em ordem, nomes acessíveis, rótulos e instruções associados aos campos; erros identificados por texto e associados ao campo.
+- [ ] Contraste alvo de pelo menos 4,5:1 em texto comum e 3:1 em texto grande e componentes essenciais; estado nunca indicado apenas por cor.
+- [ ] Texto ampliado a 200% e tela de 320 px sem perda de ações ou rolagem horizontal no fluxo principal. Áreas de toque de pelo menos 44 × 44 px para ações principais.
+- [ ] Leitor de tela anuncia carregamento, erros e confirmações sem repetir todos os dados a cada sincronização. Imagens informativas têm descrição; decorativas são ignoradas.
+- [ ] Respeitar preferência por movimento reduzido; não usar animação obrigatória, texto em imagem ou controles dependentes de hover.
+- [ ] Testar a jornada real no celular, navegador interno do WhatsApp, desktop e ao voltar de outra aba, incluindo rede lenta, queda de conexão e sessão expirada.
+- [ ] Executar verificação automatizada de acessibilidade e inspeção manual com teclado e leitor de tela; corrigir problemas que impeçam concluir a jornada.
+- [ ] Ensaiar com o irmão e pelo menos um convidado: abrir convite, confirmar presença, escolher/trocar fralda, adicionar vários mimos com quantidades, cancelar escolhas e acompanhar totais separados no painel.
+
+Aceite: tarefas completas sem ajuda técnica; visual consistente, legível e sem
+cortes; nenhuma barreira conhecida que impeça uso dos fluxos essenciais.
+
+## M6 — Colocar no ar e entregar ao irmão
+
+- [ ] Configurar ambiente do evento separado do desenvolvimento, HTTPS, URLs de Auth e envio de e-mail; validar login e entrega do link nesse ambiente.
+- [ ] Executar CI e migrations em banco limpo; fazer implantação e verificação com dados fictícios antes de cadastrar dados da família.
+- [ ] Configurar backup e ensaiar restauração em ambiente separado. Registrar frequência, perda de dados tolerada e tempo de recuperação junto ao responsável.
+- [ ] Disponibilizar registro de erros sem dados privados, verificação de disponibilidade e procedimento simples para recuperar convites e acessos.
+- [x] Definir prazo de retenção e procedimento de exclusão de dados e imagens, incluindo tratamento de backups: 30 dias após o término, implementado e implantado no chadbb-cha em 2026-09-15.
+- [ ] Concluir ensaio de concorrência, atualização e acessibilidade no ambiente do evento; registrar falhas corrigidas e limites remanescentes.
+- [ ] Cadastrar conteúdo real, entregar acesso do organizador e instruções curtas, e liberar o envio dos convites após o ensaio com o irmão.
+
+Aceite final: URL acessível, conteúdo correto, fluxo completo aprovado pelo irmão,
+banco protegido e recuperável, dados atualizados conforme as metas verificadas e
+um responsável disponível para suporte até o evento. Publicar uma tela bonita ou
+passar testes isolados não basta para considerar a entrega concluída.
+
+## Sequência e responsabilidades
+
+Ordem: M1 → M2 → M3 → M4 → M5 → M6. Acessibilidade, visual e atualização de dados
+entram na implementação de cada tela. Preparação da hospedagem pode começar antes
+da conclusão das reservas para descobrir limitações de ambiente com antecedência.
+
+Engenharia: Codex em colaboração com o solicitante. Conteúdo, prioridades e acesso
+às contas: solicitante. Validação prática: irmão como organizador e um convidado.
+Volume confirmado: 50 convidados. Prazo solicitado: segunda semana de outubro de
+2026, com cerca de 20 dias de desenvolvimento. O prazo é para entregar a ferramenta;
+o chá ocorrerá em **1º de novembro de 2026**, conforme informado pelo solicitante.
+
+### Calendário de trabalho
+
+| Período de 2026 | Entrega planejada |
+| --- | --- |
+| 11–13 de setembro | M1: regras mínimas, direção visual e telas essenciais; iniciar preparação do ambiente remoto |
+| 14–17 de setembro | M2: organizador/lista integrados, visual e política de atualização |
+| 18–22 de setembro | M3: convites, confirmação e painel de presença |
+| 23–27 de setembro | M4: reservas, cancelamento, totais e testes de concorrência |
+| 28 de setembro–1º de outubro | M5 e preparação M6: jornada completa, acessibilidade, ensaio com 50 convidados simulados, deploy de teste e restauração |
+| 2–4 de outubro | Ensaio com o irmão, correções e entrega candidata pronta para uso |
+| Segunda semana de outubro | Margem final de suporte e ajustes; confirmar dia exato de entrega |
+
+O calendário é meta de execução, com revisão ao fim de cada marco. Se houver
+atraso, adiar prévia personalizada, links de lojas e enfeites visuais opcionais.
+Preservar convite, presença, reservas, painel, acessibilidade e integridade do
+banco. Preparar contas e envio de e-mail cedo para não concentrar dependências
+externas nos últimos dias. Não adicionar escopo comercial nesses 20 dias.
+
+## Depois do chá de bebê
+
+Registrar dificuldades da família, falhas e melhorias; corrigir os problemas
+observados antes de abrir a ferramenta a novos usuários. Só então revisar modelo
+comercial, afiliados, métricas, outros eventos, temas e operação para vários clientes.
+O backlog histórico é referência, não compromisso da entrega familiar.

@@ -12,8 +12,8 @@ const EventPage = lazy(() => import('./features/events/EventPage').then(m => ({ 
 
 const GiftListPage = lazy(() => import('./features/gifts/GiftListPage').then(m => ({ default: m.GiftListPage })))
 
-const InvitationsPage = lazy(() => import('./features/invitations/InvitationsPage').then(m => ({ default: m.InvitationsPage })))
-const GuestPage = lazy(() => import('./features/invitations/GuestPage').then(m => ({ default: m.GuestPage })))
+const GuestPage = lazy(() => import('./features/guests/GuestPage').then(m => ({ default: m.GuestPage })))
+const InvitationsPage = lazy(() => import('./features/guests/InvitationsPage').then(m => ({ default: m.InvitationsPage })))
 
 export function App() {
   return <QueryClientProvider client={queryClient}><BrowserRouter><AuthProvider>

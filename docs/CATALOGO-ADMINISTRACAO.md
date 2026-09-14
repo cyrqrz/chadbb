@@ -37,10 +37,45 @@ update public.products set active = false
 where id = '00000000-0000-4000-8000-000000000000';
 ```
 
+Cada revisão grava `updated_at` automaticamente; o valor enviado na escrita é
+descartado. `id`, `created_at`, `category` e `diaper_size` entram na regra de
+identidade imutável junto com plataforma e referência externa.
+
 Não exclua produtos referenciados: a FK bloqueia essa operação. Não altere o
 significado de um produto já escolhido; desative-o e cadastre o substituto.
-A migration não contém produtos comerciais. `supabase/seed.sql` cria seis exemplos
-fictícios somente na rotina local; não execute esse seed no piloto.
+Nenhuma migration contém produtos comerciais. O catálogo do chá — 4 tamanhos de
+fralda e os 23 mimos — entra por `20260911020000_family_catalog.sql` e vale em
+todos os ambientes; `supabase/seed.sql` fica vazio para não duplicar a lista.
+
+## Categoria, tamanho e limites
+
+Todo produto declara `category` (`fralda` ou `mimo`). Fraldas declaram também
+`diaper_size` (`P`, `M`, `G`, `XG`); mimos deixam o tamanho nulo. A categoria é
+explícita no cadastro e **nunca** inferida pelo título: "Toalha fralda" e
+"Fraldas de boca" são mimos. Categoria e tamanho entram na identidade imutável,
+junto com plataforma e referência externa — mudá-los transferiria saldos entre
+tamanhos ou categorias sem passar por reserva nenhuma.
+
+```sql
+insert into public.products (title, description, platform, external_reference, category, diaper_size)
+values ('Fraldas tamanho P', 'Uma unidade equivale a um pacote.', 'manual', 'cha:fralda-p', 'fralda', 'P');
+insert into public.products (title, description, platform, external_reference, category)
+values ('Mordedor', 'Uma unidade equivale a um mordedor.', 'manual', 'cha:mimo-mordedor', 'mimo');
+```
+
+Limite é por evento, não por produto: fica em `event_items.quantity_requested` e
+o organizador define pelas operações da lista. Fralda **sempre** tem limite de
+pacotes; mimo **nunca** tem, e o valor fica `NULL` — a restrição
+`event_items_limit_matches_category` impede as duas inversões. Um número num mimo
+viraria cota fantasma e apareceria como "esgotado" ao convidado, contrariando a
+decisão registrada em [FRALDAS-E-MIMOS](FRALDAS-E-MIMOS.md).
+
+Cada tamanho ocupa um único item por evento (`event_items_event_size_idx`): dois
+produtos "P" na mesma lista criariam dois saldos para o mesmo limite de 6 pacotes.
+Tentar isso devolve `DIAPER_SIZE_ALREADY_LISTED`. O mesmo tamanho em outro evento
+é um limite legítimo e independente.
+
+Valores confirmados para o chá: P 6, M 19, G 19, XG 6 — 50 pacotes no total.
 
 ## Links oficiais e aprovação de destinos
 

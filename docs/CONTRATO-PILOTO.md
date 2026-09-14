@@ -1,73 +1,103 @@
-# Contrato inicial do piloto
+# Contrato do MVP familiar
 
-Registro: 2026-09-09. Primeira execução do plano, autorizada pelo pedido de execução.
+Revisado em 2026-09-14. Referência vigente: [plano de entrega](PLANO-EXECUCAO-MVP.md).
 
-## Stack e responsabilidades
+## Entrega e responsáveis
 
-P0.1: seguir React, Vite, TypeScript, Tailwind, React Router, TanStack Query,
-Supabase e Cloudflare Pages, conforme ADR 001. Esta execução adota a proposta
-para implementação; não representa aprovação comercial nem liberação do piloto.
-O ADR existente foi preservado.
+A primeira entrega atende ao chá de bebê do irmão do solicitante, com cerca de
+50 convidados. O solicitante informou aproximadamente 20 dias de desenvolvimento
+e necessidade de entrega até a segunda semana de outubro de 2026. O dia exato de
+entrega ainda não foi informado. Data do chá confirmada: **01/11/2026**;
+horário confirmado no convite: **12h, horário de Brasília**. Conteúdo e local
+foram recebidos na imagem do convite e preparados fora do repositório. Planejar versão completa
+para ensaio até 1º de outubro e usar a margem seguinte para validação e correções.
 
-Engenharia desta entrega: Codex. Produto e operação: solicitante como ponto de
-contato; nomes dos responsáveis pelo piloto ainda precisam ser indicados.
-Não há prazo de entrega acordado. Sequência de esforço: base → organizador →
-convite → concorrência → jornada → operação. Estimativas e datas dependem de
-capacidade da equipe e serão registradas quando informadas, com revisão após M3.
+Engenharia: Codex e solicitante. Conteúdo e contas: solicitante. Aceite de uso:
+irmão como organizador, com ensaio de pelo menos um convidado. Responsável pelo
+suporte técnico, do envio dos convites ao dia do evento: Leonardo Martins (solicitante).
 
-## Jornada e estados (P0.2)
+Manter React, Vite, TypeScript, Tailwind, Router, TanStack Query, Supabase e
+Cloudflare Pages. O núcleo existente será aproveitado. Monetização, afiliados,
+analytics comercial, outros tipos de eventos e temas configuráveis ficam para
+uma fase posterior. A primeira entrega não depende de aprovação de parceiros.
 
-| Tela | Caminho principal | Vazio, carregamento e erro |
-| --- | --- | --- |
-| Acesso do organizador | Solicitar link por e-mail, abrir retorno, entrar; sair pelo painel | Envio em andamento; orientação para verificar e-mail; link expirado permite novo envio; sessão expirada retorna ao acesso |
-| Eventos | Listar os próprios eventos; criar rascunho | Lista carregando; primeiro evento com ação de criar; falha com retentativa |
-| Editor | Título, descrição pública, data/hora, local privado e imagem pública; salvar e publicar | Rascunho incompleto pode ser salvo; publicação exige título e data futura; erros junto aos campos; confirmação de encerramento |
-| Lista | Selecionar catálogo e quantidades positivas | Catálogo vazio; carregamento; erro de rede; redução abaixo do comprometido informa limite |
-| Convites | Nome da família e integrantes, emitir link familiar, copiar e revogar | Sem convites; emissão em andamento; link só apresentado na emissão; perda exige revogar e reemitir |
-| Convite no celular | Trocar token do fragmento via POST; limpar fragmento; mostrar evento autorizado | Troca em andamento sem analytics; token inválido, expirado ou revogado orienta procurar organizador; recarga orienta reabrir convite |
-| RSVP | Sim, não ou talvez por pessoa; alterar até o início do evento | Sem resposta; salvando; falha mantém escolha para retentativa |
-| Presentes | Consultar disponibilidade, reservar, cancelar ou declarar compra | Lista vazia; carregamento; última unidade indisponível atualiza lista; retentativa usa a mesma chave; compra identificada como autodeclarada |
-| Painel | Confirmações e quantidades solicitadas, comprometidas e disponíveis | Sem respostas/reservas; carregamento; erro recuperável; paginação |
-| Prévia pública | Título e descrição pública de evento publicado | Não publicado/inexistente retorna página genérica sem dados privados |
+## Jornada mínima
 
-Acesso, listagem e editor de eventos estão implementados na segunda entrega.
-Catálogo, convites familiares e RSVP estão implementados e validados localmente.
-Reservas, painel agregado e prévia continuam pendentes. Evidências atuais em
-VALIDACAO-LOCAL-2026-09-11.md.
-
-## Classificação de dados (P0.3)
-
-| Acesso | Campos permitidos |
+| Pessoa | O que precisa conseguir fazer |
 | --- | --- |
-| Público, somente evento publicado | ID público, título escolhido para divulgação, descrição pública e imagem explicitamente publicada |
-| Portador de convite válido | Campos públicos, data/hora, endereço e instruções privadas, catálogo do evento e disponibilidade agregada, respostas dos integrantes de sua família e suas reservas |
-| Organizador proprietário | Seu evento, lista, identificação mínima dos seus convidados, expiração/revogação, respostas e reservas do evento, métricas agregadas |
-| Servidor restrito | Hashes de tokens e sessões, contadores de abuso, credenciais administrativas |
+| Organizador | Entrar, editar/publicar o chá, montar lista, emitir/copiar/revogar convites e acompanhar respostas e presentes |
+| Convidado | Abrir convite no celular sem criar conta, ver detalhes, responder presença, reservar/cancelar presente e opcionalmente informar compra |
+| Organizador após encerramento | Consultar os resultados e executar o procedimento de suporte e exclusão previsto |
 
-Data e endereço não entram na prévia por padrão. Nada de nomes de convidados,
-contatos, RSVP ou reservas individuais na projeção pública. Imagens publicáveis
-precisam de escolha explícita; arquivos privados ficam em bucket separado.
+Todas as telas terão estados de carregamento, vazio, falha e sucesso; erros terão
+retentativa quando aplicável. Dados serão reconsultados ao abrir/solicitar,
+retornar à aba e reconectar; mutações atualizarão as consultas afetadas e alterações
+de terceiros serão sincronizadas conforme o contrato do plano. Cache e falha de
+rede não podem produzir confirmação falsa ou disponibilidade garantida na tela.
 
-## Decisões em acompanhamento (P0.4–P0.6)
+## Fraldas e mimos: escopo confirmado
 
-Unidade familiar e prazo do RSVP foram confirmados pelo usuário em 2026-09-11.
-Sessão em memória e limite de 20 integrantes são configurações técnicas atuais.
-As demais propostas permanecem a resolver nos marcos indicados.
+Separar presença, escolha de fraldas por tamanho e aba opcional de mimos.
+Limites de pacotes de fraldas: P 6, M 19, G 19 e XG 6. Mimos permitem informar quantidade
+por item, inclusive mais de um, sem consumir limites de fraldas. Os 23 itens e
+os números recebidos estão na [especificação](FRALDAS-E-MIMOS.md).
 
-| Decisão | Proposta inicial | Responsável | Marco |
-| --- | --- | --- | --- |
-| Unidade do convite | Confirmado: uma família por convite, integrantes cadastrados pelo organizador; sem login do convidado | Produto | Antes de schema de RSVP (etapa 4) |
-| Sessão | 2 horas, em memória; reabrir convite após recarga | Produto + engenharia | Etapa 4 |
-| Expiração do convite | Sem expiração automática; link reabrível até revogação | Produto | Etapa 4 |
-| Prazo do RSVP | Confirmado: editável até o início; depois somente consulta; encerramento manual também bloqueia escrita | Produto | Etapa 4 |
-| Limites | Até 20 integrantes por convite na implementação; RSVP por pessoa; até 10 unidades por pedido, limitado ao disponível; limites de abuso distintos | Produto + engenharia | Etapas 4–5 |
-| Recuperação | Organizador revoga convite perdido e emite outro | Produto + operação | Etapa 4 |
-| Encerramento | Bloquear novas reservas; cancelamento e declaração permitidos por 7 dias com convite válido | Produto | Antes das funções da etapa 5 |
-| Retenção | Excluir dados pessoais 90 dias após evento; definir cópias de backup | Produto + operação | Antes de dados reais |
-| Região | Preferir São Paulo se disponível na conta, aproximando banco e funções do público | Operação | Antes de criar ambientes remotos |
-| Parceiros | Amazon, Mercado Livre e Shopee, todos desabilitados inicialmente | Produto | Antes de links públicos |
+Unidade confirmada: pacotes. Todos os mimos ficam sem limite por convite ou
+no total do evento; números originais são referências sugeridas, sem bloqueio.
+Esta decisão substitui o limite anteriormente confirmado para mimos numerados. Cada convite pode escolher
+vários pacotes, respeitando o saldo por tamanho; “varios cotes” foi interpretado
+como “vários pacotes”. Em 2026-09-14, o solicitante confirmou que os limites
+servem para equilibrar os tamanhos no total do evento: **não há cota comercial
+adicional de pacotes por convite**. Não exigir mimo para confirmar presença.
 
-Para cada parceiro, registrar aprovação do uso, geração oficial de links,
-autorização de imagens, regras de exibição de preços, rastreamento e restrições
-sobre compras de pessoas próximas. Engenharia não habilitará parceiros apenas
-por existir uma URL cadastrada. Condições comerciais serão consultadas nessa etapa.
+## Qualidade obrigatória
+
+Visual profissional e consistente, priorizando celular; acessibilidade por
+teclado e leitor de tela, contraste e tamanhos de toque conforme os critérios do
+plano. Transações no banco impedem excesso de reservas, duplicação em retentativas
+e acesso cruzado. Validar a jornada com backend real, duas sessões simultâneas e
+carga de 50 convidados ativos, registrando latência e atualização entre telas.
+
+## Classificação dos dados
+
+| Acesso | Dados permitidos |
+| --- | --- |
+| Prévia pública | Conteúdo genérico; se personalizada, apenas título, descrição e capa explicitamente públicos de evento publicado |
+| Convite válido | Detalhes autorizados do chá, data/hora, endereço, instruções, lista e disponibilidade agregada, própria resposta e reservas |
+| Organizador | Seu evento, lista, convidados, respostas e reservas, totais e gestão dos convites |
+| Servidor restrito | Hashes de credenciais/sessões, contadores de abuso e credenciais administrativas |
+
+Nomes de convidados, contatos, endereço e reservas individuais nunca entram na
+prévia pública ou em canais públicos de atualização. Coletar apenas informações
+necessárias ao chá; imagens públicas exigem escolha explícita.
+
+## Convites: decisão confirmada
+
+O organizador poderá selecionar **individual** ou **familiar** em cada convite,
+inclusive misturando os tipos no mesmo evento. Individual representa uma pessoa.
+Para família, a implementação proposta usa nome de referência, limite definido
+pelo organizador e quantidade confirmada pelo convidado; não exige nomes de todos
+os integrantes. Haverá um link e um conjunto de reservas por convite.
+
+O banco validará quantidades e limites. Resposta negativa contabiliza zero;
+“talvez” e não respondido ficam separados das pessoas confirmadas. O painel mostra
+convites respondidos e total de pessoas confirmadas como medidas distintas.
+Alterar uma resposta atualiza a contagem, sem acumular respostas antigas.
+O volume previsto de 50 pessoas não determina o número de convites.
+
+## Regras a fechar antes de implementar os respectivos fluxos
+
+As propostas abaixo ainda não são escolhas confirmadas pelo solicitante.
+
+| Decisão | Proposta de trabalho | Quando resolver |
+| --- | --- | --- |
+| Sessão | Reaproveitar proposta técnica de 2 horas em memória, com reabertura do link após recarga; validar facilidade no WhatsApp | Antes do fluxo de acesso |
+| Expiração | Até 7 dias após o evento | Antes de emitir convites reais; data do evento necessária |
+| Recuperação | Revogar e reemitir acesso perdido, preservando vínculo com respostas e reservas e invalidando credenciais anteriores | Antes do fluxo de convites |
+| Encerramento | Bloquear novas reservas; cancelamento/compra informada por até 7 dias com convite válido | Antes de concluir transações |
+| Retenção | **Fechada em 2026-09-14:** hard delete dos dados pessoais dos convidados e dos dados privados do evento 30 dias após o término (fuso de São Paulo); auditoria só com contagens; pedido do titular e obrigação legal conforme [entrega e suporte](ENTREGA-E-SUPORTE.md#retenção-e-exclusão) | Implantar antes da entrega com dados reais |
+| Recuperação do banco | Backup automático e restauração ensaiada; frequência e prazo de recuperação compatíveis com uso da família | Antes da entrega |
+
+A simplificação de escopo não elimina isolamento entre usuários, proteção de
+credenciais, integridade das reservas ou recuperação do banco. Critérios de aceite
+são os marcos M1–M6 do plano; registros com P0–P7 referem-se ao plano histórico.

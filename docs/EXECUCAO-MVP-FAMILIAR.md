@@ -1,0 +1,188 @@
+# Execução do MVP familiar
+
+Início: 2026-09-11. Autorização: planejar e executar o caminho do MVP.
+Escopo vigente: fraldas P 6 / M 19 / G 19 / XG 6 pacotes; mimos sem limite;
+convites individuais e familiares; presença e painel atualizados.
+
+## Ordem de execução
+
+1. Consolidar alterações existentes e concluir catálogo/lista em duas categorias.
+2. Implementar convites, sessão de convidados e presença individual/familiar.
+3. Implementar reservas e cancelamentos transacionais, com quantidades independentes.
+4. Integrar páginas do convidado e painel, com acessibilidade e atualização periódica.
+5. Validar banco, API, navegador e registrar resultados e bloqueios de implantação.
+
+A aplicação será validada localmente com dados fictícios. A entrega externa ainda
+exige configuração do ambiente do evento, e-mail e ensaio
+com a família. Não considerar a liberação concluída apenas com testes locais.
+
+## Continuação — 2026-09-14
+
+Chá de bebê da Liz em **01/11/2026 às 12h**, horário de Brasília; confirmação
+solicitada no convite até **18/10/2026**. Endereço, telefone e instruções foram
+extraídos da imagem recebida e preparados em arquivo privado fora da árvore do
+projeto, sem publicar a imagem original como capa. Ela contém dados privados e
+uma indicação fixa de tamanho que não corresponde à seleção dinâmica do site.
+Suporte técnico: Leonardo Martins (solicitante).
+
+Regra esclarecida: os limites P 6 / M 19 / G 19 / XG 6 são globais por tamanho,
+para equilibrar os pacotes. Não há cota comercial adicional por convite. Mimos
+continuam opcionais conforme as decisões expressas na conversa. A confirmação
+até 18/10 está registrada no conteúdo; não existe bloqueio automático por essa
+data no schema atual (o encerramento continua sendo ação do organizador).
+
+Avanço M4: testes adicionais comprovam todos os tamanhos no mesmo convite,
+esgotamento compartilhado, cancelamento idempotente concorrente, reserva contra
+redução de cota e reserva contra encerramento. PostgreSQL portátil: 46 testes.
+
+Avanço M5: abertura de outro convite na mesma aba agora troca a sessão e ignora
+resposta anterior atrasada; o fragmento inválido limpa a apresentação anterior.
+A promessa fica na montagem da página, sem cache global de credenciais. O link
+de pular para o conteúdo continua funcionando. Ensaio de resposta HTTP perdida
+após commit confirma recuperação usando a mesma chave, sem duplicação.
+
+Paleta rosa inspirada no convite; ajuste de quebra de texto, espaçamento de
+cartões e largura mínima para 320 px com fonte a 200%. Testes automatizados de
+teclado e axe nas áreas Presença, Fraldas e Mimos. Essas verificações não substituem
+leitor de tela manual, navegador interno do WhatsApp ou aceite do irmão.
+
+Validação local deste avanço: `npm run check` (40 testes unitários), 46 testes
+PostgreSQL portátil, seis cenários de navegador real e 16 E2E aprovados.
+
+Próxima etapa M6: seguir o [roteiro de entrega](ENTREGA-E-SUPORTE.md), com ambiente
+separado, login real por e-mail, restauração e ensaio com a família. Nenhum dado
+real foi cadastrado/publicado e nenhum banco remoto foi alterado neste avanço.
+
+Projeto remoto criado em 2026-09-14: **chadbb-cha**, ref `fcykqrlnofmdtmewlejr`,
+organização `chadbb` (`zfzzahtvvtmuogmatolo`), região **São Paulo (`sa-east-1`)**,
+exclusivo do chá e separado de desenvolvimento e preview. A senha do banco fica
+apenas na máquina do titular, fora do repositório. Nenhuma migration, função ou
+configuração de Auth foi aplicada ainda. Suporte técnico, do envio dos
+convites ao dia do evento: Leonardo Martins (solicitante).
+
+## Implantação no chadbb-cha — 2026-09-15
+
+Projeto `chadbb-cha` (ref `fcykqrlnofmdtmewlejr`, `sa-east-1`). Cada etapa só foi
+executada após aprovação manual (gates G1, G2 e G3). Nenhum valor de segredo foi
+exibido nem registrado.
+
+**G1, local:** `npm run check` (40), `test:db:portable` (52), `test:e2e` (16).
+Após `db:reset`: pgTAP (50), `test:api` (13, incluindo a Edge Function `retention`),
+`test:browser:local` (6) e `test:email:local` (1). Commit `6324e8b` no PR #1, com CI
+verde nos jobs `frontend` e `database`.
+
+**G2, remoto:**
+- `db push --dry-run`: 19 migrations, sem seeds e sem roles. A lista confere
+  arquivo por arquivo com o repositório.
+- `db push`: 19/19 aplicadas. O `migration list` remoto é idêntico ao local.
+  Nenhum vínculo local foi criado (`--project-ref`, sem `supabase link`).
+- Segredos da função: `GUEST_ALLOWED_ORIGINS` (somente `https://chadbb.pages.dev`)
+  e `RETENTION_CRON_SECRET`, configurados por env-file temporário já removido.
+- Vault: `project_url` e `retention_cron_secret`.
+- Funções `guest` e `retention` publicadas: `ACTIVE`, `verify_jwt=false`.
+- Cron: somente `personal-data-retention` (`17 6 * * *`); a função
+  `cleanup_guest_data` não existe.
+
+**G3, smoke remoto (`npm run test:smoke:remote`): 6/6 aprovados.**
+1. `guest`: CORS apenas para `https://chadbb.pages.dev`; origens da branch e de
+   terceiros recebem 403; GET recebe 405.
+2. Fluxo completo com dados fictícios: organizador, evento com término, lista de
+   27 itens, publicação, convite, troca de token (`no-store`, sem `owner_id` e
+   `token_hash`), leitura, RSVP, reserva com repetição idempotente, painel e
+   cancelamento.
+3. Revogação encerra a sessão existente (401).
+4. Anon não lê reservas, a auditoria nem as funções de retenção.
+5. `retention` sem segredo recebe 401; com segredo recebe 200 e não apaga o evento
+   que não venceu.
+6. Cron com somente o job de 30 dias.
+
+Conexão ao banco pelo pooler de sessão, com TLS `verify-full` contra a CA oficial
+"Supabase Root 2021 CA". A primeira tentativa, sem essa CA, foi recusada na conexão
+antes de criar qualquer dado; o banco foi conferido e estava vazio.
+
+Zero sobras, conferido pelo `finally` do smoke e depois por contagem global
+independente: usuários, eventos, itens, convites, sessões, reservas, pedidos,
+`guest_rate`, auditoria e objetos de Storage estão em 0. Os 27 produtos do
+catálogo permanecem, pois vêm da migration.
+
+Pendente para a entrega: apontar o frontend do Pages para o `chadbb-cha`,
+configurar o Auth remoto (site URL, callback e SMTP), ensaiar backup e
+restauração e fazer o ensaio no WhatsApp.
+
+## Correções da revisão do PR #1 — 2026-09-15
+
+A revisão completa de `main...mvp-familiar` encontrou seis problemas. Cinco foram
+corrigidos no próprio PR, com um teste de regressão para cada um, e um foi
+documentado. O merge fica aguardando o novo ciclo G1 → G2 → G3.
+
+| # | Problema | Correção | Teste |
+| --- | --- | --- | --- |
+| 1 | Uma pessoa esgotava a cota global; o IP vinha do primeiro `X-Forwarded-For`, controlado pelo cliente | Cotas na ordem IP → credencial → global; IP de `CF-Connecting-IP` ou do último valor acrescentado pelo gateway | API: endereço forjado não cria cota e recusa por IP não consome a global; smoke: cabeçalhos forjados ignorados no ambiente hospedado |
+| 2 | Adiar o evento não adiava a validade dos convites | `save_event` recalcula `expires_at` = novo início + 7 dias | Portátil |
+| 3 | Mudar quantidade ou tamanho apagava a compra informada | `PURCHASE_ALREADY_DECLARED`; a interface só oferece cancelar (decisão: comportamento mais previsível) | Portátil, API e navegador (desktop e celular: quantidade e troca somem, cancelar permanece) |
+| 4 | Rascunho com data passada era expurgado e ficava travado | Retenção ignora rascunhos; evento já vencido não pode mudar de data (`EVENT_RETENTION_DUE`) | Portátil |
+| 5 | Versões de migration repetidas em relação à `main` antiga | Documentado como limitação de compatibilidade histórica (README) | — |
+| 6 | Falha do servidor chegava como erro de preenchimento | Erros desconhecidos, resposta não-JSON e falha de rede viram 503, que preserva a tentativa; dados malformados continuam 400 | API |
+
+Também incluída a correção do smoke remoto: janelas de `guest_rate` que já existiam
+antes do teste e foram alteradas por ele passam a ser removidas.
+
+### Novo G3 após as correções — execução em 2026-09-14
+
+`npm run test:smoke:remote`: **6/7 passaram; G3 não aprovado**. Conexão pelo
+pooler de sessão com TLS `verify-full`, certificado e hostname validados contra
+a CA oficial local. A contagem global anterior estava zerada.
+
+O teste de cabeçalhos de IP forjados falhou ao interpretar a resposta como JSON
+(`Unexpected token '<'`), antes de conferir a cota. Uma reprodução diagnóstica
+com `X-Forwarded-For` e `CF-Connecting-IP` iguais a `203.0.113.99` retornou
+HTTP 403, `text/html`, servidor Cloudflare e erro 1000, “DNS points to prohibited
+IP”. Isso não comprova que o teste de cota passou nem que houve cota forjada;
+é necessário resolver a cobertura desse cenário hospedado antes de aprovar G3.
+
+O runner terminou os outros testes e executou a limpeza. Zero sobras confirmado
+pelo hook de limpeza e por contagem global independente das dez tabelas
+(usuários, eventos, itens, convites, sessões, reservas, pedidos, cotas, auditoria
+e objetos de Storage). Nova contagem após a reprodução também permaneceu zerada.
+Revisão final e merge suspensos conforme o critério de parada.
+
+### G3 aprovado após separar os vetores de IP — 2026-09-14
+
+**Resultado final: `npm run test:smoke:remote`, 7/7 aprovados**, com TLS
+`verify-full` pelo pooler de sessão e CA oficial. Este resultado substitui a
+pendência do G3 acima. A implementação da `guest` não foi alterada.
+
+O teste de IP agora exercita separadamente, para `203.0.113.99` e
+`198.51.100.23`:
+
+- Somente `CF-Connecting-IP` forjado: HTTP 403, servidor Cloudflare, conteúdo
+  HTML e cabeçalho da página identificando Error 1000, conforme bloqueio esperado
+  antes da função.
+- Somente `X-Forwarded-For` forjado: resposta JSON 401 da `guest` para o token
+  fictício. Consulta ao banco confirmou zero cotas para os hashes dos IPs falsos.
+
+Na primeira execução do smoke ajustado, a asserção de Error 1000 não reconheceu
+as tags HTML entre “Error” e “1000”; a extração do título `h1` foi corrigida e o
+smoke completo foi repetido com sucesso. Ambas as execuções terminaram sem sobras.
+
+Na execução final, as dez contagens globais estavam zeradas antes e depois:
+`auth.users`, `public.events`, `public.event_items`, `private.invitations`,
+`private.guest_sessions`, `public.reservations`, `private.guest_requests`,
+`private.guest_rate`, `private.retention_audit` e `storage.objects`. O hook de
+limpeza também confirmou zero sobras nos nove grupos que verifica.
+
+**G3 aprovado; merge não realizado**, conforme instrução de parar antes do merge.
+
+
+### Revisão final após G3 — 2026-09-14
+
+Revisadas as correções de `de3944e` (IP/cotas, validade de convites, compra
+informada, retenção de rascunhos e erros retentáveis), seus testes e o ajuste do
+smoke remoto. Nenhum novo bloqueio identificado nessa revisão. `npm run lint`
+e `git diff --check` aprovados. O G3 acima valida o smoke ajustado; a CI do PR
+será conferida novamente após publicar este ajuste.
+
+G2 informado na retomada pelo responsável: 20/20 migrations, última
+`20260915020000_review_fixes.sql`; `guest` versão 2 e `retention` versão 1,
+ambas ACTIVE com `verify_jwt=false`. Somente o cron `personal-data-retention`
+ativo. Sem alterações adicionais de migrations, funções ou segredos nesta revisão.

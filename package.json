@@ -20,9 +20,12 @@
     "db:test": "supabase test db --local",
     "test:db:portable": "node --test tests/database/*.integration.mjs",
     "test:e2e": "playwright test",
-    "test:api": "node --test tests/api/*.integration.mjs",
-    "test:auth:local": "node --test tests/local/email-login.test.mjs",
-    "test:invites:local": "node --test tests/local/family-invitation.test.mjs"
+    "test:api": "node --test --test-concurrency=1 tests/api/*.integration.mjs",
+    "test:browser:local": "node --test tests/browser/*.integration.mjs",
+    "functions:serve": "supabase functions serve --env-file supabase/functions/local-test.env",
+    "test:email:local": "node --test tests/local/email-login.test.mjs",
+    "test:load:local": "node tests/load/guest.mjs",
+    "test:smoke:remote": "node --test tests/remote/smoke.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",
@@ -32,6 +35,7 @@
     "react-router-dom": "^7.18.3"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/vite": "^4.3.3",

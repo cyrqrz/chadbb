@@ -8,6 +8,16 @@
 | Origem | Consolidação da sessão de definição de produto, stack e segurança |
 | Caminho sugerido no repositório | `docs/adr/001-arquitetura-mvp.md` |
 
+## Adendo de escopo — 2026-09-11
+
+A primeira entrega passa a atender o chá de bebê do irmão do solicitante, para
+cerca de 50 convidados, com prazo solicitado para a segunda semana de outubro de
+2026. O [plano do MVP familiar](PLANO-EXECUCAO-MVP.md) prevalece sobre o escopo
+comercial descrito abaixo. Monetização, afiliados e métricas de produto ficam
+para depois do evento. A stack e as regras de integridade permanecem; design,
+acessibilidade e atualização dos dados passam a ter critérios explícitos de aceite.
+As seções comerciais abaixo são contexto histórico, não requisitos de liberação.
+
 ## Contexto
 
 O produto permitirá criar eventos, convidar pessoas, confirmar presença e organizar listas de presentes. O primeiro piloto será o chá de bebê do irmão do parceiro de negócios do idealizador. O acesso ocorrerá principalmente pelo celular, a partir de um convite compartilhado no WhatsApp.

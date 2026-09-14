@@ -30,7 +30,7 @@ async function backend(page: Page, signedIn = false) {
     else if (path === '/auth/v1/user') json = session().user
     else if (path === '/rest/v1/rpc/create_event') {
       record = { id: eventId, owner_id: userId, type: 'baby_shower', status: 'draft', title: body.p_title,
-        public_description: '', private_address: '', private_instructions: '', starts_at: null, cover_path: null, version: 1,
+        public_description: '', private_address: '', private_instructions: '', starts_at: null, ends_at: null, personal_data_purged_at: null, cover_path: null, version: 1,
         created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' }
       json = record
     } else if (path === '/rest/v1/events') {
@@ -39,7 +39,7 @@ async function backend(page: Page, signedIn = false) {
     } else if (path === '/rest/v1/rpc/save_event' && record) {
       if (conflict) { json = { message: 'VERSION_CONFLICT', code: 'P0001' }; status = 400 }
       else {
-        record = { ...record, title: body.p_title, public_description: body.p_public_description, starts_at: body.p_starts_at,
+        record = { ...record, title: body.p_title, public_description: body.p_public_description, starts_at: body.p_starts_at, ends_at: body.p_ends_at,
           private_address: body.p_private_address, private_instructions: body.p_private_instructions, cover_path: body.p_cover_path, version: record.version + 1 }
         json = record
       }
@@ -103,6 +103,7 @@ test('cria, edita, publica e encerra evento; layout cabe no celular', async ({ p
   await page.getByRole('button', { name: 'Publicar evento' }).click()
   await expect(page.getByRole('alert')).toContainText('data futura')
   await page.getByLabel('Data e horário').fill('2035-09-10T14:30')
+  await page.getByLabel('Término').fill('2035-09-10T18:00')
   await page.getByLabel('Endereço privado').fill('Rua fictícia, 123')
   await page.getByLabel('Descrição pública').fill('Vamos celebrar juntos.')
   await expect(page.getByRole('button', { name: 'Publicar evento' })).toBeDisabled()
@@ -171,49 +172,4 @@ test('sessão expirada retorna ao acesso sem carregar eventos privados', async (
   await expect(page).toHaveURL(/\/entrar$/)
   await expect(page.getByLabel('Seu e-mail')).toBeVisible()
   expect(mock.calls).not.toContain('/rest/v1/events')
-})
-
-test('lista: adiciona presente, altera quantidade e fica somente leitura após encerramento', async ({ page }) => {
-  await backend(page, true)
-  const product = { id: '20000000-0000-4000-8000-000000000001', title: 'Manta fictícia', description: 'Uma unidade', platform: 'manual', active: true }
-  let item: { id: string; event_id: string; product_id: string; quantity_requested: number; version: number; product: typeof product } | null = null
-  await page.route('https://e2e.supabase.co/rest/v1/products**', route => route.fulfill({ json: [product], headers: { 'content-range': '0-0/1', 'access-control-expose-headers': 'content-range' } }))
-  await page.route('https://e2e.supabase.co/rest/v1/event_items**', route => route.fulfill({ json: item ? [item] : [], headers: { 'content-range': item ? '0-0/1' : '*/0', 'access-control-expose-headers': 'content-range' } }))
-  await page.route('https://e2e.supabase.co/rest/v1/rpc/add_event_item', async route => {
-    const body = route.request().postDataJSON()
-    expect(body).toEqual({ p_event_id: eventId, p_product_id: product.id, p_quantity: 2 })
-    item = { id: '30000000-0000-4000-8000-000000000001', event_id: eventId, product_id: product.id, quantity_requested: body.p_quantity, version: 1, product }
-    await route.fulfill({ json: item })
-  })
-  await page.route('https://e2e.supabase.co/rest/v1/rpc/set_event_item_quantity', async route => {
-    const body = route.request().postDataJSON()
-    expect(body).toEqual({ p_event_id: eventId, p_item_id: item?.id, p_version: 1, p_quantity: 3 })
-    if (!item) throw new Error('Item não criado')
-    item = { ...item, quantity_requested: body.p_quantity, version: 2 }
-    await route.fulfill({ json: item })
-  })
-  await createInBrowser(page)
-  await page.getByRole('link', { name: 'Lista de presentes' }).click()
-  await expect(page.getByText('Sua lista ainda está vazia.', { exact: false })).toBeVisible()
-  await page.getByLabel('Unidades de Manta fictícia').fill('2')
-  await page.getByRole('button', { name: 'Adicionar à lista' }).click()
-  await expect(page.getByLabel('Quantidade de Manta fictícia')).toHaveValue('2')
-  await page.getByLabel('Quantidade de Manta fictícia').fill('3')
-  await page.getByRole('button', { name: 'Atualizar quantidade' }).click()
-  await expect(page.getByRole('button', { name: 'Atualizar quantidade' })).toBeDisabled()
-  await expect(page.getByLabel('Quantidade de Manta fictícia')).toHaveValue('3')
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
-  await page.getByRole('link', { name: 'Detalhes do evento' }).click()
-  await page.getByLabel('Data e horário').fill('2035-09-10T14:30')
-  await page.getByRole('button', { name: 'Salvar alterações' }).click()
-  await expect(page.getByRole('status')).toHaveText('Alterações salvas.')
-  await page.getByRole('button', { name: 'Publicar evento' }).click()
-  await expect(page.getByRole('status')).toHaveText('Evento publicado.')
-  await page.getByRole('button', { name: 'Encerrar evento', exact: true }).click()
-  await page.getByRole('button', { name: 'Confirmar encerramento' }).click()
-  await expect(page.getByRole('status')).toHaveText('Evento encerrado.')
-  await page.getByRole('link', { name: 'Lista de presentes' }).click()
-  await expect(page.getByLabel('Quantidade de Manta fictícia')).toBeDisabled()
-  await expect(page.getByRole('button', { name: 'Adicionar à lista' })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Atualizar quantidade' })).toHaveCount(0)
 })

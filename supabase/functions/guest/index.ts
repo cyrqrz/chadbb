@@ -1,75 +1,73 @@
-// Credenciais somente em corpo/cabeçalho; nenhuma URL, log ou resposta de erro as inclui.
-const originList = (Deno.env.get('GUEST_ALLOWED_ORIGINS') ?? 'http://localhost:5173,http://127.0.0.1:5173').split(',').map(value => value.trim())
-const endpoint = Deno.env.get('SUPABASE_URL')!
+// Guest credentials are checked by SQL; the service key stays inside this function.
+const allowed = (Deno.env.get('GUEST_ALLOWED_ORIGINS') ?? 'http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:4173').split(',')
+const base = Deno.env.get('SUPABASE_URL')!
 const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-const hex = (bytes: Uint8Array) => [...bytes].map(value => value.toString(16).padStart(2, '0')).join('')
-const digest = async (value: string) => hex(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))))
-async function rpc(name: string, body: Record<string, unknown>) {
-  const response = await fetch(`${endpoint}/rest/v1/rpc/${name}`, {
-    method: 'POST', headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-  })
-  const data = await response.json()
-  if (!response.ok) throw new Error(data.message ?? 'UNAVAILABLE')
-  return data
+const known = new Set(['GUEST_SESSION_INVALID', 'EVENT_CLOSED', 'ITEM_NOT_FOUND', 'REQUEST_ID_REQUIRED', 'INVALID_ACTION',
+  'RESPONSE_VERSION_CONFLICT', 'RESERVATION_VERSION_CONFLICT', 'IDEMPOTENCY_CONFLICT', 'INSUFFICIENT_QUANTITY',
+  'RESERVATION_NOT_FOUND', 'INVALID_RESERVATION_STATE', 'INVALID_GIFT_QUANTITY', 'RSVP_INVALID_RESPONSE', 'ATTENDING_ABOVE_CAPACITY',
+  'PURCHASE_ALREADY_DECLARED'])
+class Unavailable extends Error {}
+async function rpc(name: string, body: unknown) {
+  let response: Response
+  try {
+    response = await fetch(`${base}/rest/v1/rpc/${name}`, {
+      method: 'POST', headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  } catch { throw new Unavailable() }
+  const text = await response.text()
+  let data: { message?: string; code?: string } | null
+  try { data = text ? JSON.parse(text) : null } catch { throw new Unavailable() }
+  return { ok: response.ok, data }
 }
-async function readBody(request: Request) {
-  const reader = request.body?.getReader()
-  if (!reader) throw new Error('INVALID_REQUEST')
-  let size = 0
-  const chunks: Uint8Array[] = []
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    size += value.length
-    if (size > 4096) { await reader.cancel(); throw new Error('INVALID_REQUEST') }
-    chunks.push(value)
-  }
-  const bytes = new Uint8Array(size)
-  let offset = 0
-  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length }
-  return JSON.parse(new TextDecoder().decode(bytes))
+// O primeiro valor de X-Forwarded-For vem do cliente; confiar só no que o gateway acrescenta.
+function clientAddress(request: Request) {
+  const edge = request.headers.get('cf-connecting-ip')?.trim()
+  if (edge) return edge
+  const chain = (request.headers.get('x-forwarded-for') ?? '').split(',').map(part => part.trim()).filter(Boolean)
+  return chain.at(-1) ?? 'local'
 }
 Deno.serve(async request => {
   const origin = request.headers.get('origin') ?? ''
-  const headers: Record<string, string> = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer', Vary: 'Origin' }
-  const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers })
-  if (!originList.includes(origin)) return reply({ error: 'ORIGIN_DENIED' }, 403)
-  headers['Access-Control-Allow-Origin'] = origin
-  headers['Access-Control-Allow-Headers'] = 'authorization, apikey, content-type'
-  headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', Vary: 'Origin',
+    'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info', 'Access-Control-Allow-Methods': 'POST, OPTIONS' }
+  if (allowed.includes(origin)) headers['Access-Control-Allow-Origin'] = origin
+  const reply = (status: number, data: unknown) => new Response(JSON.stringify(data), { status, headers })
+  if (origin && !allowed.includes(origin)) return reply(403, { error: 'ORIGIN_DENIED' })
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers })
-  if (request.method !== 'POST') return reply({ error: 'INVALID_REQUEST' }, 405)
+  if (request.method !== 'POST') return reply(405, { error: 'METHOD_NOT_ALLOWED' })
+  if (!request.headers.get('content-type')?.includes('application/json')) return reply(415, { error: 'INVALID_PAYLOAD' })
+  let body
   try {
-    // O limite global permanece eficaz mesmo se o proxy não normalizar o IP.
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
-    if (!(request.headers.get('content-type') ?? '').startsWith('application/json')) throw new Error('INVALID_REQUEST')
-    const body = await readBody(request)
-    if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('INVALID_REQUEST')
-    const credential = body.action === 'exchange' ? body.token : request.headers.get('authorization')?.replace(/^Bearer /, '')
-    const validCredential = typeof credential === 'string' && /^[a-f0-9]{64}$/.test(credential)
-    const credentialHash = await digest(validCredential ? credential : 'invalid')
-    if (!await rpc('allow_guest_request', { p_ip_hash: await digest(ip), p_credential_hash: credentialHash })) return reply({ error: 'RATE_LIMITED' }, 429)
-    if (!validCredential) return reply({ error: 'GUEST_SESSION_INVALID' }, 401)
-    if (body.action === 'exchange') {
-      if (Object.keys(body).some(name => !['action', 'token'].includes(name))) throw new Error('INVALID_REQUEST')
-      const session = hex(crypto.getRandomValues(new Uint8Array(32)))
-      const expires_at = await rpc('exchange_guest_invitation', { p_token_hash: credentialHash, p_session_hash: await digest(session) })
-      return reply({ session, expires_at })
+    const reader = request.body?.getReader()
+    if (!reader) return reply(400, { error: 'INVALID_PAYLOAD' })
+    let text = ''; let size = 0; const decoder = new TextDecoder()
+    while (true) {
+      const { done, value } = await reader.read(); if (done) break
+      size += value.byteLength
+      if (size > 16384) { await reader.cancel(); return reply(413, { error: 'INVALID_PAYLOAD' }) }
+      text += decoder.decode(value, { stream: true })
     }
-    if (body.action === 'read') {
-      if (Object.keys(body).length !== 1) throw new Error('INVALID_REQUEST')
-      return reply(await rpc('get_guest_invitation', { p_session_hash: credentialHash }))
+    text += decoder.decode()
+    body = JSON.parse(text)
+  } catch { return reply(400, { error: 'INVALID_PAYLOAD' }) }
+  if (!body || typeof body.action !== 'string' || !['exchange', 'read', 'rsvp', 'reserve', 'cancel', 'purchase', 'swap'].includes(body.action)) return reply(400, { error: 'INVALID_ACTION' })
+  const token = body.action === 'exchange' ? body.token : request.headers.get('authorization')?.replace(/^Bearer /, '')
+  if (typeof token !== 'string' || !/^[a-f0-9]{64}$/.test(token)) return reply(401, { error: 'GUEST_SESSION_INVALID' })
+  try {
+    // A cota global só é consumida por pedidos que passaram nas cotas de origem e credencial.
+    // No IP or token is persisted in cleartext.
+    for (const bucket of [`ip:${clientAddress(request)}`, `token:${token}`, 'global']) {
+      const rate = await rpc('check_guest_rate', { p_key: bucket })
+      if (!rate.ok) return reply(503, { error: 'TEMPORARILY_UNAVAILABLE' })
+      if (rate.data !== true) return reply(429, { error: 'RATE_LIMITED' })
     }
-    if (body.action === 'rsvp') {
-      if (Object.keys(body).some(name => !['action', 'person_id', 'response', 'version'].includes(name)) ||
-        typeof body.person_id !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(body.person_id) ||
-        !['yes', 'no', 'maybe'].includes(body.response) || !Number.isInteger(body.version) || body.version < 1) throw new Error('INVALID_REQUEST')
-      return reply(await rpc('set_guest_rsvp', { p_session_hash: credentialHash, p_person_id: body.person_id, p_response: body.response, p_version: body.version }))
-    }
-    throw new Error('INVALID_REQUEST')
-  } catch (cause) {
-    const code = cause instanceof Error ? cause.message : 'UNAVAILABLE'
-    const statuses: Record<string, number> = { GUEST_SESSION_INVALID: 401, EVENT_NOT_PUBLISHED: 403, PERSON_NOT_FOUND: 403, RSVP_VERSION_CONFLICT: 409, RSVP_CLOSED: 409, INVALID_RSVP: 400, INVALID_REQUEST: 400 }
-    return reply({ error: statuses[code] ? code : 'UNAVAILABLE' }, statuses[code] ?? 503)
-  }
+    const result = await rpc('guest_action', { p_token: token, p_action: body.action, p_payload: body.payload ?? {} })
+    if (result.ok) return reply(200, result.data)
+    const message = result.data?.message ?? ''
+    if (known.has(message)) return reply(message === 'GUEST_SESSION_INVALID' ? 401 : 409, { error: message })
+    // Dados malformados (classes 22 e 23) são erro do pedido; o resto é falha do servidor e permite repetir.
+    if (/^2[23]/.test(result.data?.code ?? '')) return reply(400, { error: 'INVALID_PAYLOAD' })
+    return reply(503, { error: 'TEMPORARILY_UNAVAILABLE' })
+  } catch { return reply(503, { error: 'TEMPORARILY_UNAVAILABLE' }) }
 })

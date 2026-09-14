@@ -39,12 +39,16 @@ jobs:
       - run: npm run db:start
       - run: npm run db:reset
       - run: npm run db:test
+      - name: Start Edge Functions
+        run: |
+          npm run functions:serve > /tmp/chadbb-functions.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl -s -o /dev/null -f -X OPTIONS http://127.0.0.1:54321/functions/v1/guest; then break; fi
+            sleep 1
+          done
       - run: npm run test:api
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:auth:local
-      - name: Convites com navegador e backend locais
-        run: |
-          node_modules/.bin/supabase functions serve guest > /tmp/chadbb-guest-runtime.log 2>&1 &
-          npm run test:invites:local
+      - run: npm run test:browser:local
+      - run: npm run test:email:local
       - if: always()
         run: npm run db:stop

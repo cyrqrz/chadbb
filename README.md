@@ -1,10 +1,15 @@
 # chadbb
 
-Aplicação de chá de bebê e lista de presentes. Implementação iniciada pelo
+MVP para o chá de bebê do irmão do solicitante, com cerca de 50 convidados.
+Prioridades: uso simples no celular, design profissional, acessibilidade e dados
+confiáveis e atualizados. Entrega planejada para a segunda semana de outubro de
+2026; evolução comercial fica para depois do evento. Implementação guiada pelo
 [plano de execução](docs/PLANO-EXECUCAO-MVP.md), com a stack do ADR 001.
 Já estão implementados acesso por link de e-mail, criação/edição/publicação/encerramento
-de eventos, capa, catálogo, lista de presentes e convites familiares com RSVP por pessoa.
-Reservas ainda não estão implementadas. As APIs Supabase locais e os testes de navegador com APIs simuladas foram validados; o login por link de e-mail também foi validado de ponta a ponta no ambiente local. Veja as [evidências atuais](docs/VALIDACAO-LOCAL-2026-09-11.md).
+de eventos e envio de capa, com permissões por proprietário, além de catálogo e
+lista de presentes. Convites e reservas ainda não estão implementados.
+Testes SQL e de API do organizador passaram no Supabase local; o ensaio de login
+por link de e-mail no navegador permanece pendente.
 Veja o [contrato do piloto](docs/CONTRATO-PILOTO.md).
 
 ## Desenvolvimento
@@ -41,7 +46,7 @@ npm run check
 Reset e testes usam explicitamente `--local`; não há comandos destrutivos para
 banco remoto nos scripts. Não vincule este ambiente local à produção nem troque
 os scripts por `--linked`/`--db-url`. A migration inicial estabelece permissões;
-`seed.sql` contém apenas produtos fictícios locais; os testes criam e removem seus próprios dados fictícios.
+o catálogo do chá — 4 tamanhos de fralda e os 23 mimos de [FRALDAS-E-MIMOS](docs/FRALDAS-E-MIMOS.md) — entra por migration, sem marcas, preços ou links; `seed.sql` permanece vazio e os testes criam e removem seus próprios dados fictícios.
 Nenhuma pessoa/evento real deve ser cadastrada nesta fase.
 
 A CI foi configurada para lint, TypeScript, testes, build, PostgreSQL temporário,
@@ -72,7 +77,11 @@ quando necessário. Os testes usam porta 4173 e configuração fictícia própri
 npm run db:start
 npm run db:reset
 npm run db:test
+# Em outro terminal: npm run functions:serve
 npm run test:api
+npm run test:browser:local
+npm run test:email:local
+npm run test:load:local
 ```
 
 `test:api` obtém a configuração da stack local pelo CLI e aceita somente loopback
@@ -80,6 +89,11 @@ na porta 54321. Cria dois usuários fictícios, verifica isolamento pela API,
 valida upload/download/tamanho/tipo e remove os dados de teste ao terminar.
 Não aponta para produção. Se a execução for interrompida, `db:reset` limpa a stack
 local inteira, incluindo quaisquer dados locais de desenvolvimento.
+
+Os testes de navegador e e-mail precisam da porta 5173 livre e rodam em sequência.
+O teste de e-mail usa apenas Mailpit local. O ensaio de carga cria 50 convidados
+fictícios e mede p50/p95 das chamadas Edge. Resultados e contratos atualizados:
+[revisão técnica](docs/REVISAO-TECNICA-2026-09-14.md).
 
 ## Usar o fluxo do organizador
 
@@ -89,6 +103,13 @@ mesmo navegador para concluir o PKCE. O callback local está configurado para
 `http://localhost:5173/auth/callback` e `http://127.0.0.1:5173/auth/callback`.
 Em ambientes remotos, cadastre a URL correspondente no Auth antes de usar.
 
+As telas seguem o contrato de atualização do plano: nenhuma resposta em cache é
+apresentada como nova. Eventos, detalhe e lista reconsultam o servidor ao abrir,
+ao voltar para a aba, ao reconectar e a cada 5 segundos com a aba visível, com
+recuo progressivo enquanto a consulta falhar e indicação “Atualizando…”. O que
+está digitado nunca é substituído por uma atualização recebida: o formulário
+avisa que existe versão mais recente e oferece recarregar.
+
 Em `/eventos`, crie um rascunho, salve título e data futura e publique. O encerramento
 é definitivo nesta etapa. Campos privados não têm leitura anônima. Edições usam
 versão para detectar conflitos entre abas; o botão de recarregar permite recuperar.
@@ -96,8 +117,19 @@ versão para detectar conflitos entre abas; o botão de recarregar permite recup
 A capa aceita JPEG, PNG e WebP até 5 MB. O envio exige autorização explícita e o
 arquivo fica público por link mesmo em rascunho. `event-private` é separado e
 protegido por proprietário; esta interface só envia capas publicáveis.
-Remover a referência de uma capa não apaga o objeto já publicado: limpeza de
-arquivos e retenção serão concluídas antes do piloto.
+Remover a referência de uma capa não apaga o objeto na hora. A Edge Function `retention`
+apaga os arquivos exclusivos do evento 30 dias após o término, junto com os dados
+pessoais ([política](docs/ENTREGA-E-SUPORTE.md#retenção-e-exclusão)).
+
+## Compatibilidade de migrations
+
+As versões `20260911000000` e `20260911010000` foram usadas com conteúdos diferentes
+numa implementação antiga de convites que existiu apenas na `main`
+(`family_invitations` e `invitation_response_deadline`), substituída pela linha
+`mvp-familiar`. Um banco que tenha aplicado aquelas migrations antigas não é
+compatível com esta sequência: o CLI consideraria essas versões já aplicadas.
+Esses bancos devem ser recriados (`npm run db:reset` localmente). O projeto do chá
+(`chadbb-cha`) nasceu com a sequência atual e não é afetado.
 
 ## Estrutura
 
@@ -123,7 +155,8 @@ foi criado: depende de acesso às contas e repositório remoto.
 
 ## Evidências e pendências
 
-Consulte [execução da base](docs/EXECUCAO-BASE.md) e [execução do organizador](docs/EXECUCAO-ORGANIZADOR.md). Não há aprovação de piloto.
+Consulte [execução da base](docs/EXECUCAO-BASE.md), [execução do organizador](docs/EXECUCAO-ORGANIZADOR.md)
+e [validação local de 11/09](docs/VALIDACAO-LOCAL-2026-09-11.md). Não há aprovação de piloto.
 Docker, contas de hospedagem, orçamento, restauração, regras comerciais e
 validação em celular/WhatsApp precisam das etapas previstas no plano.
 
@@ -131,35 +164,12 @@ Referências técnicas: [Vite](https://vite.dev/guide/),
 [Tailwind com Vite](https://tailwindcss.com/docs/installation/using-vite),
 [Supabase local](https://supabase.com/docs/guides/local-development/cli/getting-started).
 
-## Testar login por e-mail local
+## Smoke test remoto (projeto do chá)
 
-Com Supabase iniciado e Chromium instalado, execute `npm run test:auth:local`.
-O teste inicia Vite em `127.0.0.1:5173` (a porta precisa estar livre), usa a
-configuração pública da stack local e solicita acesso pela interface. Lê somente
-a mensagem fictícia correspondente no Mailpit, abre o link no mesmo navegador,
-verifica PKCE, sessão após recarregar, logout e proteção da rota.
-Não usa mocks nem envia e-mail externo; remove o usuário e a mensagem de teste.
-Não grava traces ou capturas que possam conter credenciais. A CI executa esse
-ensaio após os testes de API.
-
-## Testar convites familiares locais
-
-Com Supabase iniciado, aplique migrations pendentes sem resetar os dados:
-
-```sh
-npx supabase migration up --local
-npx supabase functions serve guest
-```
-
-Mantenha a função rodando e, em outro terminal com a porta 5173 livre, execute
-`npm run test:invites:local`. O teste usa organizador autenticado, Chromium
-(desktop e celular emulado), PostgREST e Edge Function reais. Cria suas próprias
-famílias fictícias e verifica respostas individuais, reabertura na mesma aba,
-bloqueio no início, revogação e troca de família. Remove seus dados ao terminar.
-
-O organizador cadastra até 20 integrantes por convite em **Convites e presença**.
-O link não exige login e pode ser reaberto; a sessão dura 2 horas em memória.
-Respostas podem mudar até o início do evento. Depois, ou após encerramento manual,
-o convite permanece disponível para consulta até ser revogado. Não há expiração
-automática do link emitido pela interface. Configuração da função em
-[supabase/functions/README.md](supabase/functions/README.md).
+`npm run test:smoke:remote` cria e remove dados fictícios no projeto `chadbb-cha`.
+Só executar com aprovação. Exige `CHADBB_SMOKE_REF` igual ao ref do projeto e
+`CHADBB_SMOKE_DB_URL` apontando para ele, e recusa qualquer outro host. As chaves
+vêm do CLI autenticado e o segredo da retenção de `~/.config/chadbb/`; nada disso
+é impresso. Fora da CI. A conexão usa o pooler de sessão com
+`sslmode=verify-full&sslrootcert=` apontando para a CA oficial do Supabase
+(Project Settings → Database → SSL), salva localmente fora do repositório.
