@@ -83,12 +83,26 @@ test('guest: CORS só para o site do chá, método restrito', async () => {
   assert.equal((await call('/functions/v1/guest', { method: 'GET' })).status, 405)
 })
 
-test('guest: cabeçalhos de IP enviados pelo cliente não escolhem a cota', async () => {
+test('guest: Cloudflare bloqueia CF-Connecting-IP forjado e XFF não escolhe a cota', async () => {
   const forged = ['203.0.113.99', '198.51.100.23']
   const token = track(randomUUID().replaceAll('-', '') + randomUUID().replaceAll('-', ''))
   for (const address of forged) {
-    const response = await edge(config, token, 'exchange', {}, { 'X-Forwarded-For': address, 'CF-Connecting-IP': address })
-    assert.equal(response.status, 401)
+    // Este vetor é bloqueado no edge; a resposta não é o JSON da guest.
+    const blocked = await call('/functions/v1/guest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': address },
+      body: JSON.stringify({ action: 'exchange', token }),
+    })
+    assert.equal(blocked.status, 403, 'CF-Connecting-IP forjado bloqueado')
+    assert.equal(blocked.headers.get('server'), 'cloudflare')
+    assert.match(blocked.headers.get('content-type') ?? '', /text\/html/i)
+    const blockPage = await blocked.text()
+    const heading = blockPage.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i)?.[1].replace(/<[^>]*>/g, ' ')
+    assert.ok(/Error\s+1000\b/i.test(heading ?? ''), 'página do Cloudflare identifica Error 1000')
+
+    // Sem CF-Connecting-IP enviado pelo cliente, XFF deve chegar à guest.
+    const response = await edge(config, token, 'exchange', {}, { 'X-Forwarded-For': address })
+    assert.equal(response.status, 401, 'guest rejeita o token fictício')
   }
   const used = await db.query('select count(*) n from private.guest_rate where key_hash = any($1::text[])', [forged.map(a => hash(`ip:${a}`))])
   assert.equal(used.rows[0].n, '0', 'endereço forjado não virou cota de IP')

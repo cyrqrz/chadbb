@@ -126,3 +126,63 @@ documentado. O merge fica aguardando o novo ciclo G1 → G2 → G3.
 
 Também incluída a correção do smoke remoto: janelas de `guest_rate` que já existiam
 antes do teste e foram alteradas por ele passam a ser removidas.
+
+### Novo G3 após as correções — execução em 2026-09-14
+
+`npm run test:smoke:remote`: **6/7 passaram; G3 não aprovado**. Conexão pelo
+pooler de sessão com TLS `verify-full`, certificado e hostname validados contra
+a CA oficial local. A contagem global anterior estava zerada.
+
+O teste de cabeçalhos de IP forjados falhou ao interpretar a resposta como JSON
+(`Unexpected token '<'`), antes de conferir a cota. Uma reprodução diagnóstica
+com `X-Forwarded-For` e `CF-Connecting-IP` iguais a `203.0.113.99` retornou
+HTTP 403, `text/html`, servidor Cloudflare e erro 1000, “DNS points to prohibited
+IP”. Isso não comprova que o teste de cota passou nem que houve cota forjada;
+é necessário resolver a cobertura desse cenário hospedado antes de aprovar G3.
+
+O runner terminou os outros testes e executou a limpeza. Zero sobras confirmado
+pelo hook de limpeza e por contagem global independente das dez tabelas
+(usuários, eventos, itens, convites, sessões, reservas, pedidos, cotas, auditoria
+e objetos de Storage). Nova contagem após a reprodução também permaneceu zerada.
+Revisão final e merge suspensos conforme o critério de parada.
+
+### G3 aprovado após separar os vetores de IP — 2026-09-14
+
+**Resultado final: `npm run test:smoke:remote`, 7/7 aprovados**, com TLS
+`verify-full` pelo pooler de sessão e CA oficial. Este resultado substitui a
+pendência do G3 acima. A implementação da `guest` não foi alterada.
+
+O teste de IP agora exercita separadamente, para `203.0.113.99` e
+`198.51.100.23`:
+
+- Somente `CF-Connecting-IP` forjado: HTTP 403, servidor Cloudflare, conteúdo
+  HTML e cabeçalho da página identificando Error 1000, conforme bloqueio esperado
+  antes da função.
+- Somente `X-Forwarded-For` forjado: resposta JSON 401 da `guest` para o token
+  fictício. Consulta ao banco confirmou zero cotas para os hashes dos IPs falsos.
+
+Na primeira execução do smoke ajustado, a asserção de Error 1000 não reconheceu
+as tags HTML entre “Error” e “1000”; a extração do título `h1` foi corrigida e o
+smoke completo foi repetido com sucesso. Ambas as execuções terminaram sem sobras.
+
+Na execução final, as dez contagens globais estavam zeradas antes e depois:
+`auth.users`, `public.events`, `public.event_items`, `private.invitations`,
+`private.guest_sessions`, `public.reservations`, `private.guest_requests`,
+`private.guest_rate`, `private.retention_audit` e `storage.objects`. O hook de
+limpeza também confirmou zero sobras nos nove grupos que verifica.
+
+**G3 aprovado; merge não realizado**, conforme instrução de parar antes do merge.
+
+
+### Revisão final após G3 — 2026-09-14
+
+Revisadas as correções de `de3944e` (IP/cotas, validade de convites, compra
+informada, retenção de rascunhos e erros retentáveis), seus testes e o ajuste do
+smoke remoto. Nenhum novo bloqueio identificado nessa revisão. `npm run lint`
+e `git diff --check` aprovados. O G3 acima valida o smoke ajustado; a CI do PR
+será conferida novamente após publicar este ajuste.
+
+G2 informado na retomada pelo responsável: 20/20 migrations, última
+`20260915020000_review_fixes.sql`; `guest` versão 2 e `retention` versão 1,
+ambas ACTIVE com `verify_jwt=false`. Somente o cron `personal-data-retention`
+ativo. Sem alterações adicionais de migrations, funções ou segredos nesta revisão.
