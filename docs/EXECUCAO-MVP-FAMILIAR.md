@@ -53,9 +53,9 @@ Próxima etapa M6: seguir o [roteiro de entrega](ENTREGA-E-SUPORTE.md), com ambi
 separado, login real por e-mail, restauração e ensaio com a família. Nenhum dado
 real foi cadastrado/publicado e nenhum banco remoto foi alterado neste avanço.
 
-
-Projeto remoto autorizado pelo solicitante: criar **chadbb-cha**, exclusivo do
-chá, na região **São Paulo (`sa-east-1`)**, separado de desenvolvimento e preview.
-Ainda não criado: a CLI desta máquina precisa de autenticação do titular.
-O identificador será registrado após a criação. O responsável pelo suporte foi
-respondido como `[nome]`, portanto continua pendente de identificação real.
+Projeto remoto criado em 2026-09-14: **chadbb-cha**, ref `fcykqrlnofmdtmewlejr`,
+organização `chadbb` (`zfzzahtvvtmuogmatolo`), região **São Paulo (`sa-east-1`)**,
+exclusivo do chá e separado de desenvolvimento e preview. A senha do banco fica
+apenas na máquina do titular, fora do repositório. Nenhuma migration, função ou
+configuração de Auth foi aplicada ainda. O responsável pelo suporte continua
+pendente: `[nome]` era um exemplo, não uma resposta.

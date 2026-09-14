@@ -88,9 +88,9 @@ permanecerem fora do procedimento acordado.
 - Conteúdo cadastrado e aprovado pelo irmão.
 - Ensaio no WhatsApp e no celular real aprovado pela família.
 
-
-Projeto remoto autorizado pelo solicitante: criar **chadbb-cha**, exclusivo do
-chá, na região **São Paulo (`sa-east-1`)**, separado de desenvolvimento e preview.
-Ainda não criado: a CLI desta máquina precisa de autenticação do titular.
-O identificador será registrado após a criação. O responsável pelo suporte foi
-respondido como `[nome]`, portanto continua pendente de identificação real.
+Projeto remoto criado em 2026-09-14: **chadbb-cha**, ref `fcykqrlnofmdtmewlejr`,
+organização `chadbb` (`zfzzahtvvtmuogmatolo`), região **São Paulo (`sa-east-1`)**,
+exclusivo do chá e separado de desenvolvimento e preview. A senha do banco fica
+apenas na máquina do titular, fora do repositório. Nenhuma migration, função ou
+configuração de Auth foi aplicada ainda. O responsável pelo suporte continua
+pendente: `[nome]` era um exemplo, não uma resposta.
