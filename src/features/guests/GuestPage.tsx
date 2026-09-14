@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { guestCall, GuestError, guestMessage, responseLabels } from './api'
@@ -6,23 +6,38 @@ import type { GuestItem, ResponseChoice, Snapshot } from './api'
 import { live } from '../../lib/query'
 import { coverUrl } from '../events/api'
 
-// A promessa compartilhada evita trocar duas vezes no StrictMode. Segredos não
-// entram no storage, nas chaves do cache ou nas consultas de URL.
-let opening: Promise<{ token: string; snapshot: Snapshot }> | undefined
+// O efeito reutiliza a promessa no StrictMode, sem compartilhar credenciais
+// entre montagens. Abrir outro fragmento invalida o acesso anterior imediatamente.
 function openInvite() {
-  if (!opening) {
-    const token = window.location.hash.slice(1)
-    window.history.replaceState(null, '', window.location.pathname)
-    opening = /^[a-f0-9]{64}$/.test(token)
-      ? guestCall(token, 'exchange').then(data => ({ token: data.session_token!, snapshot: data.snapshot }))
-      : Promise.reject(new GuestError('GUEST_SESSION_INVALID', 401))
-  }
-  return opening
+  const token = window.location.hash.slice(1)
+  window.history.replaceState(null, '', window.location.pathname)
+  return /^[a-f0-9]{64}$/.test(token)
+    ? guestCall(token, 'exchange').then(data => ({ token: data.session_token!, snapshot: data.snapshot }))
+    : Promise.reject(new GuestError('GUEST_SESSION_INVALID', 401))
 }
 export function GuestPage() {
   const [access, setAccess] = useState<{ token: string; snapshot: Snapshot } | null>(null)
   const [error, setError] = useState<unknown>(null)
-  useEffect(() => { let active = true; void openInvite().then(value => { if (active) setAccess(value) }).catch(cause => { if (active) setError(cause) }); return () => { active = false } }, [])
+  const opening = useRef<ReturnType<typeof openInvite> | null>(null)
+  useEffect(() => {
+    let active = true
+    let attempt = 0
+    function follow(promise: ReturnType<typeof openInvite>) {
+      const current = ++attempt
+      void promise.then(value => { if (active && current === attempt) setAccess(value) })
+        .catch(cause => { if (active && current === attempt) setError(cause) })
+    }
+    opening.current ??= openInvite()
+    follow(opening.current)
+    function reopen() {
+      if (window.location.hash === '#conteudo') return
+      setAccess(null); setError(null)
+      opening.current = openInvite()
+      follow(opening.current)
+    }
+    window.addEventListener('hashchange', reopen)
+    return () => { active = false; window.removeEventListener('hashchange', reopen) }
+  }, [])
   if (error) return <section className="page"><p className="eyebrow">Seu convite</p><h1 className="page-title">Vamos recuperar seu acesso</h1><p role="alert" className="notice mt-6">{guestMessage(error)}</p></section>
   if (!access) return <p role="status" className="page">Abrindo seu convite…</p>
   return <GuestEvent access={access} />
@@ -38,7 +53,7 @@ function GuestEvent({ access }: { access: { token: string; snapshot: Snapshot } 
   const [pending, setPending] = useState<{ action: string; payload: Record<string, unknown>; signature: string } | null>(null)
   const query = useQuery({ queryKey: key, queryFn: async ({ signal }) => (await guestCall(access.token, 'read', {}, signal)).snapshot,
     initialData: access.snapshot, ...live, enabled: q => !expired && !(q.state.error instanceof GuestError && q.state.error.status === 401), retry: false })
-  useEffect(() => () => { cache.removeQueries({ queryKey: key }); opening = undefined }, [cache, key])
+  useEffect(() => () => { cache.removeQueries({ queryKey: key }) }, [cache, key])
   async function mutate(action: string, payload: Record<string, unknown>) {
     if (busy || expired) return false
     const signature = JSON.stringify({ action, payload })

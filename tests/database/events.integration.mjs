@@ -609,3 +609,63 @@ test('6: defaults configuráveis afetam apenas novas listas e preservam regra de
     await assert.rejects(as(alice, 'select public.prepare_family_list($1)', [fresh.event.id]), { code: '22023', message: 'EVENT_CLOSED' })
   } finally { await admin.query("insert into private.family_list_defaults values ('P',6) on conflict(diaper_size) do update set quantity=6") }
 })
+
+test('regra confirmada: cota é global por tamanho, sem teto comercial de pacotes por convite', async () => {
+  const f = await familyFixture(1)
+  const other = await organizerAction(f.event, 'create', { name: 'Outro convite', kind: 'family', capacity: 4 })
+  const second = (await guestAction(other.token, 'exchange')).session_token
+  for (const [size, quantity] of Object.entries({ P: 6, M: 19, G: 19, XG: 6 })) {
+    const item = f.snapshot.items.find(i => i.diaper_size === size)
+    await guestAction(f.token, 'reserve', request({ item_id: item.id, quantity, version: null }))
+    await assert.rejects(guestAction(second, 'reserve', request({ item_id: item.id, quantity: 1, version: null })), /INSUFFICIENT_QUANTITY/)
+  }
+  const snapshot = (await guestAction(f.token, 'read')).snapshot
+  assert.equal(snapshot.items.filter(i => i.category === 'fralda').reduce((n, i) => n + i.own.quantity, 0), 50)
+  assert.equal(snapshot.invitation.attending, 0, 'reservas não dependem do RSVP nem do limite de pessoas')
+  const p = snapshot.items.find(i => i.diaper_size === 'P')
+  await guestAction(f.token, 'cancel', request({ item_id: p.id, version: 1 }))
+  const after = (await guestAction(second, 'reserve', request({ item_id: p.id, quantity: 6, version: null }))).snapshot
+  assert.deepEqual(Object.fromEntries(after.items.filter(i => i.category === 'fralda').map(i => [i.diaper_size, i.committed])), { G: 19, M: 19, P: 6, XG: 6 })
+})
+
+test('M4: cancelamento simultâneo com mesma chave libera o saldo uma única vez', async () => {
+  const f = await familyFixture(); const item = f.snapshot.items.find(i => i.diaper_size === 'P')
+  await guestAction(f.token, 'reserve', request({ item_id: item.id, quantity: 6, version: null }))
+  const clients = [server.getPgClient(), server.getPgClient()]
+  await Promise.all(clients.map(c => c.connect()))
+  try {
+    const payload = request({ item_id: item.id, version: 1 })
+    const results = await Promise.all(clients.map(c => guestAction(f.token, 'cancel', payload, c)))
+    assert.deepEqual(results[0].result, results[1].result)
+    assert.equal(results[0].result.version, 2)
+    assert.equal((await guestAction(f.token, 'read')).snapshot.items.find(i => i.id === item.id).committed, 0)
+  } finally { await Promise.all(clients.map(c => c.end())) }
+})
+
+test('M4: encerramento que obtém o bloqueio primeiro impede reserva concorrente', async () => {
+  const f = await familyFixture(); const item = f.snapshot.items.find(i => i.diaper_size === 'P')
+  const owner = await connectAs(alice); const guest = server.getPgClient(); await guest.connect()
+  try {
+    await owner.query('begin')
+    await owner.query("select public.transition_event($1,$2,'closed')", [f.event.id, f.event.version])
+    const attempt = assert.rejects(guestAction(f.token, 'reserve', request({ item_id: item.id, quantity: 1, version: null }), guest), /EVENT_CLOSED/)
+    await owner.query('commit'); await attempt
+    assert.equal((await guestAction(f.token, 'read')).snapshot.items.find(i => i.id === item.id).committed, 0)
+  } finally { await owner.query('rollback'); await Promise.all([owner.end(), guest.end()]) }
+})
+
+test('M4: redução de cota e reserva concorrentes preservam o saldo persistido', async () => {
+  const f = await familyFixture(); const item = f.snapshot.items.find(i => i.diaper_size === 'P')
+  const stored = (await admin.query('select * from public.event_items where id=$1', [item.id])).rows[0]
+  const owner = await connectAs(alice); const guest = server.getPgClient(); await guest.connect()
+  try {
+    const results = await Promise.allSettled([
+      owner.query('select public.set_event_item_quantity($1,$2,$3,$4)', [f.event.id, item.id, stored.version, 1]),
+      guestAction(f.token, 'reserve', request({ item_id: item.id, quantity: 6, version: null }), guest),
+    ])
+    assert.equal(results.filter(r => r.status === 'fulfilled').length, 1)
+    assert.match(results.find(r => r.status === 'rejected').reason.message, /INSUFFICIENT_QUANTITY|QUANTITY_BELOW_COMMITTED/)
+    const actual = (await guestAction(f.token, 'read')).snapshot.items.find(i => i.id === item.id)
+    assert.ok(actual.committed <= actual.limit)
+  } finally { await Promise.all([owner.end(), guest.end()]) }
+})

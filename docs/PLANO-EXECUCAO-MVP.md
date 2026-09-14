@@ -1,6 +1,11 @@
 # Plano de entrega — chá de bebê da família
 
-Revisado em 2026-09-11 por solicitação do idealizador.
+Revisado em 2026-09-14 por solicitação do idealizador.
+
+Data do chá: **01/11/2026**. Horário: **12h, horário de Brasília**. Título: **Chá de bebê da Liz**.
+Confirmação solicitada até **18/10/2026**. Local recebido no convite e mantido
+fora do repositório público. Responsável pelo suporte ainda precisa ser definido. Limites globais: P 6 / M 19 / G 19 / XG 6; sem cota
+comercial adicional por convite.
 
 ## Objetivo e prioridade
 
@@ -48,7 +53,13 @@ a ausência de limite para todos eles e os testes de independência. Os números
 originais dos mimos são referências sugeridas, não cotas. Cada unidade de fralda representa um pacote.
 Esses requisitos passam a integrar M1–M5 dentro do prazo já planejado.
 
-## Estado real de partida
+## Estado de partida em 11/09 (histórico)
+
+Avanço em 14/09: M2–M4 implementados e testes locais/CI aprovados conforme
+a [revisão técnica](REVISAO-TECNICA-2026-09-14.md). M5 segue com ensaios de
+falha de rede, reabertura e acessibilidade; M6 depende de configuração do
+ambiente do evento, recuperação e aceite da família. A tabela abaixo preserva
+o diagnóstico inicial, não representa o estado atual.
 
 | Área | Evidência atual | Falta para entregar |
 | --- | --- | --- |
@@ -65,11 +76,12 @@ Testes antigos de navegador usaram APIs simuladas; não comprovam a jornada real
 
 ## M1 — Fechar a experiência e o visual
 
-- [ ] Registrar data do evento e quem prestará suporte. Volume confirmado: cerca de 50 convidados. Prazo informado: segunda semana de outubro de 2026, com aproximadamente 20 dias de desenvolvimento; dia exato ainda a confirmar.
+- [x] Registrar data do evento: **01/11/2026**.
+- [ ] Definir quem prestará suporte. Volume confirmado: cerca de 50 convidados. Prazo informado: segunda semana de outubro de 2026, com aproximadamente 20 dias de desenvolvimento; dia exato ainda a confirmar.
 - [x] Escopo confirmado: o organizador escolhe individual ou familiar em cada convite.
-- [ ] Implementar convite individual com uma pessoa e familiar com nome de referência e limite de pessoas definido pelo organizador. RSVP familiar informa quantas vão dentro desse limite; painel distingue convites respondidos de pessoas confirmadas.
+- [x] Implementar convite individual com uma pessoa e familiar com nome de referência e limite de pessoas definido pelo organizador. RSVP familiar informa quantas vão dentro desse limite; painel distingue convites respondidos de pessoas confirmadas.
 - [ ] Reunir título, data/hora, local, instruções, imagem autorizada e lista desejada. Usar dados fictícios durante desenvolvimento.
-- [ ] Criar uma direção visual única: acolhedora, limpa, com tipografia legível, hierarquia, espaçamentos e cores consistentes. Adaptar ao tema escolhido pela família, sem construir um editor de temas.
+- [x] Criar uma direção visual única: acolhedora, limpa, com tipografia legível, hierarquia, espaçamentos e cores consistentes. Paleta rosa alinhada ao convite recebido em 14/09, sem construir um editor de temas.
 - [ ] Aplicar o visual às telas de convite, confirmação, presentes e painel; mostrar estados de vazio, carregamento, sucesso e erro com a mesma qualidade.
 - [ ] Manter uma ação principal clara por etapa e linguagem simples: “Confirmar presença”, “Escolher presente”, “Cancelar reserva”. Explicar reserva e compra autodeclarada.
 
@@ -80,10 +92,10 @@ com cada fluxo, sem deixá-lo como acabamento opcional ao final.
 
 ## M2 — Concluir organizador e lista com dados atuais
 
-- [ ] Testar login por e-mail, callback, logout e sessão expirada com Supabase real.
+- [x] Testar login por e-mail, callback, logout e sessão expirada com Supabase real.
 - [ ] Validar criação/edição/publicação do evento e lista pela API real, incluindo tentativa de outro usuário acessar ou alterar os dados.
-- [ ] Preparar catálogo com fraldas P/M/G/XG e os 23 mimos da especificação; usar pacotes para fraldas, ausência explícita de limite em todos os mimos, inclusive os originalmente numerados.
-- [ ] Implementar abas Fraldas e Mimos, quantidades por mimo e resumo separado; adaptar schema/API para categorias e política de limite própria por item.
+- [x] Preparar catálogo com fraldas P/M/G/XG e os 23 mimos da especificação; usar pacotes para fraldas, ausência explícita de limite em todos os mimos, inclusive os originalmente numerados.
+- [x] Implementar abas Fraldas e Mimos, quantidades por mimo e resumo separado; adaptar schema/API para categorias e política de limite própria por item.
 - [ ] Implementar a política de atualização abaixo em eventos, lista e futuros painéis.
 - [ ] Preservar alterações de formulário ainda não salvas quando chegar uma atualização; detectar conflito de versão e oferecer recarregar/revisar.
 
@@ -114,15 +126,15 @@ São metas a validar, não garantias de instantaneidade sob falha de rede.
 
 ## M3 — Convites e confirmação de presença
 
-- [ ] Criar convites, sessões e respostas com tipo individual ou familiar selecionado pelo organizador. Permitir ambos no mesmo evento.
-- [ ] Validar no banco: individual confirma exatamente uma pessoa; familiar confirma de 1 até o limite do convite; resposta negativa conta zero; “talvez” e ausência de resposta não entram em pessoas confirmadas. Atualizar resposta e quantidade na mesma transação.
-- [ ] Usar um link por convite e um responsável de referência por família, sem exigir cadastro nominal de cada integrante. Reservas pertencem ao convite e são compartilhadas pela família; alterações concorrentes da resposta devem detectar conflito de versão.
-- [ ] Impedir redução do limite abaixo da quantidade já confirmada e mudança de tipo incompatível com respostas existentes; orientar ajuste explícito sem descartar dados silenciosamente.
-- [ ] Emitir, copiar, revogar e reemitir links pelo organizador; compartilhar manualmente no WhatsApp.
-- [ ] Trocar token do convite por sessão, remover segredo da URL e validar expiração/revogação em toda leitura ou alteração. Guardar somente hashes no banco para credenciais.
-- [ ] Permitir confirmar, recusar ou deixar “talvez” e alterar a resposta, sem exigir criação de conta do convidado.
-- [ ] Mostrar apenas dados do evento e da própria resposta/reservas; não expor outros convidados.
-- [ ] Aplicar limites de abuso, validação de entrada e recuperação compreensível para convite inválido ou sessão expirada.
+- [x] Criar convites, sessões e respostas com tipo individual ou familiar selecionado pelo organizador. Permitir ambos no mesmo evento.
+- [x] Validar no banco: individual confirma exatamente uma pessoa; familiar confirma de 1 até o limite do convite; resposta negativa conta zero; “talvez” e ausência de resposta não entram em pessoas confirmadas. Atualizar resposta e quantidade na mesma transação.
+- [x] Usar um link por convite e um responsável de referência por família, sem exigir cadastro nominal de cada integrante. Reservas pertencem ao convite e são compartilhadas pela família; alterações concorrentes da resposta devem detectar conflito de versão.
+- [x] Impedir redução do limite abaixo da quantidade já confirmada e mudança de tipo incompatível com respostas existentes; orientar ajuste explícito sem descartar dados silenciosamente.
+- [x] Emitir, copiar, revogar e reemitir links pelo organizador; compartilhar manualmente no WhatsApp.
+- [x] Trocar token do convite por sessão, remover segredo da URL e validar expiração/revogação em toda leitura ou alteração. Guardar somente hashes no banco para credenciais.
+- [x] Permitir confirmar, recusar ou deixar “talvez” e alterar a resposta, sem exigir criação de conta do convidado.
+- [x] Mostrar apenas dados do evento e da própria resposta/reservas; não expor outros convidados.
+- [x] Aplicar limites de abuso, validação de entrada e recuperação compreensível para convite inválido ou sessão expirada.
 - [ ] Testar acesso cruzado, revogação, expiração, reabertura do link no WhatsApp, convite individual, família, limites e contagem de pessoas ao alterar uma resposta.
 
 Aceite: um convidado abre o link no celular, responde e vê sua resposta persistida;
@@ -131,15 +143,15 @@ o painel do organizador atualiza conforme o contrato de dados. O fluxo de retorn
 
 ## M4 — Reservas corretas no banco
 
-- [ ] Implementar reservas com quantidades positivas, vínculos obrigatórios e chave de idempotência única por convite.
-- [ ] Garantir limites P=6, M=19, G=19 e XG=6 separadamente no banco; mimos nunca alteram esses totais. Validar quantidade inteira positiva em todos os mimos, sem teto comercial por convite ou evento; não exibir esgotamento de mimos.
-- [ ] Implementar troca de tamanho atômica, preservando escolha anterior se o destino não estiver disponível; testar reservas e cancelamentos nas duas categorias.
-- [ ] Calcular e validar disponibilidade dentro da mesma transação SQL da reserva, com bloqueio evento → item → reserva quando aplicável. Não confiar na quantidade mostrada pelo navegador.
-- [ ] Integrar `private.committed_quantity` na migration de reservas; nunca assumir zero quando já houver comprometimento.
-- [ ] Permitir cancelar e indicar “Já comprei”, mantendo quantidade comprometida enquanto reservado/comprado; deixar claro que a compra é informada pelo convidado.
-- [ ] Impedir escrita direta em reservas e alteração de identidade/evento pelo cliente. Preservar RLS, grants mínimos e funções privilegiadas restritas.
+- [x] Implementar reservas com quantidades positivas, vínculos obrigatórios e chave de idempotência única por convite.
+- [x] Garantir limites P=6, M=19, G=19 e XG=6 separadamente no banco; mimos nunca alteram esses totais. Validar quantidade inteira positiva em todos os mimos, sem teto comercial por convite ou evento; não exibir esgotamento de mimos.
+- [x] Implementar troca de tamanho atômica, preservando escolha anterior se o destino não estiver disponível; testar reservas e cancelamentos nas duas categorias.
+- [x] Calcular e validar disponibilidade dentro da mesma transação SQL da reserva, com bloqueio evento → item → reserva quando aplicável. Não confiar na quantidade mostrada pelo navegador.
+- [x] Integrar `private.committed_quantity` na migration de reservas; nunca assumir zero quando já houver comprometimento.
+- [x] Permitir cancelar e indicar “Já comprei”, mantendo quantidade comprometida enquanto reservado/comprado; deixar claro que a compra é informada pelo convidado.
+- [x] Impedir escrita direta em reservas e alteração de identidade/evento pelo cliente. Preservar RLS, grants mínimos e funções privilegiadas restritas.
 - [ ] Integrar encerramento e regras pós-evento do contrato familiar.
-- [ ] Cobrir os cenários abaixo com PostgreSQL real, conexões independentes e API autorizada.
+- [x] Cobrir os cenários abaixo com PostgreSQL real, conexões independentes e API autorizada. Evidências: revisão técnica e continuação M4/M5 no registro de execução.
 
 | Cenário obrigatório | Resultado |
 | --- | --- |
@@ -197,7 +209,7 @@ Engenharia: Codex em colaboração com o solicitante. Conteúdo, prioridades e a
 às contas: solicitante. Validação prática: irmão como organizador e um convidado.
 Volume confirmado: 50 convidados. Prazo solicitado: segunda semana de outubro de
 2026, com cerca de 20 dias de desenvolvimento. O prazo é para entregar a ferramenta;
-a data do chá ainda não foi informada e não será inferida desse prazo.
+o chá ocorrerá em **1º de novembro de 2026**, conforme informado pelo solicitante.
 
 ### Calendário de trabalho
 

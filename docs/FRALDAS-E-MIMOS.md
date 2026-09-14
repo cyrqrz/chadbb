@@ -1,7 +1,7 @@
 # Fraldas e mimos do chá
 
-Requisitos recebidos em 2026-09-11. Especificação para implementação; não representa
-funcionalidade já disponível. Complementa o [plano do MVP](PLANO-EXECUCAO-MVP.md).
+Requisitos recebidos em 2026-09-11 e esclarecidos em 2026-09-14. Implementação
+e testes registrados na revisão técnica. Complementa o [plano do MVP](PLANO-EXECUCAO-MVP.md).
 
 ## Experiência do convidado
 
@@ -41,6 +41,9 @@ O convite pode escolher vários pacotes de fraldas, inclusive em convite familia
 sempre respeitando o saldo de cada tamanho. Regra registrada a partir da resposta
 “varios cotes”, interpretada como “vários pacotes”. Não multiplicar pelo RSVP.
 Permitir informar a quantidade desejada por tamanho; o servidor valida o saldo.
+Confirmado em 2026-09-14: esses limites são globais por tamanho, para equilibrar
+os pacotes do evento; não existe cota comercial adicional por convite.
+O teto técnico de 1000 por reserva é proteção de entrada, não rateio entre convidados.
 
 ## Lista de mimos recebida
 

@@ -99,3 +99,75 @@ test('organizador edita convite e recebe conflito se RSVP mudou durante a ediç�
     await page.getByRole('button', { name: 'Cancelar edição' }).click()
   } finally { await ctx.close(); await f.cleanup() }
 }, { timeout: 30000 })
+
+test('M5: outro convite e fragmento inválido na mesma aba nunca exibem a família anterior', async () => {
+  const f = await fixture(config); const ctx = await browser.newContext()
+  try {
+    const other = await f.call('organizer_invitations', { p_event_id: f.event.id, p_action: 'create', p_payload: { name: 'Outra família', kind: 'family', capacity: 2 } })
+    const page = await ctx.newPage()
+    await page.goto(`${origin}/convite#${f.invite.token}`)
+    await expect(page.getByText('Família de teste, este convite', { exact: false })).toBeVisible()
+    await page.evaluate(token => { window.location.hash = token }, other.token)
+    await expect(page.getByText('Outra família, este convite', { exact: false })).toBeVisible()
+    await expect(page.getByText('Família de teste, este convite', { exact: false })).toHaveCount(0)
+    assert.equal(new URL(page.url()).hash, '')
+    await page.evaluate(() => { window.location.hash = 'invalido' })
+    await expect(page.getByRole('heading', { name: 'Vamos recuperar seu acesso' })).toBeVisible()
+    await expect(page.getByText('Outra família, este convite', { exact: false })).toHaveCount(0)
+    await page.evaluate(token => { window.location.hash = token }, f.invite.token)
+    await expect(page.getByText('Família de teste, este convite', { exact: false })).toBeVisible()
+    assert.equal(await page.evaluate(() => localStorage.length + sessionStorage.length), 0)
+  } finally { await ctx.close(); await f.cleanup() }
+}, { timeout: 30000 })
+
+test('M5: resposta perdida após commit é recuperada com a mesma chave, sem duplicar reserva', async () => {
+  const f = await fixture(config); const ctx = await browser.newContext()
+  try {
+    const page = await ctx.newPage(); const requests = []
+    let loseResponse = true
+    await page.route('**/functions/v1/guest', async route => {
+      const body = route.request().postDataJSON()
+      if (body.action !== 'reserve') return route.continue()
+      requests.push(body.payload.request_id)
+      const response = await route.fetch()
+      assert.equal(response.status(), 200, 'o servidor confirmou antes da falha simulada')
+      if (loseResponse) { loseResponse = false; await route.abort('failed') }
+      else await route.fulfill({ response })
+    })
+    await page.goto(`${origin}/convite#${f.invite.token}`)
+    await page.getByRole('button', { name: 'Fraldas', exact: true }).click()
+    const item = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Fraldas tamanho P', exact: true }) })
+    await item.getByRole('spinbutton').fill('2')
+    await item.getByRole('button', { name: 'Vou levar', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Verificar tentativa anterior' })).toBeVisible()
+    await expect(page.getByText('Confirmado! Suas informações foram salvas.')).toHaveCount(0)
+    await page.getByRole('button', { name: 'Verificar tentativa anterior' }).click()
+    await expect(page.getByText('Confirmado! Suas informações foram salvas.')).toBeVisible()
+    assert.equal(requests.length, 2); assert.equal(requests[0], requests[1])
+    const snapshot = (await edge(config, f.invite.token, 'exchange')).data.snapshot
+    const stored = snapshot.items.find(i => i.diaper_size === 'P')
+    assert.equal(stored.committed, 2); assert.equal(stored.own.version, 1)
+  } finally { await ctx.close(); await f.cleanup() }
+}, { timeout: 30000 })
+
+test('M5: 320 px, texto a 200%, teclado e acessibilidade nas três áreas do convite', async () => {
+  const f = await fixture(config); const ctx = await browser.newContext({ viewport: { width: 320, height: 740 }, reducedMotion: 'reduce' })
+  try {
+    const page = await ctx.newPage()
+    await page.goto(`${origin}/convite#${f.invite.token}`)
+    await expect(page.getByRole('heading', { name: 'Podemos contar com você?' })).toBeVisible()
+    await page.keyboard.press('Tab')
+    await expect(page.getByRole('link', { name: 'Pular para o conteúdo' })).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('heading', { name: 'Podemos contar com você?' })).toBeVisible()
+    await page.addStyleTag({ content: 'html { font-size: 200%; }' })
+    for (const name of ['Presença', 'Fraldas', 'Mimos']) {
+      const tab = page.getByRole('button', { name, exact: true })
+      await tab.focus(); await page.keyboard.press('Enter')
+      await expect(tab).toHaveAttribute('aria-pressed', 'true')
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `sem rolagem horizontal em ${name}`)
+      const report = await new AxeBuilder({ page }).analyze()
+      assert.deepEqual(report.violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.target) })), [])
+    }
+  } finally { await ctx.close(); await f.cleanup() }
+}, { timeout: 60000 })

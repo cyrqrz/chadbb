@@ -1,31 +1,31 @@
 @import "tailwindcss";
 
 @layer base {
-  body { margin: 0; background: #f7f5ef; color: #292b25; font-family: ui-sans-serif, system-ui, sans-serif; }
+  body { margin: 0; background: #fff5f7; color: #3f2931; overflow-wrap: anywhere; font-family: ui-sans-serif, system-ui, sans-serif; }
   h1 { font-size: clamp(2.75rem, 6vw, 4.5rem); line-height: 1.08; letter-spacing: -0.055em; font-weight: 650; }
-  :focus-visible { outline: 3px solid #9a3412; outline-offset: 5px; }
+  :focus-visible { outline: 3px solid #9b365a; outline-offset: 5px; }
   html { scroll-behavior: smooth; }
   @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 }
 @layer components {
-  .button { display: inline-flex; align-items: center; gap: 2rem; border-radius: 999px; padding: 0.9rem 1.5rem; background: #344638; color: white; font-weight: 600; }
-  .button:hover { background: #243529; }
+  .button { max-width: 100%; justify-content: center; display: inline-flex; align-items: center; gap: 2rem; border-radius: 999px; padding: 0.9rem 1.5rem; background: #823b55; color: white; font-weight: 600; }
+  .button:hover { background: #63283e; }
   .skip-link { position: absolute; top: -100px; background: white; padding: 1rem; z-index: 10; }
   .skip-link:focus { top: 0; }
 }
 
 @layer components {
-  .page { padding-block: 3rem 5rem; }
+  .page { min-width: 0; padding-block: 3rem 5rem; }
   .page-title { font-size: clamp(2rem, 5vw, 3rem); letter-spacing: -0.04em; }
-  .eyebrow { margin-bottom: 0.75rem; color: #9a3412; font-size: 0.8rem; font-weight: 650; text-transform: uppercase; letter-spacing: 0.1em; }
-  .card { border: 1px solid #d6d3d1; border-radius: 1.25rem; background: #fffdf8; padding: 1.5rem; }
+  .eyebrow { margin-bottom: 0.75rem; color: #9b365a; font-size: 0.8rem; font-weight: 650; text-transform: uppercase; letter-spacing: 0.1em; }
+  .card { min-width: 0; border: 1px solid #d6d3d1; border-radius: 1.25rem; background: #fffafb; padding: clamp(0.875rem, 4vw, 1.5rem); }
   .field { display: flex; flex-direction: column; gap: 0.5rem; font-weight: 600; }
   .field input, .field textarea, .field select { width: 100%; border: 1px solid #a8a29e; border-radius: 0.65rem; background: white; padding: 0.75rem; font-weight: 400; min-width: 0; }
   .hint { font-size: 0.85rem; font-weight: 400; color: #57534e; }
-  .notice { padding: 1rem; border-radius: 0.75rem; background: #edece2; }
+  .notice { padding: 1rem; border-radius: 0.75rem; background: #fae9ef; }
   .error { color: #991b1b; }
   .text-link { text-decoration: underline; text-underline-offset: 4px; font-weight: 600; }
-  .badge { display: inline-block; border-radius: 999px; background: #e7eadf; color: #344638; padding: 0.3rem 0.75rem; font-size: 0.8rem; }
+  .badge { display: inline-block; border-radius: 999px; background: #f7e0e9; color: #823b55; padding: 0.3rem 0.75rem; font-size: 0.8rem; }
   .secondary { border: 1px solid #57534e; border-radius: 999px; padding: 0.75rem 1.25rem; font-weight: 600; }
   button { cursor: pointer; }
   button:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -34,11 +34,12 @@
 
 @layer components {
   .guest-hero { display: grid; gap: 2rem; align-items: center; padding-block: 1rem; }
-  .guest-art { min-height: 16rem; border-radius: 2rem; background: #efe5d4; color: #344638; padding: 2.5rem; display: flex; flex-direction: column; justify-content: space-between; }
+  .guest-art { min-height: 16rem; border-radius: 2rem; background: #f8dfe9; color: #823b55; padding: clamp(1rem, 5vw, 2.5rem); display: flex; flex-direction: column; justify-content: space-between; }
+  .guest-hero > * { min-width: 0; }
   .guest-art span { font-size: 4rem; line-height: 1; }
   .guest-art p { font-size: 1.5rem; font-weight: 600; margin-top: 2rem; }
   .category-nav { display: flex; flex-wrap: wrap; gap: .75rem; margin-block: 2rem; }
   .choice { display: flex; gap: .75rem; align-items: center; min-height: 48px; border: 1px solid #a8a29e; border-radius: .75rem; padding: .75rem 1rem; }
-  .choice input { width: 1.2rem; height: 1.2rem; accent-color: #344638; }
+  .choice input { flex-shrink: 0; width: 1.2rem; height: 1.2rem; accent-color: #823b55; }
   @media (min-width: 768px) { .guest-hero { grid-template-columns: 1.3fr 1fr; } }
 }

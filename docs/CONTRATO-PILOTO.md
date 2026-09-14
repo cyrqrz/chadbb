@@ -1,13 +1,15 @@
 # Contrato do MVP familiar
 
-Revisado em 2026-09-11. Referência vigente: [plano de entrega](PLANO-EXECUCAO-MVP.md).
+Revisado em 2026-09-14. Referência vigente: [plano de entrega](PLANO-EXECUCAO-MVP.md).
 
 ## Entrega e responsáveis
 
 A primeira entrega atende ao chá de bebê do irmão do solicitante, com cerca de
 50 convidados. O solicitante informou aproximadamente 20 dias de desenvolvimento
 e necessidade de entrega até a segunda semana de outubro de 2026. O dia exato de
-entrega e a data do evento ainda não foram informados. Planejar versão completa
+entrega ainda não foi informado. Data do chá confirmada: **01/11/2026**;
+horário confirmado no convite: **12h, horário de Brasília**. Conteúdo e local
+foram recebidos na imagem do convite e preparados fora do repositório. Planejar versão completa
 para ensaio até 1º de outubro e usar a margem seguinte para validação e correções.
 
 Engenharia: Codex e solicitante. Conteúdo e contas: solicitante. Aceite de uso:
@@ -44,7 +46,9 @@ Unidade confirmada: pacotes. Todos os mimos ficam sem limite por convite ou
 no total do evento; números originais são referências sugeridas, sem bloqueio.
 Esta decisão substitui o limite anteriormente confirmado para mimos numerados. Cada convite pode escolher
 vários pacotes, respeitando o saldo por tamanho; “varios cotes” foi interpretado
-como “vários pacotes”. Não exigir mimo para confirmar presença.
+como “vários pacotes”. Em 2026-09-14, o solicitante confirmou que os limites
+servem para equilibrar os tamanhos no total do evento: **não há cota comercial
+adicional de pacotes por convite**. Não exigir mimo para confirmar presença.
 
 ## Qualidade obrigatória
 
