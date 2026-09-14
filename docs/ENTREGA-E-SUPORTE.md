@@ -87,3 +87,10 @@ permanecerem fora do procedimento acordado.
 - Responsável por suporte e procedimento de exclusão definidos.
 - Conteúdo cadastrado e aprovado pelo irmão.
 - Ensaio no WhatsApp e no celular real aprovado pela família.
+
+
+Projeto remoto autorizado pelo solicitante: criar **chadbb-cha**, exclusivo do
+chá, na região **São Paulo (`sa-east-1`)**, separado de desenvolvimento e preview.
+Ainda não criado: a CLI desta máquina precisa de autenticação do titular.
+O identificador será registrado após a criação. O responsável pelo suporte foi
+respondido como `[nome]`, portanto continua pendente de identificação real.

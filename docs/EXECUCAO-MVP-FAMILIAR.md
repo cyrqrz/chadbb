@@ -52,3 +52,10 @@ PostgreSQL portátil, seis cenários de navegador real e 16 E2E aprovados.
 Próxima etapa M6: seguir o [roteiro de entrega](ENTREGA-E-SUPORTE.md), com ambiente
 separado, login real por e-mail, restauração e ensaio com a família. Nenhum dado
 real foi cadastrado/publicado e nenhum banco remoto foi alterado neste avanço.
+
+
+Projeto remoto autorizado pelo solicitante: criar **chadbb-cha**, exclusivo do
+chá, na região **São Paulo (`sa-east-1`)**, separado de desenvolvimento e preview.
+Ainda não criado: a CLI desta máquina precisa de autenticação do titular.
+O identificador será registrado após a criação. O responsável pelo suporte foi
+respondido como `[nome]`, portanto continua pendente de identificação real.

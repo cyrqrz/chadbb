@@ -4,12 +4,15 @@ import { createHash, randomBytes } from 'node:crypto'
 import { localConfig, localDatabase } from '../support/local.mjs'
 let config
 before(() => { config = localConfig() })
-function call(body, { origin = 'http://localhost:5173', method = 'POST', contentType = 'application/json', credential } = {}) {
-  return fetch(`${config.API_URL}/functions/v1/guest`, {
-    method, headers: { Origin: origin, 'Content-Type': contentType, apikey: config.PUBLISHABLE_KEY,
+async function call(body, { origin = 'http://localhost:5173', method = 'POST', contentType = 'application/json', credential } = {}) {
+  const response = await fetch(`${config.API_URL}/functions/v1/guest`, {
+    // Casos rejeitados antes de ler o body não compartilham conexão HTTP.
+    method, headers: { Connection: 'close', Origin: origin, 'Content-Type': contentType, apikey: config.PUBLISHABLE_KEY,
       ...(credential ? { Authorization: `Bearer ${credential}` } : {}) },
     body: method === 'POST' ? (typeof body === 'string' ? body : JSON.stringify(body)) : undefined,
   })
+  const content = await response.text()
+  return { status: response.status, headers: response.headers, json: async () => JSON.parse(content) }
 }
 test('resgatado da main: preflight, origem e método', async () => {
   const preflight = await call(undefined, { method: 'OPTIONS' })
