@@ -96,3 +96,43 @@ HTTP delas, entrega de e-mail real, backup diário protegido fora da máquina e
 validação das metas RPO/RTO. O comando local requer a stack Supabase de
 desenvolvimento ativa, sem usuários/eventos/arquivos e sem tráfego concorrente;
 usa portas 55321–55329 para o destino, além de 8183 reservado na configuração.
+
+## Retomada — 2026-09-14 (troca de máquina)
+
+Estado ao encerrar a sessão no computador do trabalho:
+
+- PR #1 integrado à `main` (`5353aa7`). O trabalho continua na branch `entrega-m6`.
+- `chadbb-cha`: 20/20 migrations; `guest` v2 e `retention` v1 ativas; cron apenas
+  `personal-data-retention`; Auth com Site URL e callback do Pages; SMTP pendente.
+- **Script de backup remoto preparado, mas nunca executado** (`npm run backup:remote`,
+  em `scripts/backup/`). Ele faz dump somente leitura de roles, schema e dados num
+  snapshot, copia o histórico de migrations, o cron e os objetos públicos do
+  Storage, e grava só um arquivo criptografado com GPG (AES256) em
+  `~/.config/chadbb/backups/`. `scripts/backup/supabase-ca.crt` é a CA pública
+  oficial "Supabase Root 2021 CA" (SHA-256 `80:70:25:AD…CA:FA`), usada com TLS
+  `verify-full`.
+
+### Próximo passo (exige aprovação: leitura no projeto remoto)
+
+1. `CHADBB_BACKUP_REF=fcykqrlnofmdtmewlejr npm run backup:remote` (requer Docker,
+   gpg e a chave pública de backup).
+2. Conferir a saída (`status: encrypted`, número de migrations e de objetos) e
+   ensaiar a descriptografia e restauração do arquivo num destino descartável.
+3. Definir o destino protegido fora da máquina, a retenção, o agendamento diário
+   e o alerta de falha, para cumprir RPO de 24 h e RTO de 2 h.
+4. Pages: configurar `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY` no
+   ambiente Production e fazer novo build.
+5. SMTP: domínio verificado no Resend e configuração no Auth; depois, validar a
+   entrega real e o login.
+
+### Arquivos que existem só no computador do trabalho (nunca no Git)
+
+Em `~/.config/chadbb/`, com permissão 600: `chadbb-cha.db-password`,
+`retention-cron-secret`, `backup-private.asc`, `backup-public.asc`,
+`backup-gnupg/`, `pages-production.env` e `supabase-ca.crt`. Para continuar em
+outra máquina, transfira-os por um canal seguro (gerenciador de senhas ou mídia
+criptografada), recrie a pasta com `chmod 700` e os arquivos com `chmod 600`, e
+rode `npx supabase login`. Sem `backup-private.asc` nenhum backup pode ser
+descriptografado: guarde uma cópia fora das duas máquinas. Enquanto essa chave
+estiver no mesmo computador que os backups, eles não contam como protegidos fora
+da máquina.

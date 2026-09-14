@@ -26,6 +26,7 @@
     "test:email:local": "node --test tests/local/email-login.test.mjs",
     "test:load:local": "node tests/load/guest.mjs",
     "test:recovery:local": "node tests/recovery/rehearsal.mjs",
+    "backup:remote": "node scripts/backup/remote.mjs",
     "test:smoke:remote": "node --test tests/remote/smoke.mjs"
   },
   "dependencies": {
