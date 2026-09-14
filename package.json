@@ -22,9 +22,10 @@
     "test:e2e": "playwright test",
     "test:api": "node --test --test-concurrency=1 tests/api/*.integration.mjs",
     "test:browser:local": "node --test tests/browser/*.integration.mjs",
-    "guest:serve": "supabase functions serve guest",
+    "functions:serve": "supabase functions serve --env-file supabase/functions/local-test.env",
     "test:email:local": "node --test tests/local/email-login.test.mjs",
-    "test:load:local": "node tests/load/guest.mjs"
+    "test:load:local": "node tests/load/guest.mjs",
+    "test:smoke:remote": "node --test tests/remote/smoke.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",

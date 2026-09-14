@@ -25,6 +25,7 @@ export async function cleanupUsers(config, ids) {
     await db.query('delete from public.reservations where invitation_id in (select id from private.invitations where event_id in (select id from public.events where owner_id=any($1::uuid[])))', [ids])
     await db.query('delete from private.invitations where event_id in (select id from public.events where owner_id=any($1::uuid[]))', [ids])
     await db.query('delete from public.event_items where event_id in (select id from public.events where owner_id=any($1::uuid[]))', [ids])
+    await db.query('delete from private.retention_audit where event_id in (select id from public.events where owner_id=any($1::uuid[]))', [ids])
     await db.query('delete from public.events where owner_id=any($1::uuid[])', [ids])
     await db.query('delete from auth.users where id=any($1::uuid[])', [ids])
     await db.query('commit')
@@ -43,7 +44,7 @@ export async function fixture(config) {
     const call = async (name, body) => { const result = await owner.rpc(name, body); assert.equal(result.error, null, result.error?.message); return result.data }
     let event = (await call('create_event', { p_title: 'Chá de bebê — ensaio fictício' }))
     event = (await call('save_event', { p_event_id: event.id, p_version: event.version, p_title: event.title,
-      p_public_description: 'Vamos celebrar essa chegada com muito carinho.', p_starts_at: new Date(Date.now() + 30 * 86400000).toISOString(),
+      p_public_description: 'Vamos celebrar essa chegada com muito carinho.', p_starts_at: new Date(Date.now() + 30 * 86400000).toISOString(), p_ends_at: new Date(Date.now() + 30 * 86400000 + 4 * 3600000).toISOString(),
       p_private_address: 'Jardim de teste, 123', p_private_instructions: 'Conteúdo fictício para ensaio.', p_cover_path: null }))
     await call('prepare_family_list', { p_event_id: event.id })
     event = (await call('transition_event', { p_event_id: event.id, p_version: event.version, p_status: 'published' }))

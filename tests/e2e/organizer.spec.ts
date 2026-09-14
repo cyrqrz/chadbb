@@ -30,7 +30,7 @@ async function backend(page: Page, signedIn = false) {
     else if (path === '/auth/v1/user') json = session().user
     else if (path === '/rest/v1/rpc/create_event') {
       record = { id: eventId, owner_id: userId, type: 'baby_shower', status: 'draft', title: body.p_title,
-        public_description: '', private_address: '', private_instructions: '', starts_at: null, cover_path: null, version: 1,
+        public_description: '', private_address: '', private_instructions: '', starts_at: null, ends_at: null, personal_data_purged_at: null, cover_path: null, version: 1,
         created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' }
       json = record
     } else if (path === '/rest/v1/events') {
@@ -39,7 +39,7 @@ async function backend(page: Page, signedIn = false) {
     } else if (path === '/rest/v1/rpc/save_event' && record) {
       if (conflict) { json = { message: 'VERSION_CONFLICT', code: 'P0001' }; status = 400 }
       else {
-        record = { ...record, title: body.p_title, public_description: body.p_public_description, starts_at: body.p_starts_at,
+        record = { ...record, title: body.p_title, public_description: body.p_public_description, starts_at: body.p_starts_at, ends_at: body.p_ends_at,
           private_address: body.p_private_address, private_instructions: body.p_private_instructions, cover_path: body.p_cover_path, version: record.version + 1 }
         json = record
       }
@@ -103,6 +103,7 @@ test('cria, edita, publica e encerra evento; layout cabe no celular', async ({ p
   await page.getByRole('button', { name: 'Publicar evento' }).click()
   await expect(page.getByRole('alert')).toContainText('data futura')
   await page.getByLabel('Data e horário').fill('2035-09-10T14:30')
+  await page.getByLabel('Término').fill('2035-09-10T18:00')
   await page.getByLabel('Endereço privado').fill('Rua fictícia, 123')
   await page.getByLabel('Descrição pública').fill('Vamos celebrar juntos.')
   await expect(page.getByRole('button', { name: 'Publicar evento' })).toBeDisabled()

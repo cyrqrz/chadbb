@@ -41,8 +41,10 @@ async function create(user = alice, title = 'Chá de bebê') {
   return (await as(user, 'select * from public.create_event($1)', [title])).rows[0]
 }
 async function save(event, user = alice, options = {}) {
-  return (await as(user, 'select * from public.save_event($1,$2,$3,$4,$5,$6,$7,$8)',
-    [event.id, event.version, options.title ?? event.title, options.description ?? '', options.date === undefined ? new Date(Date.now()+86400000).toISOString() : options.date,
+  const date = options.date === undefined ? new Date(Date.now()+86400000).toISOString() : options.date
+  const ends = options.ends !== undefined ? options.ends : date === null ? null : new Date(new Date(date).getTime()+4*3600000).toISOString()
+  return (await as(user, 'select * from public.save_event($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+    [event.id, event.version, options.title ?? event.title, options.description ?? '', date, ends,
       'Endereço privado', 'Instruções privadas', options.cover ?? null])).rows[0]
 }
 async function transition(event, status, user = alice) {
@@ -91,6 +93,11 @@ test('publicação exige título e data futura também fora da interface', async
   event = await save(event, alice, { title: 'Encontro', date: '2020-01-01T00:00:00Z' })
   await assert.rejects(transition(event, 'published'), /PUBLICATION_INVALID/)
   await assert.rejects(save(event, alice, { title: 'a'.repeat(121) }), { code: '23514' })
+  event = await save(event, alice, { title: 'Encontro', ends: null })
+  await assert.rejects(transition(event, 'published'), /PUBLICATION_INVALID/)
+  const start = new Date(Date.now()+86400000).toISOString()
+  await assert.rejects(save(event, alice, { title: 'Encontro', date: start, ends: start }), /EVENT_ENDS_BEFORE_START/)
+  await assert.rejects(save(event, alice, { title: 'Encontro', date: null, ends: start }), /EVENT_ENDS_BEFORE_START/)
 })
 test('rascunho → publicado → encerrado; sem reabertura ou edição após encerrar', async () => {
   let event = await save(await create())
@@ -559,20 +566,152 @@ test('3: RSVP rejeita resposta pendente/inválida e quantidade ausente sem erro 
   await guestAction(f.token, 'rsvp', request({ response: 'maybe', attending: 0, version: 1 }))
 })
 
-test('4: retenção elimina pedidos de 90 dias e sessões expiradas, preserva replay recente', async () => {
+const count = async (sql, values) => Number((await admin.query(sql, values)).rows[0].n)
+async function guestData(eventId) {
+  const scope = 'where invitation_id in (select id from private.invitations where event_id=$1)'
+  return {
+    invitations: await count('select count(*) n from private.invitations where event_id=$1', [eventId]),
+    guest_requests: await count(`select count(*) n from private.guest_requests ${scope}`, [eventId]),
+    reservations: await count(`select count(*) n from public.reservations ${scope}`, [eventId]),
+    guest_sessions: await count(`select count(*) n from private.guest_sessions ${scope}`, [eventId]),
+  }
+}
+// Evento com dois convites, respostas, reservas, sessões e capa.
+async function populatedEvent() {
   const f = await familyFixture()
-  const payload = request({ response: 'yes', attending: 2, version: 1 })
-  const first = await guestAction(f.token, 'rsvp', payload)
+  const path = `${alice}/${f.event.id}/capa.png`
+  await as(alice, "insert into storage.objects(bucket_id,name) values ('event-public',$1)", [path])
+  f.event = await save(f.event, alice, { cover: path })
+  await guestAction(f.token, 'rsvp', request({ response: 'yes', attending: 2, version: 1 }))
+  const p = f.snapshot.items.find(i => i.diaper_size === 'P')
+  await guestAction(f.token, 'reserve', request({ item_id: p.id, quantity: 2, version: null }))
+  const second = await organizerAction(f.event, 'create', { name: 'Segunda família', kind: 'family', capacity: 2 })
+  const token2 = (await guestAction(second.token, 'exchange')).session_token
+  await guestAction(token2, 'reserve', request({ item_id: p.id, quantity: 1, version: null }))
+  return { ...f, second, token2, p }
+}
+async function endAt(eventId, sql) {
+  await admin.query(`update public.events set ends_at=${sql}, starts_at=${sql}-interval '4 hours' where id=$1`, [eventId])
+  return (await admin.query('select * from public.events where id=$1', [eventId])).rows[0]
+}
+const purge = async (eventId, client = admin) => (await client.query('select private.purge_event_personal_data($1,null) r', [eventId])).rows[0].r
+const auditColumns = ['id', 'event_id', 'ran_at', 'status', 'invitations_removed', 'guest_requests_removed',
+  'reservations_removed', 'guest_sessions_removed', 'storage_objects_removed']
+
+test('retenção: prazo único em dias de calendário no fuso de São Paulo', async () => {
+  const due = async value => (await admin.query('select private.retention_due_at($1) d', [value])).rows[0].d?.toISOString() ?? null
+  assert.equal(await due('2026-11-01T23:30:00-03:00'), new Date('2026-12-01T23:30:00-03:00').toISOString())
+  // 30/10 23:30 em São Paulo (31/10 em UTC) vence em 29/11 23:30 em São Paulo, não em 30/11.
+  assert.equal(await due('2026-10-31T02:30:00Z'), new Date('2026-11-30T02:30:00Z').toISOString())
+  assert.equal(await due(null), null)
+})
+test('retenção: antes dos 30 dias nada é apagado (borda de 1 minuto)', async () => {
+  const f = await populatedEvent()
+  const before = await guestData(f.event.id)
+  const event = await endAt(f.event.id, "now()-interval '30 days'+interval '1 minute'")
+  assert.equal(await purge(f.event.id), 'not_due')
+  assert.equal((await admin.query('select * from public.retention_run() where event_id=$1', [f.event.id])).rowCount, 0)
+  assert.deepEqual(await guestData(f.event.id), before)
+  const after = (await admin.query('select * from public.events where id=$1', [f.event.id])).rows[0]
+  assert.deepEqual(after, event)
+  assert.equal(await count('select count(*) n from private.retention_audit where event_id=$1', [f.event.id]), 0)
+})
+test('retenção: após 30 dias apaga dados pessoais, preserva evento, conta e itens; repetição é segura', async () => {
+  const f = await populatedEvent(); const other = await populatedEvent()
+  const otherBefore = await guestData(other.event.id)
+  const event = await endAt(f.event.id, "now()-interval '30 days'-interval '1 minute'")
+  const before = await guestData(f.event.id)
+  assert.deepEqual(before, { invitations: 2, guest_requests: 3, reservations: 2, guest_sessions: 2 })
+  const items = await count('select count(*) n from public.event_items where event_id=$1', [f.event.id])
+  assert.deepEqual((await admin.query('select * from public.retention_run() where event_id=$1', [f.event.id])).rows, [{ event_id: f.event.id, owner_id: alice }])
+  assert.equal((await admin.query('select public.retention_purge_event($1,$2) r', [f.event.id, 3])).rows[0].r, 'purged')
+  assert.deepEqual(await guestData(f.event.id), { invitations: 0, guest_requests: 0, reservations: 0, guest_sessions: 0 })
+  const purged = (await admin.query('select * from public.events where id=$1', [f.event.id])).rows[0]
+  assert.equal(purged.private_address, ''); assert.equal(purged.private_instructions, ''); assert.equal(purged.cover_path, null)
+  for (const field of ['id', 'owner_id', 'title', 'starts_at', 'ends_at', 'status', 'created_at']) assert.deepEqual(purged[field], event[field], field)
+  assert.ok(purged.personal_data_purged_at)
+  assert.equal(await count('select count(*) n from auth.users where id=$1', [alice]), 1, 'conta do organizador permanece')
+  assert.equal(await count('select count(*) n from public.event_items where event_id=$1', [f.event.id]), items)
+  assert.deepEqual(await guestData(other.event.id), otherBefore, 'outro evento intacto')
+  const columns = (await admin.query("select column_name from information_schema.columns where table_schema='private' and table_name='retention_audit' order by ordinal_position")).rows.map(r => r.column_name)
+  assert.deepEqual(columns, auditColumns)
+  const [audit] = (await admin.query('select * from private.retention_audit where event_id=$1', [f.event.id])).rows
+  assert.deepEqual({ status: audit.status, invitations: audit.invitations_removed, guest_requests: audit.guest_requests_removed,
+    reservations: audit.reservations_removed, guest_sessions: audit.guest_sessions_removed, storage: audit.storage_objects_removed },
+    { status: 'purged', invitations: 2, guest_requests: 3, reservations: 2, guest_sessions: 2, storage: 3 })
+  // Segunda execução: sem erro e sem alteração.
+  assert.equal(await purge(f.event.id), 'already_purged')
+  assert.deepEqual((await admin.query('select * from public.events where id=$1', [f.event.id])).rows[0], purged)
+  assert.equal((await admin.query('select * from public.retention_run() where event_id=$1', [f.event.id])).rowCount, 0)
+  assert.deepEqual((await admin.query('select status from private.retention_audit where event_id=$1 order by id', [f.event.id])).rows.map(r => r.status), ['purged', 'already_purged'])
+})
+test('retenção: falha no meio desfaz tudo e a marca continua nula', async () => {
+  const f = await populatedEvent()
+  await endAt(f.event.id, "now()-interval '31 days'")
+  const before = await guestData(f.event.id)
+  const blocker = server.getPgClient(); const worker = server.getPgClient()
+  await Promise.all([blocker.connect(), worker.connect()])
+  try {
+    await blocker.query('begin')
+    await blocker.query('select 1 from public.reservations where invitation_id=$1 for update', [f.invite.id])
+    await worker.query("set lock_timeout='200ms'")
+    await assert.rejects(purge(f.event.id, worker), { code: '55P03' })
+    assert.deepEqual(await guestData(f.event.id), before)
+    const event = (await admin.query('select * from public.events where id=$1', [f.event.id])).rows[0]
+    assert.equal(event.personal_data_purged_at, null); assert.equal(event.private_address, 'Endereço privado')
+    assert.equal(await count('select count(*) n from private.retention_audit where event_id=$1', [f.event.id]), 0)
+    await blocker.query('commit')
+    assert.equal(await purge(f.event.id, worker), 'purged')
+  } finally { await blocker.query('rollback'); await Promise.all([blocker.end(), worker.end()]) }
+})
+test('retenção: evento expurgado recusa dados pessoais novos', async () => {
+  const f = await populatedEvent()
+  await endAt(f.event.id, "now()-interval '31 days'")
+  assert.equal(await purge(f.event.id), 'purged')
+  const event = (await admin.query('select * from public.events where id=$1', [f.event.id])).rows[0]
+  await assert.rejects(organizerAction(event, 'create', { name: 'Nova', kind: 'individual', capacity: 1 }), /EVENT_PURGED/)
+  await assert.rejects(save(event), /EVENT_PURGED/)
+  await assert.rejects(transition(event, 'closed'), /EVENT_PURGED/)
+  await assert.rejects(as(alice, 'select public.prepare_family_list($1)', [event.id]), /EVENT_PURGED/)
+  assert.equal((await organizerAction(event, 'list')).invitations.length, 0)
+})
+test('retenção: pedido do titular apaga um convite e libera a quantidade', async () => {
+  const f = await populatedEvent()
+  await admin.query('select private.erase_invitation($1)', [f.invite.id])
+  assert.equal(await count('select count(*) n from private.invitations where id=$1', [f.invite.id]), 0)
+  const data = await guestData(f.event.id)
+  assert.deepEqual(data, { invitations: 1, guest_requests: 1, reservations: 1, guest_sessions: 1 })
+  assert.equal((await guestAction(f.token2, 'read')).snapshot.items.find(i => i.id === f.p.id).committed, 1)
+  const [audit] = (await admin.query('select * from private.retention_audit where event_id=$1', [f.event.id])).rows
+  assert.deepEqual([audit.status, audit.invitations_removed, audit.guest_requests_removed, audit.reservations_removed, audit.guest_sessions_removed],
+    ['invitation_erased', 1, 2, 1, 1])
+  assert.equal(JSON.stringify(audit).includes(f.invite.id), false)
+  await assert.rejects(admin.query('select private.erase_invitation($1)', [f.invite.id]), /INVITATION_NOT_FOUND/)
+})
+test('retenção: substitui o expurgo de 90 dias e restringe as funções', async () => {
+  const f = await familyFixture()
+  assert.equal((await admin.query("select to_regprocedure('private.cleanup_guest_data()') f")).rows[0].f, null)
   const old = crypto.randomUUID()
   await admin.query("insert into private.guest_requests(invitation_id,request_id,payload,result,created_at) values ($1,$2,'{}','{}',now()-interval '91 days')", [f.invite.id, old])
   await admin.query("insert into private.guest_sessions values ('expired-test',$1,now()-interval '1 second')", [f.invite.id])
-  await admin.query('select private.cleanup_guest_data()')
-  assert.equal((await admin.query('select count(*) n from private.guest_requests where request_id=$1', [old])).rows[0].n, '0')
-  assert.equal((await admin.query("select count(*) n from private.guest_sessions where token_hash='expired-test'")).rows[0].n, '0')
-  assert.deepEqual((await guestAction(f.token, 'rsvp', payload)).result, first.result)
-  for (const role of ['anon', 'authenticated', 'service_role']) {
-    assert.equal((await admin.query("select has_function_privilege($1,'private.cleanup_guest_data()','EXECUTE') allowed", [role])).rows[0].allowed, false)
+  await admin.query("insert into private.guest_rate values ('old-window-test',now()-interval '1 hour',1)")
+  await admin.query('select * from public.retention_run()')
+  assert.equal(await count("select count(*) n from private.guest_sessions where token_hash='expired-test'"), 0)
+  assert.equal(await count("select count(*) n from private.guest_rate where key_hash='old-window-test'"), 0)
+  assert.equal(await count('select count(*) n from private.guest_requests where request_id=$1', [old]), 1, 'pedidos saem apenas com o evento')
+  assert.equal(await count('select count(*) n from private.guest_sessions where invitation_id=$1', [f.invite.id]), 1, 'sessão válida preservada')
+  const allowed = async (role, fn) => (await admin.query("select has_function_privilege($1,$2,'EXECUTE') a", [role, fn])).rows[0].a
+  for (const fn of ['public.retention_run()', 'public.retention_referenced_paths(uuid,text[])', 'public.retention_purge_event(uuid,integer)', 'public.retention_record_failure(uuid,text,integer)']) {
+    for (const role of ['anon', 'authenticated']) assert.equal(await allowed(role, fn), false, `${role} ${fn}`)
+    assert.equal(await allowed('service_role', fn), true, fn)
   }
+  for (const fn of ['private.retention_due_at(timestamptz)', 'private.purge_event_personal_data(uuid,integer)', 'private.erase_invitation(uuid)', 'private.cleanup_guest_technical()', 'private.invoke_retention()']) {
+    for (const role of ['anon', 'authenticated', 'service_role']) assert.equal(await allowed(role, fn), false, `${role} ${fn}`)
+  }
+  for (const role of ['anon', 'authenticated', 'service_role']) {
+    assert.equal((await admin.query("select has_table_privilege($1,'private.retention_audit','SELECT') a", [role])).rows[0].a, false)
+  }
+  await assert.rejects(admin.query("select public.retention_record_failure($1,'purged',null)", [f.event.id]), /INVALID_RETENTION_STATUS/)
 })
 
 test('5: agregação de saldos isola eventos e soma reservas/compras, excluindo cancelamentos', async () => {

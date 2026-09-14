@@ -65,7 +65,7 @@ test('Storage real: upload, limite, tipo e acesso privado entre proprietários',
 })
 test('API real: salva, publica, encerra; edição encerrada rejeitada', async () => {
   const args = { p_event_id: event.id, p_version: event.version, p_title: event.title, p_public_description: 'Prévia',
-    p_starts_at: new Date(Date.now() + 86400000).toISOString(), p_private_address: 'Rua fictícia', p_private_instructions: '', p_cover_path: objects[0] }
+    p_starts_at: new Date(Date.now() + 86400000).toISOString(), p_ends_at: new Date(Date.now() + 2 * 86400000).toISOString(), p_private_address: 'Rua fictícia', p_private_instructions: '', p_cover_path: objects[0] }
   const saved = await alice.rpc('save_event', args).single(); assert.equal(saved.error, null)
   const published = await alice.rpc('transition_event', { p_event_id: event.id, p_version: saved.data.version, p_status: 'published' }).single(); assert.equal(published.error, null)
   const closed = await alice.rpc('transition_event', { p_event_id: event.id, p_version: published.data.version, p_status: 'closed' }).single(); assert.equal(closed.error, null)

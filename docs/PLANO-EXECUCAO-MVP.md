@@ -190,7 +190,7 @@ cortes; nenhuma barreira conhecida que impeça uso dos fluxos essenciais.
 - [ ] Executar CI e migrations em banco limpo; fazer implantação e verificação com dados fictícios antes de cadastrar dados da família.
 - [ ] Configurar backup e ensaiar restauração em ambiente separado. Registrar frequência, perda de dados tolerada e tempo de recuperação junto ao responsável.
 - [ ] Disponibilizar registro de erros sem dados privados, verificação de disponibilidade e procedimento simples para recuperar convites e acessos.
-- [ ] Definir prazo de retenção e procedimento de exclusão de dados e imagens, incluindo tratamento de backups.
+- [x] Definir prazo de retenção e procedimento de exclusão de dados e imagens, incluindo tratamento de backups: 30 dias após o término, implementado localmente em 2026-09-15; implantação no chadbb-cha pendente.
 - [ ] Concluir ensaio de concorrência, atualização e acessibilidade no ambiente do evento; registrar falhas corrigidas e limites remanescentes.
 - [ ] Cadastrar conteúdo real, entregar acesso do organizador e instruções curtas, e liberar o envio dos convites após o ensaio com o irmão.
 

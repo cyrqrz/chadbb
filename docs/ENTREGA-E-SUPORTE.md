@@ -18,7 +18,7 @@ assumirá o suporte técnico.
    persistência, logout e proteção de rotas nesse ambiente.
 4. Publicar a função `guest` e definir `GUEST_ALLOWED_ORIGINS` com a origem HTTPS
    exata. Testar origem permitida e proibida, revogação e sessão expirada.
-5. Conferir execução do job `guest-data-retention` e disponibilidade das páginas.
+5. Conferir o job `personal-data-retention` (único agendado) e a disponibilidade das páginas.
    Uma resposta OPTIONS não comprova banco, Auth ou RSVP; usar um evento fictício
    para testar a jornada completa antes de cadastrar conteúdo real.
 
@@ -72,19 +72,76 @@ interno do WhatsApp, leitor de tela manual e o ambiente remoto.
 
 ## Retenção e exclusão
 
-O job técnico elimina pedidos antigos após 90 dias e sessões expiradas. Isso não
-exclui, sozinho, nomes dos convites, respostas, reservas, evento ou imagens.
-Antes da entrega, definir com o responsável a execução da exclusão de dados pessoais
-90 dias após o evento, o tratamento dos objetos Storage e o prazo de retenção das
-cópias de backup. Não declarar exclusão concluída enquanto cópias recuperáveis
-permanecerem fora do procedimento acordado.
+Decisão fechada em 2026-09-14 pelo solicitante.
+
+### Política
+
+- Dados pessoais dos convidados ficam por até **30 dias após o término do evento**
+  (`events.ends_at`). Depois, **hard delete** de convites (nomes), respostas,
+  reservas, sessões e pedidos.
+- Do evento, também são apagados endereço, instruções privadas e os arquivos do
+  Storage **exclusivos** dele. Ficam ID, título, datas e status. A conta do
+  organizador nunca é apagada, e um arquivo referenciado por outro evento é preservado.
+- O prazo é calculado apenas por `private.retention_due_at(ends_at)`: 30 dias de
+  calendário no fuso `America/Sao_Paulo`. Evento sem término nunca vence, e a
+  publicação exige término. Na interface, início e término são sempre digitados e
+  exibidos no horário de Brasília.
+- A auditoria (`private.retention_audit`) guarda só `event_id`, data, status e
+  contagens de convites, pedidos, reservas, sessões e arquivos removidos. Nenhum
+  nome, identificador de convite, payload, endereço ou caminho de arquivo.
+- Estatísticas só podem permanecer anonimizadas e sem permitir reidentificação.
+  Hoje nenhuma estatística é mantida além dessas contagens técnicas.
+- Evento expurgado não aceita edição, novos convites nem nova lista (`EVENT_PURGED`).
+
+### Agendamento e execução
+
+1. `pg_cron` executa o job `personal-data-retention` diariamente às **06:17 UTC**
+   (03:17 em Brasília). É o único job de retenção; o antigo de 90 dias foi removido.
+2. O job chama `private.invoke_retention()`, que lê `project_url` e
+   `retention_cron_secret` do Vault e faz `POST` para a Edge Function `retention`.
+   Sem esses segredos no Vault, o job não faz nada.
+3. A função valida o header `x-retention-secret` contra `RETENTION_CRON_SECRET`.
+   Para cada evento vencido, remove primeiro os arquivos exclusivos e depois executa
+   o expurgo do banco, numa transação. A marca `personal_data_purged_at` é gravada por
+   último, só depois de todas as exclusões.
+4. Execução manual pelo suporte: `POST` para `/functions/v1/retention` com o header
+   lido de `~/.config/chadbb/retention-cron-secret`, sem exibir o valor.
+
+### Recuperação
+
+- **Falha no Storage:** grava `storage_failed`, não toca no banco e tenta de novo na
+  próxima execução.
+- **Storage apagado e depois falha no banco:** grava `db_failed` e a marca continua
+  nula. Na execução seguinte, a listagem vazia é tratada como estado válido e o
+  expurgo do banco é concluído com zero arquivos removidos, sem depender dos arquivos.
+- Repetir a execução é seguro: evento já expurgado não é reprocessado.
+
+### Pedido do titular (LGPD)
+
+1. O suporte (Leonardo Martins) confirma a identidade do solicitante com o organizador.
+2. Localiza o convite e executa `select private.erase_invitation('<id>')` numa conexão
+   administrativa. A função apaga convite, respostas, reservas, sessões e pedidos
+   daquele convite, libera as quantidades e registra `invitation_erased` na auditoria.
+3. Registra a data do atendimento, sem copiar os dados apagados.
+
+### Obrigação legal de conservação
+
+Se houver obrigação legal específica, antes do expurgo exportar só os dados
+estritamente necessários para essa finalidade, em local controlado e com prazo
+próprio, e registrar a base legal. O restante segue a política acima.
+
+### Backups
+
+Cópias de backup do Supabase podem conter dados apagados até expirarem pelo ciclo do
+plano contratado. Não declarar exclusão total antes disso, e não restaurar backup
+antigo sem reaplicar o expurgo.
 
 ## Pendências para liberar o envio dos convites
 
 - Projeto e credenciais de operação disponíveis no ambiente autorizado.
 - Ambiente do evento configurado e testado, inclusive e-mail.
 - Backup/restauração executados e metas de recuperação registradas.
-- Procedimento de exclusão definido (suporte técnico já definido: Leonardo Martins (solicitante)).
+- ~~Procedimento de exclusão definido~~: política de 30 dias fechada em 2026-09-14; implantação no projeto do evento pendente.
 - Conteúdo cadastrado e aprovado pelo irmão.
 - Ensaio no WhatsApp e no celular real aprovado pela família.
 

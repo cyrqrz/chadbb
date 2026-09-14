@@ -77,7 +77,7 @@ quando necessário. Os testes usam porta 4173 e configuração fictícia própri
 npm run db:start
 npm run db:reset
 npm run db:test
-# Em outro terminal: npm run guest:serve
+# Em outro terminal: npm run functions:serve
 npm run test:api
 npm run test:browser:local
 npm run test:email:local
@@ -117,8 +117,9 @@ versão para detectar conflitos entre abas; o botão de recarregar permite recup
 A capa aceita JPEG, PNG e WebP até 5 MB. O envio exige autorização explícita e o
 arquivo fica público por link mesmo em rascunho. `event-private` é separado e
 protegido por proprietário; esta interface só envia capas publicáveis.
-Remover a referência de uma capa não apaga o objeto já publicado: limpeza de
-arquivos e retenção serão concluídas antes do piloto.
+Remover a referência de uma capa não apaga o objeto na hora. A Edge Function `retention`
+apaga os arquivos exclusivos do evento 30 dias após o término, junto com os dados
+pessoais ([política](docs/ENTREGA-E-SUPORTE.md#retenção-e-exclusão)).
 
 ## Estrutura
 
@@ -152,3 +153,11 @@ validação em celular/WhatsApp precisam das etapas previstas no plano.
 Referências técnicas: [Vite](https://vite.dev/guide/),
 [Tailwind com Vite](https://tailwindcss.com/docs/installation/using-vite),
 [Supabase local](https://supabase.com/docs/guides/local-development/cli/getting-started).
+
+## Smoke test remoto (projeto do chá)
+
+`npm run test:smoke:remote` cria e remove dados fictícios no projeto `chadbb-cha`.
+Só executar com aprovação. Exige `CHADBB_SMOKE_REF` igual ao ref do projeto e
+`CHADBB_SMOKE_DB_URL` apontando para ele, e recusa qualquer outro host. As chaves
+vêm do CLI autenticado e o segredo da retenção de `~/.config/chadbb/`; nada disso
+é impresso. Fora da CI.

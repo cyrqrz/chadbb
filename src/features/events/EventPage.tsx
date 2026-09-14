@@ -31,7 +31,8 @@ function EventEditor({ server, refreshing }: { server: EventRecord; refreshing: 
   const [imageFile, setImageFile] = useState<File | null>(null)
   const cache = useQueryClient()
   const { session } = useAuth()
-  const closed = record.status === 'closed'
+  const purged = record.personal_data_purged_at !== null
+  const closed = record.status === 'closed' || purged
   // Comparação por maior, e não por diferente: resposta antiga que chegue fora de
   // ordem depois de salvar não deve ser anunciada como alteração de outra sessão.
   const outdated = server.version > record.version
@@ -84,7 +85,8 @@ function EventEditor({ server, refreshing }: { server: EventRecord; refreshing: 
     {outdated && <div role="status" className="notice mt-6"><p>Este evento mudou em outra sessão. O que você digitou continua aqui.</p><button className="text-link mt-3" disabled={busy} onClick={() => void reload()}>Recarregar dados</button></div>}
     <Link to={`/eventos/${record.id}/presentes`} className="secondary mt-6 inline-block">Lista de presentes →</Link>
     <Link to={`/eventos/${record.id}/convites`} className="secondary mt-6 ml-3 inline-block">Convites e confirmações →</Link>
-    {closed && <p className="notice mt-6">Este evento foi encerrado. Os detalhes estão disponíveis apenas para consulta.</p>}
+    {purged ? <p className="notice mt-6">Os dados pessoais deste evento foram excluídos conforme a política de retenção. Restam apenas título e datas.</p> :
+      closed && <p className="notice mt-6">Este evento foi encerrado. Os detalhes estão disponíveis apenas para consulta.</p>}
     <form onSubmit={save} className="mt-8 space-y-8">
       <fieldset disabled={busy || closed} className="space-y-5">
         <legend className="mb-5 text-xl font-semibold">Para compartilhar</legend>
@@ -98,7 +100,8 @@ function EventEditor({ server, refreshing }: { server: EventRecord; refreshing: 
       <fieldset disabled={busy || closed} className="space-y-5 border-t border-stone-300 pt-6">
         <legend className="pr-4 text-xl font-semibold">Só para convidados</legend>
         <p className="text-sm text-stone-600">Estes dados não entram na prévia pública.</p>
-        <label className="field">Data e horário<input type="datetime-local" value={draft.localDate} onChange={e => update('localDate', e.target.value)} /><span className="hint">Fuso deste navegador: {Intl.DateTimeFormat().resolvedOptions().timeZone}. Obrigatório para publicar.</span></label>
+        <label className="field">Data e horário<input type="datetime-local" value={draft.localDate} onChange={e => update('localDate', e.target.value)} /><span className="hint">Horário de Brasília. Obrigatório para publicar.</span></label>
+        <label className="field">Término<input type="datetime-local" value={draft.localEndDate} onChange={e => update('localEndDate', e.target.value)} /><span className="hint">Horário de Brasília. Obrigatório para publicar. Os dados pessoais dos convidados são excluídos 30 dias após o término.</span></label>
         <label className="field">Endereço privado<textarea rows={2} maxLength={500} value={draft.private_address} onChange={e => update('private_address', e.target.value)} /></label>
         <label className="field">Instruções aos convidados<textarea rows={3} maxLength={2000} value={draft.private_instructions} onChange={e => update('private_instructions', e.target.value)} /></label>
       </fieldset>

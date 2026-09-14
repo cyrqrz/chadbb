@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase'
+import { fromLocalDate } from './model'
 import type { EventDraft, EventRecord } from './model'
 
 export function getClient() {
@@ -25,7 +26,8 @@ export async function createEvent(title: string) {
 export async function saveEvent(event: EventRecord, draft: EventDraft) {
   const { data, error } = await getClient().rpc('save_event', {
     p_event_id: event.id, p_version: event.version, p_title: draft.title,
-    p_public_description: draft.public_description, p_starts_at: draft.localDate ? new Date(draft.localDate).toISOString() : null,
+    p_public_description: draft.public_description, p_starts_at: fromLocalDate(draft.localDate),
+    p_ends_at: fromLocalDate(draft.localEndDate),
     p_private_address: draft.private_address, p_private_instructions: draft.private_instructions, p_cover_path: draft.cover_path,
   }).single()
   if (error) throw error

@@ -95,7 +95,7 @@ As propostas abaixo ainda não são escolhas confirmadas pelo solicitante.
 | Expiração | Até 7 dias após o evento | Antes de emitir convites reais; data do evento necessária |
 | Recuperação | Revogar e reemitir acesso perdido, preservando vínculo com respostas e reservas e invalidando credenciais anteriores | Antes do fluxo de convites |
 | Encerramento | Bloquear novas reservas; cancelamento/compra informada por até 7 dias com convite válido | Antes de concluir transações |
-| Retenção | Excluir dados pessoais 90 dias após o evento e documentar cópias e imagens | Antes da entrega com dados reais |
+| Retenção | **Fechada em 2026-09-14:** hard delete dos dados pessoais dos convidados e dos dados privados do evento 30 dias após o término (fuso de São Paulo); auditoria só com contagens; pedido do titular e obrigação legal conforme [entrega e suporte](ENTREGA-E-SUPORTE.md#retenção-e-exclusão) | Implantar antes da entrega com dados reais |
 | Recuperação do banco | Backup automático e restauração ensaiada; frequência e prazo de recuperação compatíveis com uso da família | Antes da entrega |
 
 A simplificação de escopo não elimina isolamento entre usuários, proteção de
