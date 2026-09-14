@@ -84,7 +84,7 @@ permanecerem fora do procedimento acordado.
 - Projeto e credenciais de operação disponíveis no ambiente autorizado.
 - Ambiente do evento configurado e testado, inclusive e-mail.
 - Backup/restauração executados e metas de recuperação registradas.
-- Responsável por suporte e procedimento de exclusão definidos.
+- Procedimento de exclusão definido (suporte técnico já definido: Leonardo Martins (solicitante)).
 - Conteúdo cadastrado e aprovado pelo irmão.
 - Ensaio no WhatsApp e no celular real aprovado pela família.
 
@@ -92,5 +92,5 @@ Projeto remoto criado em 2026-09-14: **chadbb-cha**, ref `fcykqrlnofmdtmewlejr`,
 organização `chadbb` (`zfzzahtvvtmuogmatolo`), região **São Paulo (`sa-east-1`)**,
 exclusivo do chá e separado de desenvolvimento e preview. A senha do banco fica
 apenas na máquina do titular, fora do repositório. Nenhuma migration, função ou
-configuração de Auth foi aplicada ainda. O responsável pelo suporte continua
-pendente: `[nome]` era um exemplo, não uma resposta.
+configuração de Auth foi aplicada ainda. Suporte técnico, do envio dos
+convites ao dia do evento: Leonardo Martins (solicitante).

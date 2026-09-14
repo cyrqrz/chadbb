@@ -13,8 +13,8 @@ foram recebidos na imagem do convite e preparados fora do repositório. Planejar
 para ensaio até 1º de outubro e usar a margem seguinte para validação e correções.
 
 Engenharia: Codex e solicitante. Conteúdo e contas: solicitante. Aceite de uso:
-irmão como organizador, com ensaio de pelo menos um convidado. O responsável pelo
-suporte no dia do evento será definido antes da entrega.
+irmão como organizador, com ensaio de pelo menos um convidado. Responsável pelo
+suporte técnico, do envio dos convites ao dia do evento: Leonardo Martins (solicitante).
 
 Manter React, Vite, TypeScript, Tailwind, Router, TanStack Query, Supabase e
 Cloudflare Pages. O núcleo existente será aproveitado. Monetização, afiliados,

@@ -23,7 +23,7 @@ solicitada no convite até **18/10/2026**. Endereço, telefone e instruções fo
 extraídos da imagem recebida e preparados em arquivo privado fora da árvore do
 projeto, sem publicar a imagem original como capa. Ela contém dados privados e
 uma indicação fixa de tamanho que não corresponde à seleção dinâmica do site.
-O nome do responsável pelo suporte ainda não foi informado.
+Suporte técnico: Leonardo Martins (solicitante).
 
 Regra esclarecida: os limites P 6 / M 19 / G 19 / XG 6 são globais por tamanho,
 para equilibrar os pacotes. Não há cota comercial adicional por convite. Mimos
@@ -57,5 +57,5 @@ Projeto remoto criado em 2026-09-14: **chadbb-cha**, ref `fcykqrlnofmdtmewlejr`,
 organização `chadbb` (`zfzzahtvvtmuogmatolo`), região **São Paulo (`sa-east-1`)**,
 exclusivo do chá e separado de desenvolvimento e preview. A senha do banco fica
 apenas na máquina do titular, fora do repositório. Nenhuma migration, função ou
-configuração de Auth foi aplicada ainda. O responsável pelo suporte continua
-pendente: `[nome]` era um exemplo, não uma resposta.
+configuração de Auth foi aplicada ainda. Suporte técnico, do envio dos
+convites ao dia do evento: Leonardo Martins (solicitante).

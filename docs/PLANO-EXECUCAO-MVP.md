@@ -4,7 +4,7 @@ Revisado em 2026-09-14 por solicitação do idealizador.
 
 Data do chá: **01/11/2026**. Horário: **12h, horário de Brasília**. Título: **Chá de bebê da Liz**.
 Confirmação solicitada até **18/10/2026**. Local recebido no convite e mantido
-fora do repositório público. Responsável pelo suporte ainda precisa ser definido. Limites globais: P 6 / M 19 / G 19 / XG 6; sem cota
+fora do repositório público. Suporte técnico: Leonardo Martins (solicitante). Limites globais: P 6 / M 19 / G 19 / XG 6; sem cota
 comercial adicional por convite.
 
 ## Objetivo e prioridade
@@ -77,7 +77,7 @@ Testes antigos de navegador usaram APIs simuladas; não comprovam a jornada real
 ## M1 — Fechar a experiência e o visual
 
 - [x] Registrar data do evento: **01/11/2026**.
-- [ ] Definir quem prestará suporte. Volume confirmado: cerca de 50 convidados. Prazo informado: segunda semana de outubro de 2026, com aproximadamente 20 dias de desenvolvimento; dia exato ainda a confirmar.
+- [x] Definir quem prestará suporte: Leonardo Martins (solicitante). Volume confirmado: cerca de 50 convidados. Prazo informado: segunda semana de outubro de 2026, com aproximadamente 20 dias de desenvolvimento; dia exato ainda a confirmar.
 - [x] Escopo confirmado: o organizador escolhe individual ou familiar em cada convite.
 - [x] Implementar convite individual com uma pessoa e familiar com nome de referência e limite de pessoas definido pelo organizador. RSVP familiar informa quantas vão dentro desse limite; painel distingue convites respondidos de pessoas confirmadas.
 - [ ] Reunir título, data/hora, local, instruções, imagem autorizada e lista desejada. Usar dados fictícios durante desenvolvimento.
