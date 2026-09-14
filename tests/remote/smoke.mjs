@@ -38,12 +38,13 @@ const hash = value => createHash('sha256').update(value).digest('hex')
 const call = (path, init = {}) => fetch(`${config.API_URL}${path}`, { ...init, headers: { apikey: config.PUBLISHABLE_KEY, ...init.headers } })
 function track(token) { if (token) tokens.add(token); return token }
 
-let rateBefore = []
+let rateBefore = new Map()
 before(async () => {
   config = remoteConfig()
   db = await localDatabase(config)
-  // O projeto ainda não recebe tráfego real: toda janela de limite criada durante o smoke é do teste.
-  rateBefore = (await db.query('select key_hash from private.guest_rate')).rows.map(r => r.key_hash)
+  // Sem tráfego real no projeto, toda janela criada ou alterada durante o smoke (global, ip e token) é do teste.
+  rateBefore = new Map((await db.query('select key_hash, window_start, requests from private.guest_rate')).rows
+    .map(r => [r.key_hash, `${r.window_start.toISOString()}|${r.requests}`]))
   f = await fixture(config)
   track(f.invite.token)
 })
@@ -52,8 +53,10 @@ after(async () => {
     if (!f) return
     const invitations = (await db.query('select id from private.invitations where event_id=$1', [f.event.id])).rows.map(r => r.id)
     await f.cleanup()
-    const created = (await db.query('select key_hash from private.guest_rate where not (key_hash = any($1::text[])) or key_hash = any($2::text[])',
-      [rateBefore, [...tokens].map(t => hash(`token:${t}`))])).rows.map(r => r.key_hash)
+    const tokenKeys = new Set([...tokens].map(t => hash(`token:${t}`)))
+    const created = (await db.query('select key_hash, window_start, requests from private.guest_rate')).rows
+      .filter(r => tokenKeys.has(r.key_hash) || rateBefore.get(r.key_hash) !== `${r.window_start.toISOString()}|${r.requests}`)
+      .map(r => r.key_hash)
     await db.query('delete from private.guest_rate where key_hash = any($1::text[])', [created])
     const left = (await db.query(`select
       (select count(*) from auth.users where id=$1) organizador,
@@ -78,6 +81,17 @@ test('guest: CORS só para o site do chá, método restrito', async () => {
     assert.equal((await call('/functions/v1/guest', { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: '{"action":"read"}' })).status, 403)
   }
   assert.equal((await call('/functions/v1/guest', { method: 'GET' })).status, 405)
+})
+
+test('guest: cabeçalhos de IP enviados pelo cliente não escolhem a cota', async () => {
+  const forged = ['203.0.113.99', '198.51.100.23']
+  const token = track(randomUUID().replaceAll('-', '') + randomUUID().replaceAll('-', ''))
+  for (const address of forged) {
+    const response = await edge(config, token, 'exchange', {}, { 'X-Forwarded-For': address, 'CF-Connecting-IP': address })
+    assert.equal(response.status, 401)
+  }
+  const used = await db.query('select count(*) n from private.guest_rate where key_hash = any($1::text[])', [forged.map(a => hash(`ip:${a}`))])
+  assert.equal(used.rows[0].n, '0', 'endereço forjado não virou cota de IP')
 })
 
 test('guest: convite, presença, reserva idempotente, cancelamento e painel', async () => {

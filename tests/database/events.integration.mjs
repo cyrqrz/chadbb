@@ -808,3 +808,47 @@ test('M4: redução de cota e reserva concorrentes preservam o saldo persistido'
     assert.ok(actual.committed <= actual.limit)
   } finally { await Promise.all([owner.end(), guest.end()]) }
 })
+
+test('revisão 2: adiar o evento publicado move a validade de todos os convites', async () => {
+  const f = await familyFixture()
+  const revoked = await organizerAction(f.event, 'create', { name: 'Revogado', kind: 'individual', capacity: 1 })
+  await organizerAction(f.event, 'revoke', { id: revoked.id })
+  await admin.query("update private.invitations set expires_at=now()-interval '1 minute' where event_id=$1", [f.event.id])
+  await assert.rejects(guestAction(f.invite.token, 'exchange'), /GUEST_SESSION_INVALID/, 'validade antiga já passou')
+  const current = (await admin.query('select * from public.events where id=$1', [f.event.id])).rows[0]
+  const postponed = new Date(Date.now() + 40 * 86400000).toISOString()
+  const saved = await save(current, alice, { date: postponed })
+  const rows = (await admin.query("select id, revoked, expires_at = $2::timestamptz + interval '7 days' as follows from private.invitations where event_id=$1", [f.event.id, saved.starts_at])).rows
+  assert.equal(rows.length, 2); assert.ok(rows.every(r => r.follows), 'validade = novo início + 7 dias')
+  assert.equal(rows.find(r => r.id === revoked.id).revoked, true, 'revogação preservada')
+  assert.ok((await guestAction(f.invite.token, 'exchange')).session_token, 'convite volta a abrir após o adiamento')
+  const unchanged = await save(saved, alice, { title: 'Mesmo horário', date: saved.starts_at.toISOString() })
+  assert.equal(unchanged.title, 'Mesmo horário')
+})
+test('revisão 3: compra informada não volta a reservada por quantidade ou troca de tamanho', async () => {
+  const f = await familyFixture()
+  const p = f.snapshot.items.find(i => i.diaper_size === 'P'); const m = f.snapshot.items.find(i => i.diaper_size === 'M')
+  await guestAction(f.token, 'reserve', request({ item_id: p.id, quantity: 2, version: null }))
+  await guestAction(f.token, 'purchase', request({ item_id: p.id, version: 1 }))
+  await assert.rejects(guestAction(f.token, 'reserve', request({ item_id: p.id, quantity: 3, version: 2 })), /PURCHASE_ALREADY_DECLARED/)
+  await assert.rejects(guestAction(f.token, 'swap', request({ from_item_id: p.id, item_id: m.id, version: 2, destination_version: null })), /PURCHASE_ALREADY_DECLARED/)
+  await guestAction(f.token, 'reserve', request({ item_id: m.id, quantity: 1, version: null }))
+  await assert.rejects(guestAction(f.token, 'swap', request({ from_item_id: m.id, item_id: p.id, version: 1, destination_version: 2 })), /PURCHASE_ALREADY_DECLARED/)
+  const snapshot = (await guestAction(f.token, 'read')).snapshot
+  assert.deepEqual([snapshot.items.find(i => i.id === p.id).own.status, snapshot.items.find(i => i.id === p.id).committed], ['purchase_declared', 2])
+  assert.equal(snapshot.items.find(i => i.id === m.id).own.status, 'reserved')
+  const cancelled = await guestAction(f.token, 'cancel', request({ item_id: p.id, version: 2 }))
+  assert.equal(cancelled.snapshot.items.find(i => i.id === p.id).own.status, 'cancelled', 'cancelar continua permitido')
+})
+test('revisão 4: rascunho com data passada nunca é expurgado; evento vencido não muda de data', async () => {
+  const draft = await save(await create(), alice, { title: 'Rascunho com ano errado', date: '2020-01-01T15:00:00Z' })
+  assert.equal(draft.status, 'draft')
+  assert.equal((await admin.query('select * from public.retention_run() where event_id=$1', [draft.id])).rowCount, 0)
+  assert.equal(await purge(draft.id), 'not_due')
+  const fixed = await save(draft, alice, { title: 'Rascunho corrigido', date: new Date(Date.now() + 86400000).toISOString() })
+  assert.equal(fixed.private_address, 'Endereço privado'); assert.equal(fixed.personal_data_purged_at, null)
+  const f = await familyFixture()
+  const due = await endAt(f.event.id, "now()-interval '31 days'")
+  await assert.rejects(save(due, alice, { date: new Date(Date.now() + 86400000).toISOString() }), /EVENT_RETENTION_DUE/)
+  assert.equal((await admin.query('select * from public.retention_run() where event_id=$1', [f.event.id])).rowCount, 1)
+})

@@ -121,6 +121,16 @@ Remover a referência de uma capa não apaga o objeto na hora. A Edge Function `
 apaga os arquivos exclusivos do evento 30 dias após o término, junto com os dados
 pessoais ([política](docs/ENTREGA-E-SUPORTE.md#retenção-e-exclusão)).
 
+## Compatibilidade de migrations
+
+As versões `20260911000000` e `20260911010000` foram usadas com conteúdos diferentes
+numa implementação antiga de convites que existiu apenas na `main`
+(`family_invitations` e `invitation_response_deadline`), substituída pela linha
+`mvp-familiar`. Um banco que tenha aplicado aquelas migrations antigas não é
+compatível com esta sequência: o CLI consideraria essas versões já aplicadas.
+Esses bancos devem ser recriados (`npm run db:reset` localmente). O projeto do chá
+(`chadbb-cha`) nasceu com a sequência atual e não é afetado.
+
 ## Estrutura
 
 - `src/features/`: fluxos; `src/components/`: interface compartilhada.

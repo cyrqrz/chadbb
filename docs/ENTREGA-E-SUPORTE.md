@@ -56,7 +56,9 @@ interno do WhatsApp, leitor de tela manual e o ambiente remoto.
 ## Instruções curtas para o organizador
 
 - Entre pelo link enviado ao seu e-mail no mesmo navegador em que o solicitou.
-- Confira título, data às 12h, endereço e instruções antes de publicar.
+- Confira título, início às 12h, término, endereço e instruções antes de publicar.
+  Os horários são sempre de Brasília. Se o chá mudar de data, a validade dos
+  convites acompanha automaticamente (novo início + 7 dias).
 - Prepare a lista e confira os quatro limites por tamanho.
 - Crie um convite por pessoa ou família; o limite de pessoas controla apenas RSVP.
 - Copie e envie cada link manualmente. Não publique lista de links ou nomes.
@@ -66,7 +68,8 @@ interno do WhatsApp, leitor de tela manual e o ambiente remoto.
   Respostas e presentes ficam preservados, e a sessão anterior deixa de funcionar.
 - Se uma tentativa ficou sem resultado, use “Verificar tentativa anterior”. Não
   interprete falha de conexão como cancelamento da reserva.
-- “Já comprei” é uma declaração do convidado, sem confirmação de pagamento.
+- “Já comprei” é uma declaração do convidado, sem confirmação de pagamento. Depois
+  dela, quantidade e tamanho não mudam; para corrigir, o convidado cancela e escolhe de novo.
 - Encerrar impede novas reservas e respostas; não há reabertura pela interface.
   A data 18/10 consta nas instruções do convite, sem encerramento automático.
 

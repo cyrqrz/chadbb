@@ -72,6 +72,44 @@ for (const [device, viewport] of [['desktop', { width: 1280, height: 900 }], ['m
     } finally { await ctx.close(); await f.cleanup() }
   }, { timeout: 90000 })
 }
+for (const [device, viewport] of [['desktop', { width: 1280, height: 900 }], ['mobile', { width: 390, height: 844 }]]) {
+  test(`compra informada ${device}: quantidade e troca somem, cancelar permanece`, async () => {
+    const f = await fixture(config)
+    const ctx = await browser.newContext({ viewport, reducedMotion: 'reduce' })
+    const page = await ctx.newPage()
+    const errors = []
+    page.on('pageerror', error => errors.push(error.message))
+    try {
+      await page.goto(`${origin}/convite#${f.invite.token}`)
+      await page.getByRole('button', { name: 'Fraldas', exact: true }).click()
+      const article = size => page.getByRole('article').filter({ has: page.getByRole('heading', { name: `Fraldas tamanho ${size}`, exact: true }) })
+      const p = article('P'); const m = article('M')
+      await p.getByRole('spinbutton').fill('2')
+      await p.getByRole('button', { name: 'Vou levar' }).click()
+      await expect(p.getByText('Você confirmou 2 pacote(s).')).toBeVisible()
+      await m.getByRole('spinbutton').fill('1')
+      await m.getByRole('button', { name: 'Vou levar' }).click()
+      await expect(m.getByText('Você confirmou 1 pacote(s).')).toBeVisible()
+      await expect(m.getByRole('combobox').getByRole('option', { name: /^P ·/ })).toHaveCount(1)
+      await p.getByRole('button', { name: 'Já comprei' }).click()
+      await expect(p.getByText(/Compra informada por você\. Para mudar a quantidade ou o tamanho, cancele a escolha/)).toBeVisible()
+      await expect(p.getByRole('spinbutton')).toHaveCount(0)
+      await expect(p.getByRole('button', { name: 'Atualizar minha escolha' })).toHaveCount(0)
+      await expect(p.getByRole('combobox')).toHaveCount(0)
+      await expect(p.getByRole('button', { name: /^Trocar meus/ })).toHaveCount(0)
+      await expect(p.getByRole('button', { name: 'Já comprei' })).toHaveCount(0)
+      await expect(p.getByRole('button', { name: 'Cancelar escolha' })).toBeVisible()
+      await expect(m.getByRole('combobox').getByRole('option', { name: /^P ·/ })).toHaveCount(0)
+      const report = await new AxeBuilder({ page }).analyze()
+      assert.deepEqual(report.violations.map(v => ({ id: v.id, impact: v.impact, nodes: v.nodes.map(n => n.target) })), [])
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+      await p.getByRole('button', { name: 'Cancelar escolha' }).click()
+      await expect(p.getByRole('button', { name: 'Vou levar' })).toBeVisible()
+      await expect(p.getByRole('spinbutton')).toHaveCount(1)
+      assert.deepEqual(errors, [])
+    } finally { await ctx.close(); await f.cleanup() }
+  }, { timeout: 90000 })
+}
 test('organizador edita convite e recebe conflito se RSVP mudou durante a edição', async () => {
   const f = await fixture(config)
   const ctx = await browser.newContext()

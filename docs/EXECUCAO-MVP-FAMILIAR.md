@@ -108,3 +108,21 @@ catálogo permanecem, pois vêm da migration.
 Pendente para a entrega: apontar o frontend do Pages para o `chadbb-cha`,
 configurar o Auth remoto (site URL, callback e SMTP), ensaiar backup e
 restauração e fazer o ensaio no WhatsApp.
+
+## Correções da revisão do PR #1 — 2026-09-15
+
+A revisão completa de `main...mvp-familiar` encontrou seis problemas. Cinco foram
+corrigidos no próprio PR, com um teste de regressão para cada um, e um foi
+documentado. O merge fica aguardando o novo ciclo G1 → G2 → G3.
+
+| # | Problema | Correção | Teste |
+| --- | --- | --- | --- |
+| 1 | Uma pessoa esgotava a cota global; o IP vinha do primeiro `X-Forwarded-For`, controlado pelo cliente | Cotas na ordem IP → credencial → global; IP de `CF-Connecting-IP` ou do último valor acrescentado pelo gateway | API: endereço forjado não cria cota e recusa por IP não consome a global; smoke: cabeçalhos forjados ignorados no ambiente hospedado |
+| 2 | Adiar o evento não adiava a validade dos convites | `save_event` recalcula `expires_at` = novo início + 7 dias | Portátil |
+| 3 | Mudar quantidade ou tamanho apagava a compra informada | `PURCHASE_ALREADY_DECLARED`; a interface só oferece cancelar (decisão: comportamento mais previsível) | Portátil, API e navegador (desktop e celular: quantidade e troca somem, cancelar permanece) |
+| 4 | Rascunho com data passada era expurgado e ficava travado | Retenção ignora rascunhos; evento já vencido não pode mudar de data (`EVENT_RETENTION_DUE`) | Portátil |
+| 5 | Versões de migration repetidas em relação à `main` antiga | Documentado como limitação de compatibilidade histórica (README) | — |
+| 6 | Falha do servidor chegava como erro de preenchimento | Erros desconhecidos, resposta não-JSON e falha de rede viram 503, que preserva a tentativa; dados malformados continuam 400 | API |
+
+Também incluída a correção do smoke remoto: janelas de `guest_rate` que já existiam
+antes do teste e foram alteradas por ele passam a ser removidas.

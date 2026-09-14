@@ -27,8 +27,8 @@ export async function guestCall(token: string, action: string, payload: Record<s
     method: 'POST', signal, cache: 'no-store', headers: { 'Content-Type': 'application/json', apikey: config.config.key, ...(action === 'exchange' ? {} : { Authorization: `Bearer ${token}` }) },
     body: JSON.stringify({ action, ...(action === 'exchange' ? { token } : { payload }) }),
   })
-  const data = await response.json()
-  if (!response.ok) throw new GuestError(data.error ?? 'TEMPORARILY_UNAVAILABLE', response.status)
+  const data = await response.json().catch(() => null)
+  if (!response.ok || data === null) throw new GuestError(data?.error ?? 'TEMPORARILY_UNAVAILABLE', data === null && response.status < 500 ? 503 : response.status)
   return data
 }
 export function guestMessage(error: unknown) {
@@ -43,6 +43,8 @@ export function guestMessage(error: unknown) {
     ATTENDING_ABOVE_CAPACITY: 'A quantidade de pessoas ultrapassa o limite deste convite.',
     INVALID_PAYLOAD: 'Confira os campos e a quantidade de pessoas permitida no convite.',
     INVALID_GIFT_QUANTITY: 'Informe uma quantidade inteira entre 1 e 1.000.',
+    PURCHASE_ALREADY_DECLARED: 'Você já informou a compra deste presente. Para mudar, cancele a escolha e escolha de novo.',
+    TEMPORARILY_UNAVAILABLE: 'O serviço está temporariamente indisponível. Sua tentativa foi guardada: tente novamente em instantes.',
   }
   return error instanceof Error && messages[error.message] || 'Não foi possível confirmar a operação. Confira a conexão e tente novamente.'
 }

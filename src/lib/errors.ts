@@ -13,6 +13,7 @@ export function errorMessage(error: unknown): string {
     VERSION_CONFLICT: 'Este evento mudou em outra aba. Recarregue os dados antes de salvar novamente.',
     PUBLICATION_INVALID: 'Para publicar, informe um título, uma data futura e o término.',
     EVENT_ENDS_BEFORE_START: 'O término deve ser depois do início.',
+    EVENT_RETENTION_DUE: 'Este evento terminou há mais de 30 dias e está na fila de exclusão de dados pessoais. Não é possível alterá-lo.',
     EVENT_PURGED: 'Os dados pessoais deste evento já foram excluídos pela política de retenção. Não é possível alterá-lo.',
     INVALID_TRANSITION: 'Essa mudança de estado não está disponível.',
     INVALID_QUANTITY: 'Informe uma quantidade inteira entre 1 e 10.000.',
