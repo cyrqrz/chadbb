@@ -72,3 +72,30 @@ for (const [device, viewport] of [['desktop', { width: 1280, height: 900 }], ['m
     } finally { await ctx.close(); await f.cleanup() }
   }, { timeout: 90000 })
 }
+test('organizador edita convite e recebe conflito se RSVP mudou durante a edição', async () => {
+  const f = await fixture(config)
+  const ctx = await browser.newContext()
+  try {
+    await ctx.addInitScript(({ key, session }) => localStorage.setItem(key, JSON.stringify(session)), {
+      key: `sb-${new URL(config.API_URL).hostname.split('.')[0]}-auth-token`, session: f.session,
+    })
+    const page = await ctx.newPage()
+    await page.goto(`${origin}/eventos/${f.event.id}/convites`)
+    await page.getByRole('button', { name: 'Editar convite de Família de teste' }).click()
+    await page.getByLabel('Nome no convite').fill('Família revisada')
+    await page.getByLabel('Limite de pessoas', { exact: true }).fill('4')
+    await page.getByRole('button', { name: 'Salvar convite' }).click()
+    await expect(page.getByRole('status')).toContainText('Convite atualizado.')
+    await expect(page.getByRole('heading', { name: 'Família revisada' })).toBeVisible()
+    await page.getByRole('button', { name: 'Editar convite de Família revisada' }).click()
+    const access = (await edge(config, f.invite.token, 'exchange')).data
+    assert.equal((await edge(config, access.session_token, 'rsvp', {
+      response: 'yes', attending: 4, version: 2, request_id: crypto.randomUUID(),
+    })).status, 200)
+    await page.getByLabel('Limite de pessoas', { exact: true }).fill('2')
+    await page.getByRole('button', { name: 'Salvar convite' }).click()
+    await expect(page.getByRole('alert')).toContainText('Este convite mudou.')
+    assert.equal((await f.call('organizer_invitations', { p_event_id: f.event.id })).invitations[0].capacity, 4)
+    await page.getByRole('button', { name: 'Cancelar edição' }).click()
+  } finally { await ctx.close(); await f.cleanup() }
+}, { timeout: 30000 })

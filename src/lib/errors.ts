@@ -2,6 +2,10 @@ export function errorMessage(error: unknown): string {
   const object = error && typeof error === 'object' ? error as { message?: string; code?: string; status?: number } : {}
   const messages: Record<string, string> = {
     EVENT_NOT_PUBLISHED: 'Publique o evento antes de criar convites.',
+    INVITATION_VERSION_CONFLICT: 'Este convite mudou. Atualize o painel e revise os dados antes de salvar.',
+    INVALID_INVITATION: 'Confira o nome, o tipo e o limite de pessoas do convite.',
+    CAPACITY_BELOW_ATTENDING: 'O limite não pode ser menor que o número de pessoas já confirmadas.',
+    DIAPER_DEFAULT_REQUIRED: 'Peça à administração para configurar a quantidade inicial deste tamanho.',
     INVITATION_NOT_FOUND: 'Convite não encontrado ou sem permissão.',
     AUTH_REQUIRED: 'Sua sessão expirou. Entre novamente.',
     EVENT_NOT_FOUND: 'Evento não encontrado ou sem permissão de acesso.',

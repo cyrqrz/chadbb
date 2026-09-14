@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../auth/context'
 import { getEvent, eventKeys } from '../events/api'
 import { invitations, responseLabels } from './api'
-import type { Dashboard } from './api'
+import type { Dashboard, Invitation } from './api'
 import { errorMessage } from '../../lib/errors'
 import { live } from '../../lib/query'
 
@@ -16,6 +16,7 @@ export function InvitationsPage() {
   const key = ['invitations', session?.user.id, id]
   const query = useQuery<Dashboard>({ queryKey: key, queryFn: () => invitations(id), ...live })
   const event = useQuery({ queryKey: [...eventKeys.detail(id), session?.user.id], queryFn: () => getEvent(id), ...live })
+  const [editing, setEditing] = useState<Invitation | null>(null)
   const [name, setName] = useState('')
   const [kind, setKind] = useState('individual')
   const [capacity, setCapacity] = useState('2')
@@ -29,6 +30,7 @@ export function InvitationsPage() {
     try {
       const result = await invitations(id, action, payload)
       if (result.token) { setLink(`${window.location.origin}/convite#${result.token}`); setNotice('Convite pronto. Copie o link e envie pelo WhatsApp.') }
+      else if (action === 'update') { setNotice('Convite atualizado.'); setEditing(null) }
       else setNotice('Convite revogado. O acesso anterior não funciona mais; as respostas e escolhas foram preservadas.')
       if (action === 'create') setName('')
       await cache.invalidateQueries({ queryKey: key })
@@ -56,9 +58,18 @@ export function InvitationsPage() {
       {link && <div className="notice mt-5"><label className="field">Link para compartilhar<input readOnly value={link} onFocus={e => e.target.select()} /></label><p className="hint mt-2">Guarde este link. Por segurança, ele só aparece na emissão.</p><button className="secondary mt-3" onClick={() => void navigator.clipboard.writeText(link).then(() => setNotice('Link copiado.')).catch(() => setNotice('Selecione o campo do link e copie manualmente.'))}>Copiar convite</button></div>}
       {notice && <p role="status" className="mt-4">{notice}</p>}{error && <p role="alert" className="error mt-4">{error}</p>}
     </section>
+    {editing && <section className="card mt-8" aria-labelledby="edit-invitation"><h2 id="edit-invitation" className="text-2xl font-semibold">Editar convite</h2>
+      <form className="mt-5 grid gap-4" onSubmit={e => { e.preventDefault(); void act('update', { id: editing.id, version: editing.version, name: editing.name, kind: editing.kind, capacity: editing.capacity }) }}>
+        <label className="field">Nome no convite<input required maxLength={120} disabled={busy} value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} /></label>
+        <label className="field">Tipo atualizado<select disabled={busy} value={editing.kind} onChange={e => setEditing({ ...editing, kind: e.target.value as Invitation['kind'], capacity: e.target.value === 'individual' ? 1 : editing.capacity })}><option value="individual">Individual</option><option value="family">Família</option></select></label>
+        <label className="field">Limite de pessoas<input required type="number" min={1} max={editing.kind === 'individual' ? 1 : 50} disabled={busy} value={editing.capacity} onChange={e => setEditing({ ...editing, capacity: Number(e.target.value) })} /></label>
+        <p className="hint">O limite deve comportar todas as pessoas já confirmadas.</p>
+        <button className="button" disabled={busy || !ready}>Salvar convite</button><button type="button" className="secondary" disabled={busy} onClick={() => setEditing(null)}>Cancelar edição</button>
+      </form>
+    </section>}
     <section className="mt-10" aria-labelledby="invites-title"><h2 id="invites-title" className="text-2xl font-semibold">Quem vai celebrar com vocês</h2>
       {!data.invitations.length && <p className="notice mt-4">Seu primeiro convite pode ser criado acima.</p>}
-      <div className="mt-5 grid gap-4 md:grid-cols-2">{data.invitations.map(inv => <article key={inv.id} className="card"><span className="badge">{inv.kind === 'family' ? `Família · até ${inv.capacity} pessoas` : 'Individual'}</span><h3 className="mt-3 text-xl font-semibold break-words">{inv.name}</h3><p className="mt-2">{responseLabels[inv.response]}{inv.response === 'yes' ? ` · ${inv.attending} pessoa(s)` : ''}</p>{inv.revoked && <p className="error mt-2">Acesso revogado; escolhas preservadas.</p>}<div className="mt-4 flex flex-wrap gap-3"><button className="secondary" disabled={busy || !ready} onClick={() => { if (window.confirm('Gerar um novo link e invalidar o anterior? Respostas e presentes serão mantidos.')) void act('rotate', { id: inv.id }) }}>Reemitir link</button>{!inv.revoked && <button className="text-link min-h-11" disabled={busy} onClick={() => { if (window.confirm('Revogar este acesso? Respostas e presentes serão mantidos.')) void act('revoke', { id: inv.id }) }}>Revogar acesso</button>}</div></article>)}</div>
+      <div className="mt-5 grid gap-4 md:grid-cols-2">{data.invitations.map(inv => <article key={inv.id} className="card"><span className="badge">{inv.kind === 'family' ? `Família · até ${inv.capacity} pessoas` : 'Individual'}</span><h3 className="mt-3 text-xl font-semibold break-words">{inv.name}</h3><p className="mt-2">{responseLabels[inv.response]}{inv.response === 'yes' ? ` · ${inv.attending} pessoa(s)` : ''}</p>{inv.revoked && <p className="error mt-2">Acesso revogado; escolhas preservadas.</p>}<div className="mt-4 flex flex-wrap gap-3"><button className="secondary" disabled={busy || !ready} onClick={() => { setEditing({ ...inv }); setError(''); setNotice('') }}>Editar convite de {inv.name}</button><button className="secondary" disabled={busy || !ready} onClick={() => { if (window.confirm('Gerar um novo link e invalidar o anterior? Respostas e presentes serão mantidos.')) void act('rotate', { id: inv.id }) }}>Reemitir link</button>{!inv.revoked && <button className="text-link min-h-11" disabled={busy} onClick={() => { if (window.confirm('Revogar este acesso? Respostas e presentes serão mantidos.')) void act('revoke', { id: inv.id }) }}>Revogar acesso</button>}</div></article>)}</div>
     </section>
     <section className="mt-10" aria-labelledby="diaper-totals"><h2 id="diaper-totals" className="text-2xl font-semibold">Fraldas por tamanho</h2><div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{data.items.filter(i => i.category === 'fralda').map(item => <article className="card" key={item.id}><p className="eyebrow">Tamanho {item.diaper_size}</p><p className="text-3xl font-semibold">{item.committed} / {item.limit}</p><p className="mt-2 text-sm">pacotes confirmados</p><p className="mt-3">{(item.limit ?? 0) - item.committed} disponíveis</p></article>)}</div><Link className="text-link mt-4 inline-block" to={`/eventos/${id}/presentes`}>Organizar fraldas e mimos</Link></section>
     <section className="mt-10" aria-labelledby="promises"><h2 id="promises" className="text-2xl font-semibold">Presentes confirmados</h2><p className="mt-2 text-stone-600">Mimos não têm limite. “Compra informada” é uma declaração do convidado.</p>

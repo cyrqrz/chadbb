@@ -397,7 +397,7 @@ test('lista familiar: quatro cotas, 23 mimos ilimitados; preparação repetida n
 })
 test('RSVP: limites familiares, resposta atual e total do painel, sem multiplicar presentes', async () => {
   const f = await familyFixture()
-  await assert.rejects(guestAction(f.token, 'rsvp', request({ response: 'yes', attending: 4, version: 1 })), { code: '23514' })
+  await assert.rejects(guestAction(f.token, 'rsvp', request({ response: 'yes', attending: 4, version: 1 })), /ATTENDING_ABOVE_CAPACITY/)
   const payload = request({ response: 'yes', attending: 3, version: 1 })
   const confirmed = await guestAction(f.token, 'rsvp', payload)
   const replay = await guestAction(f.token, 'rsvp', payload)
@@ -408,7 +408,7 @@ test('RSVP: limites familiares, resposta atual e total do painel, sem multiplica
   await guestAction(f.token, 'rsvp', request({ response: 'no', attending: 0, version: 2 }))
   assert.equal((await organizerAction(f.event, 'list')).invitations[0].attending, 0)
   const individual = await familyFixture(1)
-  await assert.rejects(guestAction(individual.token, 'rsvp', request({ response: 'yes', attending: 2, version: 1 })), { code: '23514' })
+  await assert.rejects(guestAction(individual.token, 'rsvp', request({ response: 'yes', attending: 2, version: 1 })), /ATTENDING_ABOVE_CAPACITY/)
 })
 test('mimos sem limite: repetição idempotente, compras e cancelamentos não alteram fraldas', async () => {
   const f = await familyFixture()
@@ -486,4 +486,126 @@ test('troca de tamanho é atômica: destino esgotado preserva origem; sucesso tr
   current = moved.snapshot
   assert.equal(current.items.find(i => i.id === from.id).committed, 0)
   assert.equal(current.items.find(i => i.id === to.id).committed, 3)
+})
+
+test('1: quantidade técnica 1–1000 vale para RPC, escrita direta e troca atômica', async () => {
+  const f = await familyFixture()
+  const item = f.snapshot.items.find(i => i.category === 'mimo')
+  for (const quantity of [0, -1, 1001, 2147483647, 1.5, '2', null]) {
+    await assert.rejects(guestAction(f.token, 'reserve', request({ item_id: item.id, quantity, version: null })), /INVALID_GIFT_QUANTITY/)
+  }
+  await guestAction(f.token, 'reserve', request({ item_id: item.id, quantity: 1000, version: null }))
+  await assert.rejects(admin.query('update public.reservations set quantity=1001 where item_id=$1', [item.id]), { code: '23514' })
+  await guestAction(f.token, 'reserve', request({ item_id: item.id, quantity: 1, version: 1 }))
+  const from = f.snapshot.items.find(i => i.diaper_size === 'M')
+  const to = f.snapshot.items.find(i => i.diaper_size === 'P')
+  await admin.query('update public.event_items set quantity_requested=2000 where id=any($1::uuid[])', [[from.id, to.id]])
+  for (const id of [from.id, to.id]) await guestAction(f.token, 'reserve', request({ item_id: id, quantity: 600, version: null }))
+  await assert.rejects(guestAction(f.token, 'swap', request({ from_item_id: from.id, item_id: to.id, version: 1, destination_version: 1 })), /INVALID_GIFT_QUANTITY/)
+  const snapshot = (await guestAction(f.token, 'read')).snapshot
+  assert.equal(snapshot.items.find(i => i.id === from.id).committed, 600)
+  assert.equal(snapshot.items.find(i => i.id === to.id).committed, 600)
+})
+
+test('2: edição preserva confirmações, verifica versão, tipo, limite e proprietário', async () => {
+  const f = await familyFixture()
+  await guestAction(f.token, 'rsvp', request({ response: 'yes', attending: 3, version: 1 }))
+  const payload = { id: f.invite.id, version: 2, name: 'Nome revisado', kind: 'family', capacity: 4 }
+  await assert.rejects(organizerAction(f.event, 'update', payload, bob), /EVENT_NOT_FOUND/)
+  await assert.rejects(organizerAction(f.event, 'update', { ...payload, version: 1 }), /INVITATION_VERSION_CONFLICT/)
+  await assert.rejects(organizerAction(f.event, 'update', { ...payload, capacity: 2 }), /CAPACITY_BELOW_ATTENDING/)
+  await assert.rejects(organizerAction(f.event, 'update', { ...payload, kind: 'individual' }), /INVALID_INVITATION/)
+  await assert.rejects(organizerAction(f.event, 'update', { ...payload, kind: 'individual', capacity: 1 }), /CAPACITY_BELOW_ATTENDING/)
+  assert.equal((await organizerAction(f.event, 'update', payload)).version, 3)
+  const listed = (await organizerAction(f.event, 'list')).invitations[0]
+  assert.equal(listed.version, 3); assert.equal(listed.attending, 3); assert.equal(listed.name, payload.name)
+  await assert.rejects(guestAction(f.token, 'rsvp', request({ response: 'no', attending: 0, version: 2 })), /RESPONSE_VERSION_CONFLICT/)
+  await guestAction(f.token, 'rsvp', request({ response: 'no', attending: 0, version: 3 }))
+  await organizerAction(f.event, 'update', { ...payload, version: 4, kind: 'individual', capacity: 1 })
+  await transition(f.event, 'closed')
+  await assert.rejects(organizerAction(f.event, 'update', { ...payload, version: 5 }), /EVENT_NOT_PUBLISHED/)
+})
+
+test('2: edição concorrente com RSVP não sobrescreve a mesma versão', async () => {
+  const f = await familyFixture()
+  const owner = await connectAs(alice); const guest = server.getPgClient(); await guest.connect()
+  const blocker = server.getPgClient(); await blocker.connect()
+  try {
+    await blocker.query('begin'); await blocker.query('select 1 from private.invitations where id=$1 for update', [f.invite.id])
+    const attempts = Promise.allSettled([
+      owner.query("select public.organizer_invitations($1,'update',$2)", [f.event.id, { id: f.invite.id, version: 1, name: 'Revisado', kind: 'family', capacity: 2 }]),
+      guestAction(f.token, 'rsvp', request({ response: 'yes', attending: 3, version: 1 }), guest),
+    ])
+    await blocker.query('commit')
+    const results = await attempts
+    assert.equal(results.filter(r => r.status === 'fulfilled').length, 1)
+    assert.match(results.find(r => r.status === 'rejected').reason.message, /VERSION_CONFLICT|ATTENDING_ABOVE_CAPACITY/)
+    const inv = (await guestAction(f.token, 'read')).snapshot.invitation
+    assert.equal(inv.version, 2); assert.ok(inv.attending <= inv.capacity)
+  } finally { await blocker.query('rollback'); await Promise.all([owner.end(), guest.end(), blocker.end()]) }
+})
+
+test('3: RSVP rejeita resposta pendente/inválida e quantidade ausente sem erro SQL cru', async () => {
+  const f = await familyFixture()
+  for (const fields of [{ response: 'pending', attending: 0 }, { response: 'other', attending: 0 },
+    { attending: 1 }, { response: 'yes' }, { response: 'yes', attending: null },
+    { response: 'yes', attending: 0 }, { response: 'no', attending: 1 },
+    { response: 'yes', attending: 1.5 }, { response: 'yes', attending: '2' }]) {
+    await assert.rejects(guestAction(f.token, 'rsvp', request({ ...fields, version: 1 })), /RSVP_INVALID_RESPONSE/)
+  }
+  await assert.rejects(guestAction(f.token, 'rsvp', request({ response: 'yes', attending: 4, version: 1 })), /ATTENDING_ABOVE_CAPACITY/)
+  assert.equal((await guestAction(f.token, 'read')).snapshot.invitation.version, 1)
+  assert.equal((await admin.query('select count(*) n from private.guest_requests where invitation_id=$1', [f.invite.id])).rows[0].n, '0')
+  await guestAction(f.token, 'rsvp', request({ response: 'maybe', attending: 0, version: 1 }))
+})
+
+test('4: retenção elimina pedidos de 90 dias e sessões expiradas, preserva replay recente', async () => {
+  const f = await familyFixture()
+  const payload = request({ response: 'yes', attending: 2, version: 1 })
+  const first = await guestAction(f.token, 'rsvp', payload)
+  const old = crypto.randomUUID()
+  await admin.query("insert into private.guest_requests(invitation_id,request_id,payload,result,created_at) values ($1,$2,'{}','{}',now()-interval '91 days')", [f.invite.id, old])
+  await admin.query("insert into private.guest_sessions values ('expired-test',$1,now()-interval '1 second')", [f.invite.id])
+  await admin.query('select private.cleanup_guest_data()')
+  assert.equal((await admin.query('select count(*) n from private.guest_requests where request_id=$1', [old])).rows[0].n, '0')
+  assert.equal((await admin.query("select count(*) n from private.guest_sessions where token_hash='expired-test'")).rows[0].n, '0')
+  assert.deepEqual((await guestAction(f.token, 'rsvp', payload)).result, first.result)
+  for (const role of ['anon', 'authenticated', 'service_role']) {
+    assert.equal((await admin.query("select has_function_privilege($1,'private.cleanup_guest_data()','EXECUTE') allowed", [role])).rows[0].allowed, false)
+  }
+})
+
+test('5: agregação de saldos isola eventos e soma reservas/compras, excluindo cancelamentos', async () => {
+  const f = await familyFixture(); const other = await familyFixture()
+  const item = f.snapshot.items.find(i => i.category === 'mimo')
+  const invite = await organizerAction(f.event, 'create', { name: 'Outra família', kind: 'individual', capacity: 1 })
+  const token = (await guestAction(invite.token, 'exchange')).session_token
+  await guestAction(f.token, 'reserve', request({ item_id: item.id, quantity: 3, version: null }))
+  await guestAction(token, 'reserve', request({ item_id: item.id, quantity: 7, version: null }))
+  await guestAction(token, 'purchase', request({ item_id: item.id, version: 1 }))
+  assert.equal((await guestAction(f.token, 'read')).snapshot.items.find(i => i.id === item.id).committed, 10)
+  assert.equal((await organizerAction(f.event, 'list')).items.find(i => i.id === item.id).committed, 10)
+  assert.ok((await guestAction(other.token, 'read')).snapshot.items.every(i => i.committed === 0))
+  await guestAction(f.token, 'cancel', request({ item_id: item.id, version: 1 }))
+  const current = (await guestAction(f.token, 'read')).snapshot.items.find(i => i.id === item.id)
+  assert.equal(current.committed, 7); assert.equal(current.own.status, 'cancelled')
+})
+
+test('6: defaults configuráveis afetam apenas novas listas e preservam regra de mimos', async () => {
+  const old = await familyFixture()
+  try {
+    await admin.query("update private.family_list_defaults set quantity=8 where diaper_size='P'")
+    const fresh = await familyFixture()
+    assert.equal(fresh.snapshot.items.find(i => i.diaper_size === 'P').limit, 8)
+    assert.equal((await guestAction(old.token, 'read')).snapshot.items.find(i => i.diaper_size === 'P').limit, 6)
+    const treat = fresh.snapshot.items.find(i => i.category === 'mimo')
+    await assert.rejects(admin.query('update public.event_items set quantity_requested=3 where id=$1', [treat.id]), { code: '23514' })
+    await assert.rejects(as(alice, 'select * from private.family_list_defaults'), { code: '42501' })
+    await admin.query("delete from private.family_list_defaults where diaper_size='P'")
+    const empty = await create()
+    await assert.rejects(as(alice, 'select public.prepare_family_list($1)', [empty.id]), /DIAPER_DEFAULT_REQUIRED/)
+    assert.equal((await admin.query('select count(*) n from public.event_items where event_id=$1', [empty.id])).rows[0].n, '0')
+    await transition(fresh.event, 'closed')
+    await assert.rejects(as(alice, 'select public.prepare_family_list($1)', [fresh.event.id]), { code: '22023', message: 'EVENT_CLOSED' })
+  } finally { await admin.query("insert into private.family_list_defaults values ('P',6) on conflict(diaper_size) do update set quantity=6") }
 })

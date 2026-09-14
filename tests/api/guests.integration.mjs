@@ -44,3 +44,18 @@ test('Edge real: revogação bloqueia sessão existente e rotação preserva res
   assert.equal(fresh.status, 200); assert.equal(fresh.data.snapshot.invitation.attending, 3)
   assert.equal((await edge(config, f.invite.token, 'exchange')).status, 401)
 })
+test('Edge real: erros de domínio RSVP e teto de reserva chegam sem erro genérico', async () => {
+  const rotated = await f.call('organizer_invitations', { p_event_id: f.event.id, p_action: 'rotate', p_payload: { id: f.invite.id } })
+  const current = (await edge(config, rotated.token, 'exchange')).data
+  for (const [payload, code] of [
+    [{ response: 'pending', attending: 0 }, 'RSVP_INVALID_RESPONSE'],
+    [{ response: 'yes' }, 'RSVP_INVALID_RESPONSE'],
+    [{ response: 'yes', attending: 4 }, 'ATTENDING_ABOVE_CAPACITY'],
+  ]) {
+    const response = await edge(config, current.session_token, 'rsvp', { ...payload, version: current.snapshot.invitation.version, request_id: randomUUID() })
+    assert.equal(response.status, 409); assert.equal(response.data.error, code)
+  }
+  const item = current.snapshot.items.find(i => i.category === 'mimo' && !i.own)
+  const oversized = await edge(config, current.session_token, 'reserve', { item_id: item.id, quantity: 1001, version: null, request_id: randomUUID() })
+  assert.equal(oversized.status, 409); assert.equal(oversized.data.error, 'INVALID_GIFT_QUANTITY')
+})

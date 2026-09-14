@@ -20,9 +20,11 @@
     "db:test": "supabase test db --local",
     "test:db:portable": "node --test tests/database/*.integration.mjs",
     "test:e2e": "playwright test",
-    "test:api": "node --test tests/api/*.integration.mjs",
+    "test:api": "node --test --test-concurrency=1 tests/api/*.integration.mjs",
     "test:browser:local": "node --test tests/browser/*.integration.mjs",
-    "guest:serve": "supabase functions serve guest"
+    "guest:serve": "supabase functions serve guest",
+    "test:email:local": "node --test tests/local/email-login.test.mjs",
+    "test:load:local": "node tests/load/guest.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",

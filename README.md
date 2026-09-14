@@ -77,7 +77,11 @@ quando necessário. Os testes usam porta 4173 e configuração fictícia própri
 npm run db:start
 npm run db:reset
 npm run db:test
+# Em outro terminal: npm run guest:serve
 npm run test:api
+npm run test:browser:local
+npm run test:email:local
+npm run test:load:local
 ```
 
 `test:api` obtém a configuração da stack local pelo CLI e aceita somente loopback
@@ -85,6 +89,11 @@ na porta 54321. Cria dois usuários fictícios, verifica isolamento pela API,
 valida upload/download/tamanho/tipo e remove os dados de teste ao terminar.
 Não aponta para produção. Se a execução for interrompida, `db:reset` limpa a stack
 local inteira, incluindo quaisquer dados locais de desenvolvimento.
+
+Os testes de navegador e e-mail precisam da porta 5173 livre e rodam em sequência.
+O teste de e-mail usa apenas Mailpit local. O ensaio de carga cria 50 convidados
+fictícios e mede p50/p95 das chamadas Edge. Resultados e contratos atualizados:
+[revisão técnica](docs/REVISAO-TECNICA-2026-09-14.md).
 
 ## Usar o fluxo do organizador
 

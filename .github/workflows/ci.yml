@@ -49,5 +49,6 @@ jobs:
       - run: npm run test:api
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser:local
+      - run: npm run test:email:local
       - if: always()
         run: npm run db:stop

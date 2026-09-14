@@ -39,8 +39,10 @@ export function guestMessage(error: unknown) {
     RESPONSE_VERSION_CONFLICT: 'Sua resposta mudou em outra sessão. Revise os dados antes de confirmar.',
     EVENT_CLOSED: 'O evento está encerrado. Novas confirmações e reservas não estão disponíveis.',
     RATE_LIMITED: 'Muitas tentativas. Aguarde um minuto e tente novamente.',
+    RSVP_INVALID_RESPONSE: 'Escolha uma resposta e informe a quantidade de pessoas que vão participar.',
+    ATTENDING_ABOVE_CAPACITY: 'A quantidade de pessoas ultrapassa o limite deste convite.',
     INVALID_PAYLOAD: 'Confira os campos e a quantidade de pessoas permitida no convite.',
-    INVALID_GIFT_QUANTITY: 'Informe uma quantidade inteira maior que zero.',
+    INVALID_GIFT_QUANTITY: 'Informe uma quantidade inteira entre 1 e 1.000.',
   }
   return error instanceof Error && messages[error.message] || 'Não foi possível confirmar a operação. Confira a conexão e tente novamente.'
 }
