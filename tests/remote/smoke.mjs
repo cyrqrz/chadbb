@@ -38,20 +38,35 @@ const hash = value => createHash('sha256').update(value).digest('hex')
 const call = (path, init = {}) => fetch(`${config.API_URL}${path}`, { ...init, headers: { apikey: config.PUBLISHABLE_KEY, ...init.headers } })
 function track(token) { if (token) tokens.add(token); return token }
 
+let rateBefore = []
 before(async () => {
   config = remoteConfig()
   db = await localDatabase(config)
+  // O projeto ainda não recebe tráfego real: toda janela de limite criada durante o smoke é do teste.
+  rateBefore = (await db.query('select key_hash from private.guest_rate')).rows.map(r => r.key_hash)
   f = await fixture(config)
   track(f.invite.token)
 })
 after(async () => {
   try {
-    if (db) await db.query('delete from private.guest_rate where key_hash=any($1::text[])', [[...tokens].map(t => hash(`token:${t}`))])
-    if (f) {
-      await f.cleanup()
-      const left = await db.query('select (select count(*) from public.events where owner_id=$1) events, (select count(*) from auth.users where id=$1) users', [f.userId])
-      assert.deepEqual(left.rows[0], { events: '0', users: '0' }, 'smoke não deixou dados fictícios')
-    }
+    if (!f) return
+    const invitations = (await db.query('select id from private.invitations where event_id=$1', [f.event.id])).rows.map(r => r.id)
+    await f.cleanup()
+    const created = (await db.query('select key_hash from private.guest_rate where not (key_hash = any($1::text[])) or key_hash = any($2::text[])',
+      [rateBefore, [...tokens].map(t => hash(`token:${t}`))])).rows.map(r => r.key_hash)
+    await db.query('delete from private.guest_rate where key_hash = any($1::text[])', [created])
+    const left = (await db.query(`select
+      (select count(*) from auth.users where id=$1) organizador,
+      (select count(*) from public.events where id=$2 or owner_id=$1) evento,
+      (select count(*) from public.event_items where event_id=$2) itens,
+      (select count(*) from private.invitations where event_id=$2 or id=any($3::uuid[])) convites,
+      (select count(*) from private.guest_sessions where invitation_id=any($3::uuid[])) sessoes,
+      (select count(*) from public.reservations where invitation_id=any($3::uuid[])) reservas,
+      (select count(*) from private.guest_requests where invitation_id=any($3::uuid[])) pedidos,
+      (select count(*) from private.guest_rate where key_hash=any($4::text[])) guest_rate,
+      (select count(*) from private.retention_audit where event_id=$2) auditoria`, [f.userId, f.event.id, invitations, created])).rows[0]
+    console.log(`# zero sobras: ${JSON.stringify(left)}`)
+    assert.deepEqual(Object.values(left).map(Number), Array(9).fill(0), 'smoke deixou dados fictícios')
   } finally { await db?.end() }
 })
 

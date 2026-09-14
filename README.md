@@ -160,4 +160,6 @@ Referências técnicas: [Vite](https://vite.dev/guide/),
 Só executar com aprovação. Exige `CHADBB_SMOKE_REF` igual ao ref do projeto e
 `CHADBB_SMOKE_DB_URL` apontando para ele, e recusa qualquer outro host. As chaves
 vêm do CLI autenticado e o segredo da retenção de `~/.config/chadbb/`; nada disso
-é impresso. Fora da CI.
+é impresso. Fora da CI. A conexão usa o pooler de sessão com
+`sslmode=verify-full&sslrootcert=` apontando para a CA oficial do Supabase
+(Project Settings → Database → SSL), salva localmente fora do repositório.

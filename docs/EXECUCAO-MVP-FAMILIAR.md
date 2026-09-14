@@ -59,3 +59,52 @@ exclusivo do chá e separado de desenvolvimento e preview. A senha do banco fica
 apenas na máquina do titular, fora do repositório. Nenhuma migration, função ou
 configuração de Auth foi aplicada ainda. Suporte técnico, do envio dos
 convites ao dia do evento: Leonardo Martins (solicitante).
+
+## Implantação no chadbb-cha — 2026-09-15
+
+Projeto `chadbb-cha` (ref `fcykqrlnofmdtmewlejr`, `sa-east-1`). Cada etapa só foi
+executada após aprovação manual (gates G1, G2 e G3). Nenhum valor de segredo foi
+exibido nem registrado.
+
+**G1, local:** `npm run check` (40), `test:db:portable` (52), `test:e2e` (16).
+Após `db:reset`: pgTAP (50), `test:api` (13, incluindo a Edge Function `retention`),
+`test:browser:local` (6) e `test:email:local` (1). Commit `6324e8b` no PR #1, com CI
+verde nos jobs `frontend` e `database`.
+
+**G2, remoto:**
+- `db push --dry-run`: 19 migrations, sem seeds e sem roles. A lista confere
+  arquivo por arquivo com o repositório.
+- `db push`: 19/19 aplicadas. O `migration list` remoto é idêntico ao local.
+  Nenhum vínculo local foi criado (`--project-ref`, sem `supabase link`).
+- Segredos da função: `GUEST_ALLOWED_ORIGINS` (somente `https://chadbb.pages.dev`)
+  e `RETENTION_CRON_SECRET`, configurados por env-file temporário já removido.
+- Vault: `project_url` e `retention_cron_secret`.
+- Funções `guest` e `retention` publicadas: `ACTIVE`, `verify_jwt=false`.
+- Cron: somente `personal-data-retention` (`17 6 * * *`); a função
+  `cleanup_guest_data` não existe.
+
+**G3, smoke remoto (`npm run test:smoke:remote`): 6/6 aprovados.**
+1. `guest`: CORS apenas para `https://chadbb.pages.dev`; origens da branch e de
+   terceiros recebem 403; GET recebe 405.
+2. Fluxo completo com dados fictícios: organizador, evento com término, lista de
+   27 itens, publicação, convite, troca de token (`no-store`, sem `owner_id` e
+   `token_hash`), leitura, RSVP, reserva com repetição idempotente, painel e
+   cancelamento.
+3. Revogação encerra a sessão existente (401).
+4. Anon não lê reservas, a auditoria nem as funções de retenção.
+5. `retention` sem segredo recebe 401; com segredo recebe 200 e não apaga o evento
+   que não venceu.
+6. Cron com somente o job de 30 dias.
+
+Conexão ao banco pelo pooler de sessão, com TLS `verify-full` contra a CA oficial
+"Supabase Root 2021 CA". A primeira tentativa, sem essa CA, foi recusada na conexão
+antes de criar qualquer dado; o banco foi conferido e estava vazio.
+
+Zero sobras, conferido pelo `finally` do smoke e depois por contagem global
+independente: usuários, eventos, itens, convites, sessões, reservas, pedidos,
+`guest_rate`, auditoria e objetos de Storage estão em 0. Os 27 produtos do
+catálogo permanecem, pois vêm da migration.
+
+Pendente para a entrega: apontar o frontend do Pages para o `chadbb-cha`,
+configurar o Auth remoto (site URL, callback e SMTP), ensaiar backup e
+restauração e fazer o ensaio no WhatsApp.

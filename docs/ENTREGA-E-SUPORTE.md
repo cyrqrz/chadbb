@@ -141,7 +141,7 @@ antigo sem reaplicar o expurgo.
 - Projeto e credenciais de operação disponíveis no ambiente autorizado.
 - Ambiente do evento configurado e testado, inclusive e-mail.
 - Backup/restauração executados e metas de recuperação registradas.
-- ~~Procedimento de exclusão definido~~: política de 30 dias fechada em 2026-09-14; implantação no projeto do evento pendente.
+- ~~Procedimento de exclusão definido~~: política de 30 dias fechada em 2026-09-14 e implantada no `chadbb-cha` em 2026-09-15.
 - Conteúdo cadastrado e aprovado pelo irmão.
 - Ensaio no WhatsApp e no celular real aprovado pela família.
 
