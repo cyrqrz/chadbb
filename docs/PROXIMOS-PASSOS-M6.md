@@ -548,3 +548,33 @@ o repositório ficar parado em outubro, um commit qualquer reinicia a contagem.
 
 **Decisão: manter Supabase Free no piloto.** Pro permanece como saída caso o
 backup diário se mostre instável ou o evento cresça além do escopo familiar.
+
+## Instabilidade no CI: 405 isolado não prova runtime pronto — 2026-09-15
+
+O commit `157e996` produziu resultados divergentes no mesmo código: `CI /
+database (pull_request)` passou e `CI / database (push)` falhou. O `ci.yml`
+dispara em `push` **e** em `pull_request`, então cada commit numa branch com PR
+executa a suíte duas vezes, e as duas execuções discordaram.
+
+A falha foi em `npm run test:api`, com assinatura inequívoca:
+
+| Teste | Resultado |
+|---|---|
+| 1, 2, 3 | falha, `actual: 502` em todas |
+| 4 a 17 | passam |
+
+Três 502 seguidos e depois nada — o runtime Edge subiu **durante** a suíte. O
+passo "Start Edge Functions" tinha reportado sucesso.
+
+A correção `eb55e19` continua correta no diagnóstico original: o Kong responde
+`OPTIONS` antes do runtime existir, e exigir `GET` com 405 `METHOD_NOT_ALLOWED`
+elimina esse falso-pronto. Mas ela é **insuficiente**, porque uma resposta
+isolada não prova runtime estável — o gateway devolveu 405 e, logo depois, 502.
+
+A espera passa a exigir **cinco respostas consecutivas**, zerando o contador a
+cada falha, com teto de 90 tentativas. Medição local: 12 s até liberar, contra
+cerca de 4 s antes, e `npm run test:api` aprovado em 17 de 17 logo em seguida.
+
+Observação à parte, não corrigida: o disparo duplo em `push` e `pull_request`
+gasta o dobro de minutos do Actions e dobra a exposição a instabilidades. Vale
+uma limpeza, fora do escopo desta entrega.
