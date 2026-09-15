@@ -502,3 +502,49 @@ Saídas, em ordem de confiabilidade:
 `anon recusado no PostgREST`, esperando 401/403 com código `42501`. Vale como
 regressão de segurança: se um grant for afrouxado e `anon` passar a ler
 `public.events`, a verificação falha. Resultado atual: **6/6**.
+
+## Free é suficiente para o MVP — 2026-09-15
+
+Revisão da recomendação anterior, que pedia Supabase Pro na janela do evento.
+**Não é necessário**, porque o keep-alive já existe dentro do backup diário.
+
+### O backup diário é atividade de banco real
+
+`scripts/backup/remote.mjs` abre sessão Postgres autenticada pelo pooler e
+executa dezessete consultas a cada execução: `begin isolation level repeatable
+read read only`, `pg_export_snapshot()`, `transaction_timestamp()`, leitura de
+`supabase_migrations.schema_migrations`, de `cron.job` e de `storage.objects`,
+onze `select count(*)`, `commit` e `show server_version`. Somam-se a isso um
+`pg_dumpall` e dois `pg_dump` completos.
+
+Diferente da sonda de PostgREST, isto não é proxy: é carga de banco de cliente
+externo, diária, às 07:23 UTC. O projeto não completa uma semana ocioso.
+
+O encaixe com o monitoramento é direto: o health check vigia o frescor do backup
+com limite de 36 h, então **backup parado dispara o alarme** — e backup parado é
+precisamente quando o risco de pausa começa. Um alarme cobre as duas falhas.
+
+### Link parado não é problema
+
+Duas propriedades já existentes no sistema:
+
+- **O convite não expira por desuso.** `expires_at = starts_at + interval '7
+  days'`, então vale até uma semana depois do chá, independentemente de quando
+  for aberto.
+- **Pausa não produz falha feia.** `src/features/guests/api.ts:47` já traduz a
+  indisponibilidade para "O serviço está temporariamente indisponível. Sua
+  tentativa foi guardada: tente novamente em instantes." A página é servida pela
+  Cloudflare Pages, independente do Supabase, então carrega normalmente e mostra
+  essa mensagem. Não há tela branca nem erro técnico exposto à família.
+
+### Condição e ressalva
+
+Tudo depende de `backup.yml` estar na `main`. Sem o merge, não há backup, não há
+keep-alive e não há alarme.
+
+Ressalva de calendário: o GitHub desativa workflow agendado após 60 dias sem
+atividade no repositório. São 47 dias até 01/11/2026 — cabe, com pouca folga. Se
+o repositório ficar parado em outubro, um commit qualquer reinicia a contagem.
+
+**Decisão: manter Supabase Free no piloto.** Pro permanece como saída caso o
+backup diário se mostre instável ou o evento cresça além do escopo familiar.
