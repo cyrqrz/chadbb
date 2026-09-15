@@ -46,7 +46,21 @@ try {
   record('frontend configurado', false, 'site não respondeu como esperado')
 }
 
-// 3. O backup mais recente no R2 está dentro da janela de RPO.
+// 3. O PostgREST responde e continua negando leitura anônima.
+// Vale como regressão de segurança: se um grant for afrouxado, anon passa a ler e isto falha.
+// Toca o banco de verdade — o erro 42501 vem do próprio Postgres, não do PostgREST.
+try {
+  const key = process.env.CHADBB_PUBLISHABLE_KEY ?? 'sb_publishable_dL_DxguwKnPNPYHYWJxDGw_J3lh1fUH'
+  const response = await fetch(`https://${REF}.supabase.co/rest/v1/events?select=id&limit=1`,
+    { headers: { apikey: key, Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(20000) })
+  const body = await response.json().catch(() => null)
+  const denied = (response.status === 401 || response.status === 403) && body?.code === '42501'
+  record('anon recusado no PostgREST', denied, `${response.status}${body?.code ? ` / ${body.code}` : ''}`)
+} catch {
+  record('anon recusado no PostgREST', false, 'PostgREST não respondeu — projeto pausado?')
+}
+
+// 4. O backup mais recente no R2 está dentro da janela de RPO.
 const endpoint = process.env.R2_ENDPOINT, bucket = process.env.R2_BUCKET
 if (!endpoint || !bucket || !process.env.AWS_ACCESS_KEY_ID) {
   record('backup recente no R2', true, 'credenciais R2 ausentes nesta execução', true)

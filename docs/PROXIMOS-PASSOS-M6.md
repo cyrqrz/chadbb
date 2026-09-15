@@ -435,3 +435,70 @@ Aberto por Codex às 11:52 e atualizado para refletir o escopo completo. `gh pr
 edit` falha neste repositório por causa da depreciação de Projects clássico no
 GraphQL; a edição foi feita por `gh api ... -X PATCH`, que não passa por esse
 caminho.
+
+## Decisão sobre e-mail e plano no MVP — 2026-09-15
+
+### Sem domínio próprio no piloto
+
+Registro anterior tratava domínio verificado no Resend como obrigatório. **Não
+é**, para o escopo do chá, porque os convidados não recebem e-mail:
+
+| Quem | Quantos | Recebe e-mail |
+|---|---|---|
+| Convidados | ~50 | Não — abrem o link do convite pelo WhatsApp |
+| Organizador (irmão do solicitante) | 1 | Sim, o magic link do Auth |
+| Suporte (Leonardo Martins) | 1 | Não |
+
+O código não envia e-mail próprio: `grep` em `src/` e `supabase/functions/` não
+encontra nenhum envio. O único caminho é
+`supabase.auth.signInWithOtp` em `src/features/auth/LoginPage.tsx:30`.
+
+O suporte também não depende de login: a retenção é acionada por `POST` na Edge
+`retention` com `x-retention-secret` (`ENTREGA-E-SUPORTE.md:104`), em
+service-role.
+
+E não haveria como dar acesso a um segundo organizador nem com domínio: o evento
+tem dono único, com `owner_id = auth.uid()` em toda a RLS e nas RPCs, sem
+caminho de co-organizador. Um segundo usuário logaria e não veria nada.
+
+**Decisão: `resend.dev` com a conta Resend registrada no e-mail do organizador.**
+Custo zero, sem DNS. Resend Free dá 3.000 e-mails por mês e 100 por dia, contra
+alguns links de login de uma pessoa. A única fricção é de montagem: a conta
+precisa estar no e-mail dele, então ele confirma o cadastro e repassa a chave.
+
+Domínio próprio fica para a versão produto, onde destrava envio a qualquer
+endereço. Multi-organizador, nesse cenário, **não** é configuração: exige
+migration trocando `owner_id` por tabela de membros, com a RLS toda junto.
+
+### O risco real é a pausa por inatividade, e o health check não o resolve
+
+O chá é em **01/11/2026**; faltam 47 dias a contar de 2026-09-15. O Supabase Free
+pausa projetos após uma semana de inatividade (já registrado em
+`ADR-001`, linha 179). Projeto pausado significa link de convidado morto.
+
+Chegou-se a supor que o health check serviria de keep-alive. **Não serve.** A
+documentação define o critério como atividade de banco — "user database
+activity", "user queries" — e a sonda da Edge `guest` devolve 405 em
+`index.ts:38`, **antes** de qualquer chamada `rpc()`. Nenhuma consulta chega ao
+Postgres.
+
+A verificação de PostgREST acrescentada nesta sessão toca o banco de fato: o erro
+`42501` vem do próprio Postgres. Mas a documentação não quantifica "suficiente",
+então **tratar isso como keep-alive garantido seria suposição, não fato.**
+
+O que o health check dá com segurança é **detecção**: projeto pausado derruba as
+sondas da Edge e do PostgREST, e a falha aparece em até 6 horas.
+
+Saídas, em ordem de confiabilidade:
+
+1. **Supabase Pro nos ~30 dias em torno do evento**, US$ 25. Não pausa e inclui
+   PITR, o que também cobre o RPO que hoje depende só do backup diário próprio.
+   Pode ser desligado depois.
+2. Manter Free, confiando na detecção do health check e em despausar manualmente
+   se ocorrer. Aceitável antes dos convites reais; arriscado depois.
+
+### Sexta verificação no health check
+
+`anon recusado no PostgREST`, esperando 401/403 com código `42501`. Vale como
+regressão de segurança: se um grant for afrouxado e `anon` passar a ler
+`public.events`, a verificação falha. Resultado atual: **6/6**.
