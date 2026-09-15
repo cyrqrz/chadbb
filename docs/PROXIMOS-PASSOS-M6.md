@@ -67,7 +67,27 @@ captura com o evento cadastrado e pelo menos uma capa no bucket `event-public`.
 
 ### 1. Restauração real a partir do arquivo cifrado
 
-Ainda não feita. O ensaio local restaura de dumps soltos, não do `.tar.gz.gpg`.
+**Concluída em 2026-09-15 para o arquivo capturado às 11:12:38 UTC.**
+`npm run test:recovery:archive -- /caminho/backup.tar.gz.gpg` descriptografa e
+restaura o pacote em Supabase local descartável, sem acessar a origem remota.
+Requer Docker, gpg, Python 3.12+ e o chaveiro privado em
+`~/.config/chadbb/backup-gnupg` (ou `CHADBB_BACKUP_GNUPGHOME`).
+
+Resultado: **40,639 s** incluindo preparação; **0,458 s** de importação e
+validação. SHA-256 do cifrado:
+`5d50de77a96c0673dc27e9ff38de86db4cc476911b918263b4dd4daeeb52151c`.
+Conferidos os cinco hashes internos, as 11 contagens do manifest, as 20
+migrations completas, nome/horário/comando/estado do cron, timeouts das três
+roles e bloqueio de anon ao schema privado e à retenção. Cron foi recriado com
+seu estado original, mas o agendador ficou desligado durante todo o ensaio.
+
+As portas 55321–55329 foram recusadas pelo encaminhamento do Docker desta
+máquina; o ensaio do arquivo usa **56321–56329**. Containers, volumes e texto
+claro do destino foram removidos. Diagnósticos de comandos que falham ficam
+em diretório privado `/tmp/chadbb-archive-diagnostic-*`, para análise local.
+
+O resultado cobre o pacote vazio de dados de usuário. Não valida login remoto,
+Edge Functions, Storage com objetos ou o RTO operacional completo.
 
 Validações de aceite:
 
@@ -97,18 +117,29 @@ Decidido nesta sessão. Motivos: mesma conta que já hospeda o Pages, egress zer
 plano gratuito contra um backup de ~31 KB, API compatível com S3 e regras de
 ciclo de vida para a retenção.
 
-Depende do titular, porque o CLI desta máquina não tem credencial Cloudflare:
+O titular confirmou que **bucket e token já foram criados** e definiu retenção
+em **30 dias**. Credenciais ainda aguardam preenchimento em
+`~/.config/chadbb/r2.env` (modo 600). O modelo contém `R2_ENDPOINT`, `R2_BUCKET`,
+`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` e `AWS_DEFAULT_REGION=auto`.
 
-- Criar o bucket (sugestão: `chadbb-backups`, região automática).
-- Criar token de API com escopo restrito a esse bucket, permissão de
+A transferência entre PCs foi preparada no repositório privado
+`Leonardocmartins02/chadbb-secret-transfer`: `sync-r2.sh` exporta/importa
+`r2.env.gpg` usando a chave de backup. O pacote original cifrado com senha foi
+preservado. A chave privada viaja por outro canal. O repositório de aplicação
+`cyrqrz/chadbb` é público; credenciais abertas nunca entram nele.
+
+Pendente conferir no painel e por execução real:
+
+- Confirmar nome e endpoint S3 do bucket criado.
+- Confirmar token de API com escopo restrito a esse bucket, permissão de
   leitura e escrita de objetos, sem acesso a outros recursos da conta.
-- Definir a regra de ciclo de vida da retenção.
+- Configurar regra de ciclo de vida de **30 dias** para os backups.
 
 Validações de aceite:
 
 - Upload e download de um arquivo de teste com `rclone` ou `aws s3`.
 - Token recusado ao tentar listar outro bucket da conta.
-- Objeto com mais de N dias desaparece após a regra de ciclo de vida entrar.
+- Objeto com mais de 30 dias desaparece após a regra de ciclo de vida entrar.
 
 ### 4. Agendamento diário: GitHub Actions
 
@@ -116,11 +147,36 @@ O PC do trabalho não fica ligado; agendador local produziria falha silenciosa. 
 Actions cobre agendamento, alerta de falha (notificação nativa) e ambiente com
 Docker, rodando o `remote.mjs` sem alteração.
 
-Secrets necessários: senha do banco, chave **pública** de backup e credenciais do
-R2. Vale registrar o risco: a senha do banco passa a existir no GitHub. O que o
-atenua é que só a chave pública participa do pipeline — um comprometimento do
-repositório expõe a senha, que é rotacionável, e **não torna nenhum backup
-legível**.
+Implementação preparada em `.github/workflows/backup.yml`, com disparo manual
+e horário diário de 07:23 UTC (04:23 Brasília). O script
+`scripts/backup/publish-r2.mjs` exige relatório de captura concluída e SHA-256
+local válido antes do upload; depois baixa o objeto e confere novamente o hash.
+Falhas de captura impedem a etapa de publicação; falhas na conferência do R2
+fazem o job falhar. Arquivos do runner são removidos ao final.
+
+**Ainda não ativo nem validado contra R2.** O workflow precisa estar na branch
+padrão para agendamento. O GitHub pode atrasar ou descartar execuções agendadas;
+acompanhar a idade do último backup continua necessário.
+
+Secrets necessários no repositório de aplicação:
+
+- `CHADBB_BACKUP_DB_PASSWORD`
+- `CHADBB_BACKUP_PUBLIC_KEY` (conteúdo ASCII da chave **pública**)
+- `CHADBB_R2_ENDPOINT`
+- `CHADBB_R2_BUCKET`
+- `CHADBB_R2_ACCESS_KEY_ID`
+- `CHADBB_R2_SECRET_ACCESS_KEY`
+
+Variável necessária: `CHADBB_BACKUP_RECIPIENT`, fingerprint da chave pública.
+A consulta desta rodada encontrou zero secrets e zero variáveis no repositório.
+
+Referências: [AWS CLI com R2](https://developers.cloudflare.com/r2/examples/aws/aws-cli/)
+e [agendamento no Actions](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule).
+
+Nesse desenho, a senha do banco passa a existir no GitHub. Um comprometimento
+com acesso aos secrets do workflow pode expor a senha e os dados acessíveis no
+banco. A chave pública sozinha não decifra os backups já
+existentes. Isso não protege novas capturas contra um workflow adulterado.
 
 Validações de aceite:
 
@@ -179,3 +235,12 @@ decifra. Sem ela, nenhum backup é recuperável.
 Passos 1, 3 e 4 destravam a continuidade e não dependem do evento estar
 cadastrado. O passo 2 espera os dados reais. Os passos 6 e 7 são independentes do
 backup e dependem de ação do titular no painel da Cloudflare e do Resend.
+
+## Validações de implementação nesta continuidade
+
+- `npm run lint`, checagem de sintaxe Node e `git diff --check`: aprovados.
+- Ensaio completo do arquivo cifrado: aprovado conforme passo 1.
+- Publicação R2 com CLI simulada: sucesso, download corrompido, hash local
+  inválido e endpoint externo recusado verificados; não substitui o teste real.
+- Transferência cifrada: campos vazios recusados, exportação/importação com
+  dados sintéticos idênticos, modo 600 e proteção contra sobrescrita conferidos.
