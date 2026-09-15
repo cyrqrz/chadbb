@@ -291,9 +291,10 @@ foi testado.
 O pacote original de transferência foi preservado. Para o outro PC, usar
 `git pull` e seguir `README.md` / `sync-r2.sh import` com a chave privada local.
 
-Pendente: configurar secrets/variável no GitHub, integrar e executar o workflow,
-validar alertas e observar a sequência de backups diários. Nenhuma meta RPO/RTO
-passa a estar garantida apenas com esse upload manual.
+Pendente: integrar e executar o workflow, validar alertas e observar a sequência
+de backups diários. Nenhuma meta RPO/RTO passa a estar garantida apenas com esse
+upload manual. (Os secrets e a variável foram configurados em seguida — ver a
+seção de 2026-09-15, 13:30 UTC.)
 
 ## Validação do job `database` — 2026-09-15, 12:00 UTC
 
@@ -323,3 +324,70 @@ Observações sobre o workflow de backup, ainda não exercitado no GitHub:
 - O GitHub desativa workflows agendados após 60 dias sem atividade no
   repositório. Depois do chá o repositório tende a ficar quieto, e o backup
   pararia em silêncio. Convém acompanhar a idade do último objeto no R2.
+
+## Avanço do backup e health check — 2026-09-15, 13:30 UTC
+
+### O agendamento diário tem um bloqueio estrutural
+
+`backup.yml` existe **apenas em `entrega-m6`**. A branch padrão do repositório é
+`main`, e o GitHub dispara `schedule:` somente a partir dela. `gh workflow list`
+confirma: só `CI` aparece, e o backup nem como `workflow_dispatch` está
+disponível. **O backup diário não roda até o workflow chegar na `main`.**
+
+Ordem importa: mesclar `entrega-m6` na `main` dispara um build de produção do
+Pages, porque `production_branch` é `main`. Enquanto as duas variáveis `VITE_*`
+não existirem, esse build sai tão incompleto quanto o atual. Configurar o Pages
+antes do merge evita publicar de novo um site sem conexão.
+
+### Secrets e variável já configurados
+
+No repositório `cyrqrz/chadbb`, em 2026-09-15 11:51: `CHADBB_BACKUP_DB_PASSWORD`,
+`CHADBB_BACKUP_PUBLIC_KEY`, `CHADBB_R2_ENDPOINT`, `CHADBB_R2_BUCKET`,
+`CHADBB_R2_ACCESS_KEY_ID`, `CHADBB_R2_SECRET_ACCESS_KEY` como secrets, e
+`CHADBB_BACKUP_RECIPIENT` como variável, com valor
+`63054589D5D37A839C34AEE0B7D2C32BCA0344D0` — idêntico ao fingerprint da chave
+local de backup.
+
+### O caminho de variáveis do workflow foi exercitado
+
+Nenhuma execução tinha usado os overrides que o `backup.yml` aplica. Simulados
+localmente com sucesso: `CHADBB_BACKUP_PUBLIC_KEY_FILE` a partir de chave
+exportada, `CHADBB_BACKUP_OUT` para diretório próprio e a asserção de
+`CHADBB_BACKUP_RECIPIENT`. O `report.json` saiu limpo no stdout, que é o formato
+que o `publish-r2.mjs` consome, e o diretório de backups local ficou intacto.
+
+O artefato produzido por esse caminho foi restaurado por
+`npm run test:recovery:archive`: aprovado, **39,973 s** no total e **1,128 s** de
+importação e validação, com 20 migrations, cron recriado e as onze contagens
+idênticas ao manifest. É a primeira vez que um arquivo gerado pelo caminho do
+workflow é restaurado de fato.
+
+O bucket `chadbb-backups` contém um objeto, o de 11:47, confirmando o registro
+anterior.
+
+### Health check implementado
+
+`npm run health:remote` (`scripts/health/check.mjs`), agendado por
+`.github/workflows/health.yml` a cada 6 horas. Sem dependências: só módulos
+nativos do Node e a AWS CLI já presente no runner. Cinco verificações:
+
+| Verificação | Critério |
+|---|---|
+| edge guest responde | 405 `METHOD_NOT_ALLOWED` para a origem do site |
+| edge guest recusa origem estranha | 403 `ORIGIN_DENIED` |
+| frontend configurado | bundle contém a URL do projeto e `sb_publishable_` |
+| frontend sem segredo | bundle **sem** `sb_secret_` e sem `service_role` |
+| backup recente no R2 | objeto mais novo com menos de 36 h |
+
+Erros da AWS ficam fora do log, porque podem conter detalhes da requisição. Sem
+credenciais de R2 a última verificação é marcada `SKIP` em vez de falhar, para
+continuar executável na máquina do titular.
+
+Resultado da primeira execução: **4 de 5**, com a única falha sendo
+`frontend configurado` — o estado real do Pages. O workflow ficará vermelho até
+as variáveis serem aplicadas, e isso é o sinal correto, não um defeito da
+verificação. Esse mesmo health check passa a proteger contra alguém remover as
+variáveis depois.
+
+Vale lembrar que `health.yml` tem o mesmo bloqueio de `backup.yml`: só passa a
+rodar quando estiver na `main`.

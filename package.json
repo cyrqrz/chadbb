@@ -28,7 +28,8 @@
     "test:recovery:local": "node tests/recovery/rehearsal.mjs",
     "test:recovery:archive": "node tests/recovery/archive.mjs",
     "backup:remote": "node scripts/backup/remote.mjs",
-    "test:smoke:remote": "node --test tests/remote/smoke.mjs"
+    "test:smoke:remote": "node --test tests/remote/smoke.mjs",
+    "health:remote": "node scripts/health/check.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",
