@@ -1,0 +1,56 @@
+name: Backup diário
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 7 * * *' # 04:23 em Brasília
+permissions:
+  contents: read
+concurrency:
+  group: chadbb-remote-backup
+  cancel-in-progress: false
+jobs:
+  backup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Conferir ferramentas
+        run: |
+          docker info > /dev/null
+          gpg --version > /dev/null
+          aws --version
+      - name: Capturar backup cifrado
+        env:
+          CHADBB_BACKUP_REF: fcykqrlnofmdtmewlejr
+          CHADBB_BACKUP_DB_PASSWORD: ${{ secrets.CHADBB_BACKUP_DB_PASSWORD }}
+          BACKUP_PUBLIC_KEY: ${{ secrets.CHADBB_BACKUP_PUBLIC_KEY }}
+          CHADBB_BACKUP_RECIPIENT: ${{ vars.CHADBB_BACKUP_RECIPIENT }}
+          CHADBB_BACKUP_DEBUG: '0'
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$CHADBB_BACKUP_DB_PASSWORD"
+          test -n "$BACKUP_PUBLIC_KEY"
+          test -n "$CHADBB_BACKUP_RECIPIENT"
+          mkdir -p "$RUNNER_TEMP/chadbb-backup"
+          export CHADBB_BACKUP_PUBLIC_KEY_FILE="$RUNNER_TEMP/chadbb-backup/public.asc"
+          export CHADBB_BACKUP_OUT="$RUNNER_TEMP/chadbb-backup/archives"
+          printf '%s\n' "$BACKUP_PUBLIC_KEY" > "$CHADBB_BACKUP_PUBLIC_KEY_FILE"
+          node scripts/backup/remote.mjs > "$RUNNER_TEMP/chadbb-backup/report.json"
+      - name: Publicar no R2 e conferir download
+        env:
+          R2_ENDPOINT: ${{ secrets.CHADBB_R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.CHADBB_R2_BUCKET }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.CHADBB_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CHADBB_R2_SECRET_ACCESS_KEY }}
+        run: node scripts/backup/publish-r2.mjs "$RUNNER_TEMP/chadbb-backup/report.json"
+      - name: Limpar arquivos do runner
+        if: always()
+        run: rm -rf -- "$RUNNER_TEMP/chadbb-backup"

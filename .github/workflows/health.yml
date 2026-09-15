@@ -1,0 +1,29 @@
+name: Saúde da produção
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */6 * * *'
+permissions:
+  contents: read
+concurrency:
+  group: chadbb-health
+  cancel-in-progress: true
+jobs:
+  health:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      # O script usa apenas módulos nativos do Node e a AWS CLI já presente no runner.
+      - name: Verificar produção
+        env:
+          R2_ENDPOINT: ${{ secrets.CHADBB_R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.CHADBB_R2_BUCKET }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.CHADBB_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CHADBB_R2_SECRET_ACCESS_KEY }}
+        run: node scripts/health/check.mjs

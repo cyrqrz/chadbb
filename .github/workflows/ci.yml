@@ -42,10 +42,24 @@ jobs:
       - name: Start Edge Functions
         run: |
           npm run functions:serve > /tmp/chadbb-functions.log 2>&1 &
-          for attempt in $(seq 1 30); do
-            if curl -s -o /dev/null -f -X OPTIONS http://127.0.0.1:54321/functions/v1/guest; then break; fi
-            sleep 1
+          # Kong can answer OPTIONS before the Edge runtime is ready, so GET must reach
+          # guest and return its method-not-allowed response. One such answer is still not
+          # proof of a stable runtime: the gateway has replied 405 and then 502 during the
+          # first tests. Require consecutive answers before releasing the suite.
+          ready=0
+          for attempt in $(seq 1 90); do
+            status=$(curl -s -o /tmp/chadbb-readiness.json -w '%{http_code}' --max-time 2 \
+              -H 'Origin: http://localhost:5173' http://127.0.0.1:54321/functions/v1/guest || true)
+            if [ "$status" = 405 ] && node -e 'const fs = require("node:fs"); process.exit(JSON.parse(fs.readFileSync("/tmp/chadbb-readiness.json")).error === "METHOD_NOT_ALLOWED" ? 0 : 1)'; then
+              ready=$((ready + 1))
+              if [ "$ready" -ge 5 ]; then exit 0; fi
+            else
+              ready=0
+            fi
+            sleep 2
           done
+          echo 'Edge guest não ficou pronta dentro do prazo.' >&2
+          exit 1
       - run: npm run test:api
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser:local
