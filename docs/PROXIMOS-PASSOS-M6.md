@@ -578,3 +578,56 @@ cerca de 4 s antes, e `npm run test:api` aprovado em 17 de 17 logo em seguida.
 Observação à parte, não corrigida: o disparo duplo em `push` e `pull_request`
 gasta o dobro de minutos do Actions e dobra a exposição a instabilidades. Vale
 uma limpeza, fora do escopo desta entrega.
+
+## Backup diário ativo e validado no GitHub — 2026-09-15, 14:38 UTC
+
+PR #2 mesclado em `6309afd`. `gh workflow list` passou a mostrar os três
+workflows: `CI`, `Backup diário` e `Saúde da produção`. Antes só havia `CI`.
+
+### Primeira execução real, por `workflow_dispatch`
+
+Run `34982951767`, 1m29s, **todos os passos aprovados** — inclusive os dois que
+não tinham como ser testados fora do runner:
+
+| Passo | Resultado |
+|---|---|
+| Conferir ferramentas | success |
+| **Capturar backup cifrado** | success |
+| **Publicar no R2 e conferir download** | success |
+| Limpar arquivos do runner | success |
+
+Isso exercita pela primeira vez, no ambiente real, o `uid` 1001 do runner passado
+ao container e a chave pública vinda de secret em vez de arquivo em disco. Eram
+os dois pontos de risco que restavam.
+
+### Validação independente do artefato
+
+O objeto novo `chadbb-2026-09-15T14-38-21-118Z.tar.gz.gpg` (33.719 bytes) foi
+baixado do R2, decifrado com a chave privada local e **restaurado** por
+`npm run test:recovery:archive`: aprovado, 38,616 s no total e 0,546 s de
+importação e validação, com 20 migrations, cron recriado e as onze contagens
+conferidas.
+
+O arquivo do GitHub é ~2 KB maior que os gerados localmente, mas os arquivos
+internos têm tamanho idêntico — `data.sql` 18.136, `roles.sql` 370, `schema.sql`
+61.817. A diferença está no envelope tar/gzip/gpg, não no conteúdo.
+
+### Consequências
+
+- **RPO de 24 h deixa de ser roteiro e passa a ser mecanismo.** Próxima execução
+  automática às 07:23 UTC, 04:23 em Brasília.
+- **O plano Free fica sustentado**, porque a captura diária executa dezessete
+  consultas numa sessão Postgres autenticada, impedindo a semana ociosa que
+  dispara a pausa.
+- **A cadeia de recuperação está provada de ponta a ponta**: GitHub captura,
+  cifra, publica no R2; a chave privada local decifra e restaura.
+
+Health check após a execução: **6/6**, com backup de 0,0 h de idade.
+
+### O que ainda não está provado
+
+O projeto continua com zero usuários e zero objetos no Storage, então o caminho
+de dados reais e o de cópia do Storage seguem não exercitados. Também não há
+ainda uma sequência observada de execuções diárias — só uma manual. O RTO de 2 h
+permanece estimado a partir de ensaios locais, não medido em recuperação
+operacional completa.
