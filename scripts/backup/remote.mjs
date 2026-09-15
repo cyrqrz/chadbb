@@ -13,14 +13,37 @@ const REF = 'fcykqrlnofmdtmewlejr'
 const IMAGE = 'public.ecr.aws/supabase/postgres:17.6.1.167'
 const here = dirname(fileURLToPath(import.meta.url))
 const config = join(homedir(), '.config/chadbb')
+// Never relay child output by default: pg_dump errors can contain rows or connection details.
+// CHADBB_BACKUP_DEBUG=1 keeps a redacted stderr tail, for operator diagnosis on a trusted terminal.
+const debug = process.env.CHADBB_BACKUP_DEBUG === '1'
+let secret = null
+const redact = text => secret ? text.split(secret).join('***') : text
 const run = (bin, args, env = process.env) => new Promise((resolveRun, reject) => {
   const p = spawn(bin, args, { env, stdio: ['ignore', 'pipe', 'pipe'] })
-  // Never relay child output: pg_dump errors can contain rows or connection details.
-  let stdout = ''
+  let stdout = '', stderr = ''
+  let discardLine = false
   p.stdout.on('data', b => { stdout += b })
-  p.stderr.resume()
+  if (debug) p.stderr.on('data', b => {
+    let chunk = String(b)
+    if (discardLine) {
+      const newline = chunk.indexOf('\n')
+      if (newline < 0) return
+      chunk = chunk.slice(newline + 1)
+      discardLine = false
+    }
+    stderr += chunk
+    if (stderr.length > 4000) {
+      const boundary = stderr.indexOf('\n', stderr.length - 4000)
+      // Passwords cannot contain newlines; drop the whole cut line to avoid leaking a suffix.
+      stderr = boundary < 0 ? '' : stderr.slice(boundary + 1)
+      discardLine = boundary < 0
+    }
+  })
+  else p.stderr.resume()
   p.on('error', () => reject(new Error(`Não foi possível iniciar ${bin}`)))
-  p.on('close', code => code === 0 ? resolveRun(stdout) : reject(new Error(`${bin} encerrou com código ${code}`)))
+  p.on('close', code => code === 0
+    ? resolveRun(stdout)
+    : reject(new Error(`${bin} encerrou com código ${code}${debug && stderr ? `\n--- stderr ---\n${redact(stderr)}` : ''}`)))
 })
 const digest = async path => {
   const hash = createHash('sha256')
@@ -36,6 +59,7 @@ try {
   assert.equal(process.env.CHADBB_BACKUP_REF, REF, 'Projeto de backup não autorizado')
   const password = process.env.CHADBB_BACKUP_DB_PASSWORD ?? (await readFile(join(config, 'chadbb-cha.db-password'), 'utf8')).trim()
   assert.ok(password && !/[\r\n\0]/.test(password), 'Senha ausente ou formato inválido')
+  secret = password
   const ca = await readFile(join(here, 'supabase-ca.crt'), 'utf8')
   const host = 'aws-0-sa-east-1.pooler.supabase.com'
   const user = `postgres.${REF}`
@@ -74,7 +98,8 @@ try {
   for (const name of ['roles','schema','data']) {
     stage = `dump ${name}`
     await copyFile(join(here, `${name}.sh`), join(directory, `${name}.sh`))
-    await run('docker', ['run', '--rm', '--network', 'host', '--env-file', join(directory, 'pg.env'), '--mount', `type=bind,source=${directory},target=/backup`, '--entrypoint', 'bash', IMAGE, '-c', `bash /backup/${name}.sh > /backup/bundle/${name}.sql`])
+    // Run as the host user: files written into the bind mount would otherwise be root-owned and the chmod below fails.
+    await run('docker', ['run', '--rm', '--network', 'host', '--user', `${process.getuid()}:${process.getgid()}`, '--env-file', join(directory, 'pg.env'), '--mount', `type=bind,source=${directory},target=/backup`, '--entrypoint', 'bash', IMAGE, '-c', `bash /backup/${name}.sh > /backup/bundle/${name}.sql`])
     await chmod(join(bundle, `${name}.sql`), 0o600)
   }
   stage = 'cópia do Storage'
@@ -103,8 +128,9 @@ try {
   await chmod(archive, 0o600)
   complete = true
   console.log(JSON.stringify({ status: 'encrypted', capturedAt, project: REF, archive, sha256: await digest(archive), storageObjects: storage.length, migrations: migrationHistory.length }))
-} catch {
+} catch (error) {
   console.error(`Backup falhou na etapa: ${stage}. Nenhuma cópia parcial deve ser publicada.`)
+  if (debug) console.error(redact(String(error?.message ?? error)))
   process.exitCode = 1
 } finally {
   await db?.end()
