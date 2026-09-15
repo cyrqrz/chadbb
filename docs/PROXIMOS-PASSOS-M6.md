@@ -207,11 +207,37 @@ ambiente Production do projeto `chadbb`, com os valores de
 `~/.config/chadbb/pages-production.env`, seguidos de novo build da `main`. Nunca
 usar chave `service_role` no frontend.
 
+**Causa confirmada em 2026-09-15.** No projeto Pages, tanto Production quanto
+Preview têm apenas `NODE_VERSION`; as duas variáveis públicas do Supabase não
+existem em nenhum dos dois ambientes. Como o Vite resolve `import.meta.env` em
+tempo de build, o bundle sai sem endereço nem chave, e a tela de entrada informa
+conexão não configurada. Não é falha de runtime nem de callback do Auth.
+
+Verificação independente pelo artefato publicado, sem uso de credencial:
+`https://chadbb.pages.dev/assets/index-B17_76md.js` (298.303 bytes) não contém
+nenhuma ocorrência de `*.supabase.co` nem de `sb_publishable_`. A mesma inspeção
+confirmou que **nenhum segredo vazou** para o bundle: sem `sb_secret_`, sem
+`service_role`.
+
+Corrigir **os dois ambientes**. Só Production deixaria todo deploy de preview
+igualmente quebrado, e é em preview que os PRs seriam conferidos antes do merge.
+
+**O bloqueio mudou.** O registro em `OPERACAO-M6.md` dizia que o CLI desta
+máquina não tinha credencial Cloudflare; hoje o `wrangler` está autenticado por
+OAuth como `leonardocmartins02@hotmail.com`, com acesso à conta
+`Queirozcyro@gmail.com's Account` (`551bc632…`), onde o projeto `chadbb` vive.
+Ou seja, a configuração passou a ser executável daqui — mas é escrita em
+ambiente hospedado e permanece sob aprovação explícita do titular.
+
 Validações de aceite:
 
+- As duas variáveis presentes em Production **e** em Preview.
+- Novo build da `main` concluído após a configuração — variável criada sem
+  rebuild não entra em bundle já publicado.
+- Bundle publicado passa a conter a URL e a chave publishable.
+- Bundle publicado continua sem `sb_secret_` e sem `service_role`.
 - Tela de entrada deixa de informar conexão não configurada.
 - Requisição do frontend ao Supabase retorna 200.
-- Bundle publicado não contém a chave secreta.
 
 ### 7. SMTP via Resend
 
@@ -268,3 +294,32 @@ O pacote original de transferência foi preservado. Para o outro PC, usar
 Pendente: configurar secrets/variável no GitHub, integrar e executar o workflow,
 validar alertas e observar a sequência de backups diários. Nenhuma meta RPO/RTO
 passa a estar garantida apenas com esse upload manual.
+
+## Validação do job `database` — 2026-09-15, 12:00 UTC
+
+A correção da espera da Edge Function (`eb55e19`) ficou em teste quando a sessão
+anterior terminou. O job inteiro foi reproduzido localmente, com a stack de
+desenvolvimento, e passou:
+
+| Etapa | Resultado |
+|---|---|
+| `db:reset` + `db:test` | 50/50 testes, 4 arquivos |
+| Espera da Edge `guest` | pronta na tentativa 2 (~4 s), contra 60 tentativas de teto |
+| `test:api` | 17/17 |
+| `test:browser:local` | 8/8 |
+| `test:email:local` | 1/1 |
+
+A premissa da correção foi conferida no código antes de rodar: `guest` tem
+`verify_jwt = false` em `config.toml`, responde 405 `METHOD_NOT_ALLOWED` a GET
+(`index.ts:38`), e `http://localhost:5173` está na allowlist padrão de origens,
+que o `local-test.env` não sobrescreve. A troca de OPTIONS por GET é o ponto: o
+Kong responde OPTIONS antes do runtime Edge existir, então a sonda antiga podia
+liberar os testes cedo demais.
+
+Observações sobre o workflow de backup, ainda não exercitado no GitHub:
+
+- O alerta de falha depende da notificação padrão do GitHub, que para execuções
+  agendadas vai a quem alterou o cron por último. É frágil como único alerta.
+- O GitHub desativa workflows agendados após 60 dias sem atividade no
+  repositório. Depois do chá o repositório tende a ficar quieto, e o backup
+  pararia em silêncio. Convém acompanhar a idade do último objeto no R2.
