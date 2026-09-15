@@ -117,8 +117,10 @@ Decidido nesta sessão. Motivos: mesma conta que já hospeda o Pages, egress zer
 plano gratuito contra um backup de ~31 KB, API compatível com S3 e regras de
 ciclo de vida para a retenção.
 
-O titular confirmou que **bucket e token já foram criados** e definiu retenção
-em **30 dias**. Credenciais ainda aguardam preenchimento em
+A informação inicial de bucket/token existentes não havia sido verificada e
+foi corrigida ao abrir o painel: o R2 ainda não estava ativado. O titular então
+ativou o serviço, criou o bucket `chadbb-backups`, a regra de retenção de
+**30 dias** e um token. Credenciais salvas em
 `~/.config/chadbb/r2.env` (modo 600). O modelo contém `R2_ENDPOINT`, `R2_BUCKET`,
 `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` e `AWS_DEFAULT_REGION=auto`.
 
@@ -154,7 +156,7 @@ local válido antes do upload; depois baixa o objeto e confere novamente o hash.
 Falhas de captura impedem a etapa de publicação; falhas na conferência do R2
 fazem o job falhar. Arquivos do runner são removidos ao final.
 
-**Ainda não ativo nem validado contra R2.** O workflow precisa estar na branch
+**Agendamento ainda não ativo; publicação local validada contra R2.** O workflow precisa estar na branch
 padrão para agendamento. O GitHub pode atrasar ou descartar execuções agendadas;
 acompanhar a idade do último backup continua necessário.
 
@@ -244,3 +246,25 @@ backup e dependem de ação do titular no painel da Cloudflare e do Resend.
   inválido e endpoint externo recusado verificados; não substitui o teste real.
 - Transferência cifrada: campos vazios recusados, exportação/importação com
   dados sintéticos idênticos, modo 600 e proteção contra sobrescrita conferidos.
+
+## R2 validado — 2026-09-15, 11:47 UTC
+
+Nova captura somente leitura concluída e publicada em `chadbb-backups`:
+`chadbb-2026-09-15T11-47-30-239Z.tar.gz.gpg`, 31.681 bytes.
+O download do R2 teve SHA-256 idêntico ao arquivo local:
+`d684451cc5c8e2eacac0397ed04ae07b2cc75c9b7a792ed58f4cebb1dcab78a8`.
+A captura continua com 20 migrations e zero objetos Storage.
+
+O `HeadObject` retornou a regra `excluir-apos-30-dias` e expiração em
+**2026-10-15 11:47:53 UTC**, comprovando a regra aplicada ao objeto. A exclusão
+futura ainda precisa ser observada. O escopo do token sobre outros buckets não
+foi testado.
+
+`r2.env.gpg` enviado ao repositório privado de transferência no commit
+`6f29f89`; sua decriptação foi comparada com o arquivo local e é idêntica.
+O pacote original de transferência foi preservado. Para o outro PC, usar
+`git pull` e seguir `README.md` / `sync-r2.sh import` com a chave privada local.
+
+Pendente: configurar secrets/variável no GitHub, integrar e executar o workflow,
+validar alertas e observar a sequência de backups diários. Nenhuma meta RPO/RTO
+passa a estar garantida apenas com esse upload manual.
