@@ -15,6 +15,10 @@ const get = async (url, headers = {}) => {
   const response = await fetch(url, { headers, redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(20000) })
   return { status: response.status, text: await response.text() }
 }
+// O index.html fica em cache na borda da Cloudflare: sem furar esse cache, uma verificação
+// logo após um deploy lê o HTML antigo e acusa falha onde não há.
+const getFresh = url => get(`${url}${url.includes('?') ? '&' : '?'}cb=${Date.now()}`,
+  { 'Cache-Control': 'no-cache', Pragma: 'no-cache' })
 
 // 1. A Edge guest responde e continua recusando origem não autorizada.
 try {
@@ -30,7 +34,7 @@ try {
 
 // 2. O bundle publicado tem a configuração pública e nenhum segredo.
 try {
-  const page = await get(SITE)
+  const page = await getFresh(SITE)
   const asset = page.text.match(/\/assets\/index-[A-Za-z0-9_-]+\.js/)?.[0]
   if (!asset) throw new Error('bundle não localizado')
   const bundle = (await get(`${SITE}${asset}`)).text
