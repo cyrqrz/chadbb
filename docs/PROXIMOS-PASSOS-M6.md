@@ -391,3 +391,47 @@ variáveis depois.
 
 Vale lembrar que `health.yml` tem o mesmo bloqueio de `backup.yml`: só passa a
 rodar quando estiver na `main`.
+
+## Pages de produção resolvido e PR aberto — 2026-09-15, 13:50 UTC
+
+### Frontend configurado
+
+`VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY` aplicadas no ambiente
+**Production** do Pages como `plain_text`, seguidas de novo build. O bundle
+publicado passou de `index-B17_76md.js` para `index-1awbkm0D.js` e agora contém
+a URL do projeto e a publishable key, sem `sb_secret_` nem `service_role`.
+`npm run health:remote` passou a dar **5/5**.
+
+O ambiente **Preview** continua só com `NODE_VERSION`. Deploys de preview seguem
+sem conexão, então PRs não podem ser conferidos nesse ambiente antes do merge.
+
+### Correção no próprio health check
+
+A primeira conferência após o deploy acusou falha com a publicação correta. O
+`index.html` é servido pela borda da Cloudflare com etag próprio, e
+`cache: 'no-store'` governa apenas o cache local do `fetch` — a verificação lia o
+HTML antigo e apontava o bundle anterior. Agora a requisição do HTML leva
+parâmetro de cache-busting e cabeçalhos `no-cache`. Sem isso, toda verificação
+logo após um deploy daria falso negativo.
+
+### Check "Workers Builds: chadbb" falha e pode ser ignorado
+
+O PR mostra esse check em vermelho. Ele **não** decorre de nada neste
+repositório:
+
+- Falha em zero segundo — `started_at` igual a `completed_at` — em todo commit
+  desde `5353aa7`, em 2026-09-14T18:40, que é justamente o que está em produção.
+- A conta não tem Worker nenhum: `/workers/scripts` volta vazio e só existem os
+  projetos Pages `chadbb` e `titanium-do-brasil`.
+- O check clássico *Cloudflare Pages* passa, com "Deployed successfully".
+
+É uma integração do sistema novo de builds da Cloudflare apontada ao repositório
+sem nada para construir. Convém desconectá-la no painel para parar o ruído; a
+`main` não tem branch protection, então ela não bloqueia merge.
+
+### PR #2
+
+Aberto por Codex às 11:52 e atualizado para refletir o escopo completo. `gh pr
+edit` falha neste repositório por causa da depreciação de Projects clássico no
+GraphQL; a edição foi feita por `gh api ... -X PATCH`, que não passa por esse
+caminho.
