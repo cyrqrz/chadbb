@@ -127,6 +127,10 @@ Estado ao encerrar a sessão no computador do trabalho:
 
 ### Arquivos que existem só no computador do trabalho (nunca no Git)
 
+> **Desatualizado desde 2026-09-15.** Não menciona `r2.env`, criado depois, nem a
+> sessão do `wrangler`, que passou a existir. O roteiro vigente de troca de
+> máquina é `TROCA-DE-MAQUINA.md`.
+
 Em `~/.config/chadbb/`, com permissão 600: `chadbb-cha.db-password`,
 `retention-cron-secret`, `backup-private.asc`, `backup-public.asc`,
 `backup-gnupg/`, `pages-production.env` e `supabase-ca.crt`. Para continuar em
