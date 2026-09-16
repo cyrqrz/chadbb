@@ -279,3 +279,146 @@ for (const status of ['published', 'closed'] as const) {
     expect(overflow).toBe(0)
   })
 }
+
+test('tentar de novo pelo teclado mantém o foco no botão', async ({ page }) => {
+  await backend(page, () => ({ status: 500, json: { message: 'unavailable' } }))
+  await page.goto(`/eventos/${eventId}/convites`)
+  const retry = page.getByRole('alert').getByRole('button', { name: 'Tentar novamente' })
+  await expect(retry).toBeVisible({ timeout: 15_000 })
+  // Atrasa as próximas respostas para observar o botão durante a tentativa.
+  await page.route('**/rest/v1/rpc/organizer_invitations', async route => { await new Promise(resolve => setTimeout(resolve, 800)); await route.fallback() })
+  await retry.focus()
+  await page.keyboard.press('Enter')
+  await expect(retry).toHaveAttribute('aria-disabled', 'true')
+  await expect(retry).toBeFocused()
+  await expect(retry).not.toHaveAttribute('aria-disabled', 'true', { timeout: 15_000 })
+  await expect(retry).toBeFocused()
+})
+
+test('links de voltar têm área de toque de 44 px', async ({ page }) => {
+  await backend(page, () => ({ status: 200, json: full }))
+  await page.goto(`/eventos/${eventId}/convites`)
+  const back = page.getByRole('link', { name: 'Detalhes do evento' })
+  await expect(back).toBeVisible()
+  expect((await back.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+})
+
+test('falha de atualização nos detalhes não apaga o que está sendo digitado', async ({ page }) => {
+  let failing = false
+  await backend(page, () => ({ status: 200, json: full }), () => failing ? { status: 500, json: { message: 'unavailable' } } : { status: 200, json: [event] })
+  await page.goto(`/eventos/${eventId}`)
+  await page.getByLabel('Endereço privado').fill('Rascunho fictício em andamento')
+  failing = true
+  await expect(page.getByRole('alert')).toContainText('Os dados abaixo são da última consulta.', { timeout: 20_000 })
+  await expect(page.getByLabel('Endereço privado')).toHaveValue('Rascunho fictício em andamento')
+})
+
+test('falha de atualização na lista de presentes mantém a tela', async ({ page }) => {
+  let failing = false
+  await backend(page, () => ({ status: 200, json: full }), () => failing ? { status: 500, json: { message: 'unavailable' } } : { status: 200, json: [event] },
+    { '/rest/v1/event_items': none, '/rest/v1/products': none })
+  await page.goto(`/eventos/${eventId}/presentes`)
+  await expect(page.getByRole('heading', { name: 'Fraldas na lista' })).toBeVisible()
+  failing = true
+  await page.waitForResponse(r => r.url().includes('/rest/v1/events') && r.status() === 500, { timeout: 20_000 })
+  await page.waitForTimeout(300)
+  await expect(page.getByRole('heading', { name: 'Fraldas na lista' })).toBeVisible()
+})
+
+test('voltar a uma tela que falhou mostra carregando, não o erro antigo', async ({ page }) => {
+  let delay = 0
+  await backend(page, () => ({ status: 200, json: full }), () => ({ status: 500, json: { message: 'unavailable' } }))
+  await page.goto(`/eventos/${eventId}`)
+  await expect(page.getByRole('heading', { name: 'Detalhes do evento' })).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByRole('alert')).toContainText('Não foi possível abrir o evento.')
+  await page.getByRole('link', { name: 'Seus eventos' }).click()
+  await expect(page.getByRole('heading', { name: 'Seus eventos' })).toBeVisible()
+  delay = 1500
+  await page.route('**/rest/v1/events**', async route => { if (delay) await new Promise(resolve => setTimeout(resolve, delay)); await route.fallback() })
+  await page.goBack()
+  // A consulta em cache ainda guarda o erro, mas a nova tentativa ao montar é uma carga nova.
+  await expect(page.getByRole('status').filter({ hasText: 'Carregando evento…' })).toBeVisible()
+  await expect(page.getByRole('alert')).toContainText('Não foi possível abrir o evento.', { timeout: 15_000 })
+})
+
+test.describe('G2.1 · card de convidado', () => {
+  test.beforeEach(async ({ page }) => {
+    await backend(page, () => ({ status: 200, json: full }))
+    await page.goto(`/eventos/${eventId}/convites`)
+    await expect(page.getByRole('heading', { name: 'Convidado fictício 1' })).toBeVisible()
+    // Os botões só ficam disponíveis depois que o evento (publicado) carrega.
+    await expect(page.getByRole('button', { name: 'Editar convite de Convidado fictício 1' })).toBeEnabled()
+  })
+  const card = (page: Page, n: number) => page.getByRole('listitem').filter({ has: page.getByRole('heading', { name: `Convidado fictício ${n}`, exact: true }) })
+  const radius = (locator: ReturnType<Page['locator']>) => locator.evaluate(el => parseFloat(getComputedStyle(el).borderTopLeftRadius))
+
+  test('editar mostra só "Editar convite" e mantém o nome para o leitor de tela', async ({ page }) => {
+    const edit = card(page, 3).getByRole('button', { name: 'Editar convite de Convidado fictício 3' })
+    await expect(edit).toBeVisible()
+    // Texto visível: tudo menos o complemento em .sr-only (só para leitor de tela).
+    expect(await edit.evaluate(el => { const copy = el.cloneNode(true) as HTMLElement; copy.querySelectorAll('.sr-only').forEach(n => n.remove()); return copy.textContent?.trim() })).toBe('Editar convite')
+  })
+
+  test('forma: card e botões sem cápsula, selo continua pill', async ({ page }) => {
+    const item = card(page, 1)
+    expect(await radius(item)).toBeLessThanOrEqual(16)
+    for (const name of [/^Editar convite/, 'Reemitir link', 'Revogar acesso']) {
+      const button = item.getByRole('button', { name })
+      expect(await radius(button)).toBeLessThanOrEqual(12)
+      expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+    }
+    expect(await radius(item.locator('.badge').first())).toBeGreaterThan(100)
+  })
+
+  test('revogar é botão de ação destrutiva, sem aparência de link', async ({ page }) => {
+    const revoke = card(page, 1).getByRole('button', { name: 'Revogar acesso' })
+    await expect(revoke).toHaveClass(/btn-danger/)
+    expect(await revoke.evaluate(el => getComputedStyle(el).textDecorationLine)).toBe('none')
+  })
+
+  test('só uma ação domina: nenhum botão preenchido dentro do card', async ({ page }) => {
+    const filled = await card(page, 1).getByRole('button').evaluateAll(buttons => buttons.filter(b => {
+      const bg = getComputedStyle(b).backgroundColor
+      return bg !== 'rgba(0, 0, 0, 0)' && bg !== 'rgb(255, 255, 255)' && bg !== 'transparent'
+    }).length)
+    expect(filled).toBe(0)
+  })
+
+  test('foco visível no teclado', async ({ page }) => {
+    const edit = card(page, 1).getByRole('button', { name: /^Editar convite/ })
+    await edit.focus()
+    await page.keyboard.press('Shift+Tab'); await page.keyboard.press('Tab')
+    await expect(edit).toBeFocused()
+    expect(await edit.evaluate(el => getComputedStyle(el).outlineWidth)).toBe('3px')
+  })
+
+  test('alto contraste do sistema mantém o contorno dos botões', async ({ page }) => {
+    await page.emulateMedia({ forcedColors: 'active' })
+    const border = (locator: ReturnType<Page['locator']>) => locator.evaluate(el => { const s = getComputedStyle(el); return `${s.borderTopStyle} ${s.borderTopWidth} ${s.borderTopColor}` })
+    for (const name of [/^Editar convite/, 'Reemitir link', 'Revogar acesso']) {
+      // Cor visível (não transparente) além do estilo: é o que desenha o contorno.
+      expect(await border(card(page, 1).getByRole('button', { name }))).toMatch(/^solid [1-9][.0-9]*px rgb\(/)
+    }
+    // A trilha da barra de progresso perde o fundo nas cores forçadas; o contorno mostra o total.
+    const meters = page.locator('.meter')
+    await expect(meters.first()).toBeAttached()
+    for (const meter of await meters.all()) expect(await border(meter)).toMatch(/^solid 1px rgb\(/)
+  })
+
+  test('card médio não deixa "Revogar acesso" sozinho à direita numa segunda linha', async ({ page }) => {
+    // Viewport de 1000 px: dois cards por linha, cada um com ~450 px; as três ações não cabem numa linha.
+    await page.setViewportSize({ width: 1000, height: 900 })
+    const item = card(page, 1)
+    const edit = (await item.getByRole('button', { name: /^Editar convite/ }).boundingBox())!
+    const revoke = (await item.getByRole('button', { name: 'Revogar acesso' }).boundingBox())!
+    if (revoke.y > edit.y + 1) expect(Math.abs(revoke.x - edit.x)).toBeLessThanOrEqual(1)
+  })
+
+  test('card estreito empilha as ações ocupando a largura (container query)', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 740 })
+    const item = card(page, 1)
+    const box = (await item.boundingBox())!
+    const edit = (await item.getByRole('button', { name: /^Editar convite/ }).boundingBox())!
+    expect(edit.width).toBeGreaterThan(box.width * 0.75)
+  })
+})

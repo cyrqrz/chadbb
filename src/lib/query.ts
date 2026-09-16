@@ -34,3 +34,11 @@ export function liveInterval(failures: number) {
 export const live = {
   refetchInterval: (query: { state: { fetchFailureCount: number } }) => liveInterval(query.state.fetchFailureCount),
 }
+
+// Sem dado anterior, o TanStack v5 volta a consulta para "pending" e limpa o
+// erro a cada nova tentativa. Para a tela de erro não piscar (nem soltar o foco
+// do botão), vale a última resposta registrada. Use junto com useLastError: ao
+// remontar a tela, o cache ainda guarda o erro, mas a tentativa é uma carga nova.
+export function failedLast(query: { errorUpdatedAt: number; dataUpdatedAt: number }) {
+  return query.errorUpdatedAt > query.dataUpdatedAt
+}

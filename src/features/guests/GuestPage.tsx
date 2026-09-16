@@ -6,6 +6,7 @@ import type { GuestItem, ResponseChoice, Snapshot } from './api'
 import { live } from '../../lib/query'
 import { coverUrl } from '../events/api'
 import { EmptyState, ErrorState, LoadingState, RefreshStatus, SuccessMessage } from '../../components/States'
+import { Button } from '../../components/ui'
 
 // O efeito reutiliza a promessa no StrictMode, sem compartilhar credenciais
 // entre montagens. Abrir outro fragmento invalida o acesso anterior imediatamente.
@@ -85,7 +86,7 @@ function GuestEvent({ access }: { access: { token: string; snapshot: Snapshot } 
   return <section className="page">
     <div className="guest-hero">
       <div><p className="eyebrow">Um encontro cheio de carinho</p><h1>{data.event.title}</h1><p className="mt-5 text-lg">{data.invitation.name}, este convite é para você{data.invitation.kind === 'family' ? ' e sua família' : ''}.</p><p className="mt-4 whitespace-pre-line text-stone-600">{data.event.description}</p></div>
-      {data.event.cover_path ? <img className="h-64 w-full rounded-3xl object-cover" src={coverUrl(data.event.cover_path)} alt="Capa do chá de bebê" /> : <div className="guest-art" aria-hidden="true"><span>✳</span><p>Pequenos começos.<br />Muito amor.</p></div>}
+      {data.event.cover_path ? <img className="h-64 w-full rounded-panel object-cover" src={coverUrl(data.event.cover_path)} alt="Capa do chá de bebê" /> : <div className="guest-art" aria-hidden="true"><span>✳</span><p>Pequenos começos.<br />Muito amor.</p></div>}
     </div>
     <div className="stagger mt-6 grid gap-4 md:grid-cols-2"><div className="card"><p className="eyebrow">Quando</p><p className="text-xl">{new Date(data.event.starts_at).toLocaleString('pt-BR', { dateStyle: 'full', timeStyle: 'short', timeZone: 'America/Sao_Paulo' })}</p><p className="hint mt-2">Horário de Brasília</p></div><div className="card"><p className="eyebrow">Onde vamos celebrar</p><p className="whitespace-pre-line">{data.event.address || 'Local a combinar com a organização.'}</p><p className="mt-3 whitespace-pre-line text-stone-600">{data.event.instructions}</p></div></div>
     {closed && <p className="notice mt-6">O evento foi encerrado. Você ainda pode consultar suas escolhas, cancelar ou informar uma compra enquanto seu convite estiver válido.</p>}
@@ -144,7 +145,7 @@ function GuestGift({ item, alternatives, busy, closed, save }: { item: GuestItem
     <button className="button" disabled={busy || closed || available === 0 && !active}>{active ? 'Atualizar minha escolha' : available === 0 ? 'Tamanho completo' : 'Escolher presente'}</button></form>}
     {draft && draft.version !== (own?.version ?? null) && <p role="status" className="mt-3">A escolha mudou em outra sessão. <button className="text-link" onClick={() => setDraft(null)}>Usar escolha atual</button></p>}
     {active && !purchased && item.category === 'fralda' && !closed && <div className="mt-4 space-y-3"><label className="field">Trocar tamanho {item.diaper_size} por<select disabled={busy} value={destination} onChange={e => setDestination(e.target.value)}><option value="">Escolha outro tamanho</option>{swapTargets.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.diaper_size} · {availableOf(candidate) ?? 0} disponíveis</option>)}</select></label><button className="secondary" disabled={busy || !destination} onClick={() => { const target = swapTargets.find(candidate => candidate.id === destination); if (target) void save('swap', { from_item_id: item.id, item_id: target.id, version: own.version, destination_version: target.own?.version ?? null }).then(done => { if (done) { setDraft(null); setDestination('') } }) }}>Trocar meus {own.quantity} pacote(s)</button></div>}
-    {active && <div className="mt-4 flex flex-wrap gap-x-4"><button className="text-link min-h-11" disabled={busy} onClick={() => void save('cancel', { item_id: item.id, version: own.version }).then(done => { if (done) setDraft(null) })}>Cancelar reserva</button>{!purchased && <button className="text-link min-h-11" disabled={busy} aria-describedby={purchaseHint} onClick={() => void save('purchase', { item_id: item.id, version: own.version })}>Já comprei</button>}</div>}
+    {active && <div className="mt-4 flex flex-wrap gap-2">{!purchased && <Button variant="ghost" size="sm" disabled={busy} aria-describedby={purchaseHint} onClick={() => void save('purchase', { item_id: item.id, version: own.version })}>Já comprei</Button>}<Button variant="danger" size="sm" disabled={busy} onClick={() => void save('cancel', { item_id: item.id, version: own.version }).then(done => { if (done) setDraft(null) })}>Cancelar reserva</Button></div>}
     {active && !purchased && <p id={purchaseHint} className="hint mt-1">“Já comprei” só avisa a organização que você já tem o presente. O site não faz pagamento nem confere a compra.</p>}
   </article>
 }

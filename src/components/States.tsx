@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Button } from './ui/Button'
 
 // Estados das telas com o mesmo acabamento. Só o carregamento inicial, o erro e o
 // sucesso usam região viva; a atualização periódica aparece sem anúncio, para o
@@ -14,7 +15,7 @@ export function ErrorState({ title, message, onRetry, retryLabel = 'Tentar novam
   return <div role="alert" className="state state-error">
     {title && <p className="font-semibold">{title}</p>}
     <p>{message}</p>
-    {onRetry && <button type="button" className="secondary" disabled={busy} onClick={onRetry}>{retryLabel}</button>}
+    {onRetry && <Button variant="secondary" busy={busy} onClick={onRetry}>{retryLabel}</Button>}
   </div>
 }
 
@@ -34,7 +35,7 @@ export function RefreshStatus({ fetching, failed, onRetry, label = 'Atualizando�
   if (failed) return <div role="alert" className="state state-error mt-4">
     <p>Não foi possível atualizar. Os dados abaixo são da última consulta.</p>
     {/* Texto fixo: a região de alerta é relida a cada mudança, e a tela tenta de novo sozinha. */}
-    <button type="button" className="secondary" disabled={fetching} onClick={onRetry}>Tentar novamente</button>
+    <Button variant="secondary" busy={fetching} onClick={onRetry}>Tentar novamente</Button>
   </div>
   return <p className="refresh-status" aria-hidden={!fetching}>{fetching ? label : ''}</p>
 }

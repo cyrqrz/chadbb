@@ -7,8 +7,11 @@ import { getEvent, eventKeys } from '../events/api'
 import { availableOf, invitations, panelSummary, responseLabels } from './api'
 import type { Dashboard, DashboardReservation, Invitation, PanelSummary } from './api'
 import { errorMessage } from '../../lib/errors'
-import { live } from '../../lib/query'
+import { failedLast, live } from '../../lib/query'
+import { useLastError } from '../../lib/useLastError'
 import { EmptyState, ErrorState, LoadingState, RefreshStatus, SuccessMessage } from '../../components/States'
+import { BackLink, Button, StatusBadge } from '../../components/ui'
+import type { StatusTone } from '../../components/ui'
 
 export function InvitationsPage() {
   const { id = '' } = useParams()
@@ -29,6 +32,7 @@ export function InvitationsPage() {
   const [feedbackAt, setFeedbackAt] = useState<'create' | 'edit'>('create')
   const [error, setError] = useState('')
   const linkField = useRef<HTMLInputElement>(null)
+  const loadError = useLastError(query.error)
   // O link novo pode ter sido pedido lá embaixo, na lista: o foco vai até ele.
   useEffect(() => { if (link) linkField.current?.focus() }, [link])
   async function act(action: string, payload: Record<string, unknown>) {
@@ -45,9 +49,9 @@ export function InvitationsPage() {
   }
   function create(e: FormEvent) { e.preventDefault(); void act('create', { name, kind, capacity: kind === 'individual' ? 1 : Number(capacity) }) }
   const ready = event.data?.status === 'published'
-  const heading = <><Link className="text-link" to={`/eventos/${id}`}>← Detalhes do evento</Link><p className="eyebrow mt-7 break-words">{event.data?.title}</p><h1 className="page-title">Convites e confirmações</h1></>
-  if (query.isPending) return <section className="page">{heading}<LoadingState>Carregando seu painel…</LoadingState></section>
-  if (!query.data) return <section className="page">{heading}<div className="mt-6"><ErrorState title="Não foi possível abrir o painel." message={errorMessage(query.error)} busy={query.isFetching} onRetry={() => void query.refetch()} /></div></section>
+  const heading = <><BackLink to={`/eventos/${id}`}>Detalhes do evento</BackLink><p className="eyebrow mt-7 break-words">{event.data?.title}</p><h1 className="page-title">Convites e confirmações</h1></>
+  if (query.isPending && !(failedLast(query) && loadError)) return <section className="page">{heading}<LoadingState>Carregando seu painel…</LoadingState></section>
+  if (!query.data) return <section className="page">{heading}<div className="mt-6"><ErrorState title="Não foi possível abrir o painel." message={errorMessage(loadError)} busy={query.isFetching} onRetry={() => void query.refetch()} /></div></section>
   const data = query.data
   const feedback = <>{notice && <div className="mt-4"><SuccessMessage>{notice}</SuccessMessage></div>}{error && <div className="mt-4"><ErrorState message={error} /></div>}</>
   return <section className="page">
@@ -79,10 +83,38 @@ export function InvitationsPage() {
     </section>}
     <section className="mt-10" aria-labelledby="invites-title"><h2 id="invites-title" className="text-2xl font-semibold">Quem vai celebrar com vocês</h2>
       {!data.invitations.length ? <div className="mt-4"><EmptyState title="Nenhum convite ainda.">Crie o primeiro convite no formulário acima.</EmptyState></div> :
-      <ul className="mt-5 grid gap-4 md:grid-cols-2">{data.invitations.map(inv => <li key={inv.id} className="card"><span className="badge">{inv.kind === 'family' ? `Família · até ${inv.capacity} pessoas` : 'Individual'}</span><h3 className="mt-3 text-xl font-semibold break-words">{inv.name}</h3><p className="mt-2">{responseLabels[inv.response]}{inv.response === 'yes' ? ` · ${inv.attending} pessoa(s)` : ''}</p>{inv.revoked && <p className="error mt-2">Acesso revogado; escolhas preservadas.</p>}<div className="mt-4 flex flex-wrap gap-3"><button className="secondary" disabled={busy || !ready} onClick={() => { setEditing({ ...inv }); setError(''); setNotice('') }}>Editar convite de {inv.name}</button><button className="secondary" disabled={busy || !ready} onClick={() => { if (window.confirm('Gerar um novo link e invalidar o anterior? Respostas e presentes serão mantidos.')) void act('rotate', { id: inv.id }) }}>Reemitir link</button>{!inv.revoked && <button className="text-link min-h-11" disabled={busy} onClick={() => { if (window.confirm('Revogar este acesso? Respostas e presentes serão mantidos.')) void act('revoke', { id: inv.id }) }}>Revogar acesso</button>}</div></li>)}</ul>}
+      <ul className="mt-5 grid gap-4 md:grid-cols-2">{data.invitations.map(inv => <GuestCard key={inv.id} invitation={inv} canEdit={!busy && ready} canRevoke={!busy}
+        onEdit={() => { setEditing({ ...inv }); setError(''); setNotice('') }}
+        onRotate={() => { if (window.confirm('Gerar um novo link e invalidar o anterior? Respostas e presentes serão mantidos.')) void act('rotate', { id: inv.id }) }}
+        onRevoke={() => { if (window.confirm('Revogar este acesso? Respostas e presentes serão mantidos.')) void act('revoke', { id: inv.id }) }} />)}</ul>}
     </section>
     <Choices reservations={data.reservations} />
   </section>
+}
+
+const responseTones: Record<Invitation['response'], StatusTone> = { yes: 'success', maybe: 'warning', no: 'neutral', pending: 'neutral' }
+// Ícones próprios para não confundir a resposta com o selo do tipo de convite.
+const responseIcons: Partial<Record<Invitation['response'], string>> = { no: '–', pending: '?' }
+
+// G2.1: uma ação de edição (secundária), reemitir como auxiliar e revogar como
+// destrutiva; o nome do convidado fica só no título e no nome acessível.
+function GuestCard({ invitation: inv, canEdit, canRevoke, onEdit, onRotate, onRevoke }: {
+  invitation: Invitation; canEdit: boolean; canRevoke: boolean; onEdit: () => void; onRotate: () => void; onRevoke: () => void
+}) {
+  return <li className="card guest-card">
+    <div className="flex flex-wrap gap-2">
+      <StatusBadge tone="neutral">{inv.kind === 'family' ? `Família · até ${inv.capacity} pessoas` : 'Individual'}</StatusBadge>
+      {inv.revoked && <StatusBadge tone="danger">Acesso revogado</StatusBadge>}
+    </div>
+    <h3 className="text-h3 font-bold break-words">{inv.name}</h3>
+    <p><StatusBadge tone={responseTones[inv.response]} icon={responseIcons[inv.response]}>{responseLabels[inv.response]}{inv.response === 'yes' ? ` · ${inv.attending} pessoa(s)` : ''}</StatusBadge></p>
+    {inv.revoked && <p className="hint">O link antigo não funciona mais; as respostas e escolhas foram preservadas.</p>}
+    <div className="card-actions">
+      <Button variant="secondary" size="sm" disabled={!canEdit} onClick={onEdit}>Editar convite<span className="sr-only"> de {inv.name}</span></Button>
+      <Button variant="ghost" size="sm" disabled={!canEdit} onClick={onRotate}>Reemitir link</Button>
+      {!inv.revoked && <Button variant="danger" size="sm" disabled={!canRevoke} onClick={onRevoke}>Revogar acesso</Button>}
+    </div>
+  </li>
 }
 
 function Figure({ value, of, children }: { value: number; of?: number | null; children: ReactNode }) {

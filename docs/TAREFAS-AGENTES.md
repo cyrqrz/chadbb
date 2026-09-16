@@ -23,7 +23,7 @@ irmão depende.
 ## Claude — front (`chadbb-claude`, `claude/front`)
 
 - [x] **T-F1 · Visual e estados das telas (M1).** _(2026-09-16: componentes comuns
-  em `src/components/States.tsx`; aguardando revisão.)_ Em `GuestPage`, `GiftListPage`,
+  em `src/components/States.tsx`; mergeado no PR #7.)_ Em `GuestPage`, `GiftListPage`,
   `InvitationsPage` e `EventPage`: estados de vazio, carregando, sucesso e erro com
   o mesmo acabamento; uma ação principal por etapa ("Confirmar presença",
   "Escolher presente", "Cancelar reserva"); explicar que "Já comprei" é só uma
@@ -44,7 +44,9 @@ irmão depende.
   (meta tags em `index.html`). Prévia personalizada por evento é opcional.
 - [ ] **T-F7 · Refatoração visual (plano em `docs/design/PLANO-VISUAL.md`).**
   Gates G0–G5 até o ensaio; congelamento a partir de 05/10. Absorve T-F3, T-F4
-  e T-F5 nos gates indicados no plano.
+  e T-F5 nos gates indicados no plano. G0 e G1 mergeados (PR #7, 2026-09-16);
+  G2 e G2.1 (foundation, forma e hierarquia de ações; fontes Manrope + Fraunces
+  aprovadas) em PR. Próximo: G3 (convite).
 - [ ] **T-F6 · Testes.** Ampliar os testes e2e para o que mudar; `npm run check`
   antes de cada PR.
 
@@ -126,9 +128,9 @@ _Nenhum no momento._
 
 | Agente | Tarefa | Branch | Situação |
 |---|---|---|---|
-| Claude | T-F1/T-F2 prontos; T-F7 (plano visual) no G0 | `claude/front` | aguardando aprovação do G0 (2026-09-16) |
+| Claude | T-F7 · G2 + G2.1 em PR; G3 (convite) a seguir | `claude/front` | aguardando merge (2026-09-16) |
 | Codex | — | `codex/back` | livre |
 
 ## Concluídas
 
-_Nenhuma ainda._
+- 2026-09-16 · Claude · T-F1 (estados das telas), G0 (baseline visual) e G1 (audit), PR #7.
