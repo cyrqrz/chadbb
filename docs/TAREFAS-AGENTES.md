@@ -95,6 +95,12 @@ Enquanto os campos não chegam, o front usa `summary`/`available` quando existem
 mantém o cálculo antigo só como transição, isolado em `src/features/guests/api.ts`
 (`panelSummary` e `availableOf`). Depois da entrega, o Claude remove o cálculo.
 
+- [ ] 2026-09-16 · Usuário → Codex · **Depois do MVP: outras formas de entrar.**
+  No MVP o organizador entra só pelo link por e-mail. Para o produto, avaliar
+  login com Google/Apple e cadastro com nome (ideia do usuário a partir de
+  referências de mercado). Não bloqueia o chá de 01/11; o front só muda depois
+  que o Auth estiver pronto.
+
 ## Pedidos do back para o front
 
 _Nenhum no momento._

@@ -58,3 +58,16 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) { .spinner { animation: none; border-top-color: #f0d3de; border-right-color: #823b55; } }
 }
+
+@layer components {
+  .login-shell { display: grid; margin-block: 2rem 4rem; overflow: hidden; border: 1px solid #ecd3dc; border-radius: 1.75rem; background: white; }
+  .login-form { display: flex; flex-direction: column; justify-content: center; min-width: 0; padding: clamp(1.25rem, 5vw, 3.5rem); }
+  .login-guest { margin-top: 2rem; border-top: 1px solid #e7e5e4; padding-top: 1.25rem; font-size: 0.9rem; color: #57534e; }
+  .login-aside { display: flex; align-items: center; min-width: 0; background: #f6c3d4; padding: clamp(1rem, 5vw, 3.5rem); }
+  .login-features { display: grid; gap: 1rem; width: 100%; margin: 0; padding: 0; list-style: none; }
+  .login-feature { display: flex; gap: 1rem; align-items: flex-start; border-radius: 1rem; background: white; padding: 1.1rem 1.25rem; box-shadow: 0 1px 2px rgb(63 41 49 / 0.08); }
+  .login-feature h3 { font-weight: 650; font-size: 1.05rem; }
+  .login-feature p { margin-top: 0.2rem; color: #57534e; }
+  .login-icon { display: grid; flex-shrink: 0; place-items: center; width: 2.75rem; height: 2.75rem; border-radius: 0.8rem; background: #fae9ef; color: #823b55; }
+  @media (min-width: 900px) { .login-shell { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); min-height: 34rem; } }
+}
