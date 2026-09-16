@@ -1,5 +1,5 @@
 import { getClient } from '../events/api'
-import type { Category, EventItem, Product } from './model'
+import type { Category, DiaperSize, EventItem, Product } from './model'
 import { searchPattern } from './model'
 
 export const giftKeys = { items: (eventId: string) => ['event-items', eventId] as const, catalog: ['catalog'] as const }
@@ -21,6 +21,13 @@ export async function listItems(eventId: string, page: number, category?: Catego
   const { data, error, count } = await query.order('created_at').order('id').range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
   if (error) throw error
   return { items: data as unknown as EventItem[], count: count ?? 0 }
+}
+// Só identificadores: o catálogo marca o que já está na lista. O banco continua
+// recusando repetição (ITEM_ALREADY_EXISTS e DIAPER_SIZE_ALREADY_LISTED).
+export async function listedProducts(eventId: string) {
+  const { data, error } = await getClient().from('event_items').select('product_id,diaper_size').eq('event_id', eventId)
+  if (error) throw error
+  return data as { product_id: string; diaper_size: DiaperSize | null }[]
 }
 export async function addItem(eventId: string, productId: string, quantity: number | null) {
   const { data, error } = await getClient().rpc('add_event_item', { p_event_id: eventId, p_product_id: productId, p_quantity: quantity }).single()

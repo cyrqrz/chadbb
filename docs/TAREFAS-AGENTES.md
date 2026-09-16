@@ -42,6 +42,9 @@ irmão depende.
   que está sendo digitado em nenhum formulário, inclusive na edição de convite.
 - [ ] **T-F5 · Prévia do link no WhatsApp.** Prévia genérica bem apresentada
   (meta tags em `index.html`). Prévia personalizada por evento é opcional.
+- [ ] **T-F7 · Refatoração visual (plano em `docs/design/PLANO-VISUAL.md`).**
+  Gates G0–G5 até o ensaio; congelamento a partir de 05/10. Absorve T-F3, T-F4
+  e T-F5 nos gates indicados no plano.
 - [ ] **T-F6 · Testes.** Ampliar os testes e2e para o que mudar; `npm run check`
   antes de cada PR.
 
@@ -91,6 +94,11 @@ irmão depende.
   não traz identificador, e o front usa o índice como chave da lista. Pedido:
   incluir `id` (da reserva) em cada item.
 
+- [ ] 2026-09-16 · Claude → Codex · **Progresso geral das fraldas (T-F7).** No
+  mesmo `summary`, incluir `diapers: { committed, limit }` (soma de todos os
+  tamanhos), para o resumo “X de Y pacotes”. Sem esse campo, o número não
+  aparece no painel.
+
 Enquanto os campos não chegam, o front usa `summary`/`available` quando existem e
 mantém o cálculo antigo só como transição, isolado em `src/features/guests/api.ts`
 (`panelSummary` e `availableOf`). Depois da entrega, o Claude remove o cálculo.
@@ -109,7 +117,7 @@ _Nenhum no momento._
 
 | Agente | Tarefa | Branch | Situação |
 |---|---|---|---|
-| Claude | T-F1 e T-F2 prontos; T-F2 aguarda T-B7 | `claude/front` | em revisão (2026-09-16) |
+| Claude | T-F1/T-F2 prontos; T-F7 (plano visual) no G0 | `claude/front` | aguardando aprovação do G0 (2026-09-16) |
 | Codex | — | `codex/back` | livre |
 
 ## Concluídas

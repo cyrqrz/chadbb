@@ -33,16 +33,18 @@ const full: Dashboard = {
   ],
 }
 
-type Reply = () => { status: number; json: unknown }
-async function backend(page: Page, dashboard: Reply, events: Reply = () => ({ status: 200, json: [event] })) {
+type Reply = () => { status: number; json: unknown; headers?: Record<string, string> }
+const none: Reply = () => ({ status: 200, json: [], headers: { 'content-range': '*/0' } })
+async function backend(page: Page, dashboard: Reply, events: Reply = () => ({ status: 200, json: [event] }), rest: Record<string, Reply> = {}) {
   await page.addInitScript(value => localStorage.setItem('sb-e2e-auth-token', JSON.stringify(value)), session())
   await page.route('https://e2e.supabase.co/**', async route => {
     const path = new URL(route.request().url()).pathname
-    let result: { status: number; json: unknown } = { status: 500, json: { message: 'Unexpected test request' } }
+    let result: ReturnType<Reply> = { status: 500, json: { message: 'Unexpected test request' } }
     if (path === '/auth/v1/user') result = { status: 200, json: session().user }
     else if (path === '/rest/v1/events') result = events()
     else if (path === '/rest/v1/rpc/organizer_invitations') result = dashboard()
-    await route.fulfill({ status: result.status, contentType: 'application/json', body: JSON.stringify(result.json), })
+    else if (rest[path]) result = rest[path]()
+    await route.fulfill({ status: result.status, contentType: 'application/json', body: JSON.stringify(result.json), headers: { 'access-control-expose-headers': 'content-range', ...result.headers } })
   })
 }
 async function expectAccessible(page: Page) {
@@ -129,4 +131,45 @@ test('detalhes e lista de presentes mostram o mesmo estado de erro', async ({ pa
   failing = false
   await page.getByRole('alert').getByRole('button', { name: 'Tentar novamente' }).click()
   await expect(page.getByRole('heading', { name: 'Lista de presentes' })).toBeVisible()
+})
+
+const product = (n: number, size: 'P' | 'M' | 'G' | 'XG') => ({ id: `80000000-0000-4000-8000-00000000000${n}`, title: `Fraldas tamanho ${size}`,
+  description: 'Uma unidade equivale a um pacote.', platform: 'manual', category: 'fralda', diaper_size: size, active: true })
+test('catálogo marca o que já está na lista e destaca a lista pronta', async ({ page }) => {
+  const g = product(1, 'G')
+  const listedG = { id: '90000000-0000-4000-8000-000000000009', event_id: eventId, product_id: g.id, quantity_requested: 12, category: 'fralda', diaper_size: 'G', version: 1, product: g }
+  await backend(page, () => ({ status: 200, json: full }), undefined, {
+    '/rest/v1/event_items': () => ({ status: 200, json: [listedG], headers: { 'content-range': '0-0/1' } }),
+    '/rest/v1/products': () => ({ status: 200, json: [g, product(2, 'M')], headers: { 'content-range': '0-1/2' } }),
+  })
+  await page.goto(`/eventos/${eventId}/presentes`)
+  await expect(page.getByRole('button', { name: 'Completar a lista do chá' })).toBeVisible()
+  const catalog = page.getByRole('region', { name: 'Incluir itens avulsos' })
+  const cardG = catalog.getByRole('article').filter({ hasText: 'Fraldas tamanho G' })
+  await expect(cardG).toContainText('Já na lista')
+  await expect(cardG.getByRole('button')).toHaveCount(0)
+  await expect(catalog.getByText('Catálogo manual')).toHaveCount(0)
+  await expect(catalog.getByRole('button', { name: 'Adicionar Fraldas tamanho M à lista' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Mimos', exact: true })).toHaveAttribute('aria-pressed', 'false')
+  await expectAccessible(page)
+})
+
+test('lista vazia recomenda a lista pronta do chá', async ({ page }) => {
+  await backend(page, () => ({ status: 200, json: full }), undefined, { '/rest/v1/event_items': none, '/rest/v1/products': none })
+  await page.goto(`/eventos/${eventId}/presentes`)
+  await expect(page.getByRole('region', { name: 'Comece com a lista pronta do chá' })).toContainText('Recomendado')
+  await expect(page.getByRole('button', { name: 'Preparar lista do chá' })).toBeVisible()
+  await expectAccessible(page)
+})
+
+test('evento encerrado fica só para leitura, sem envio de imagem', async ({ page }) => {
+  const closed = { ...event, status: 'closed' }
+  await backend(page, () => ({ status: 200, json: full }), () => ({ status: 200, json: [closed] }))
+  await page.goto(`/eventos/${eventId}`)
+  await expect(page.getByText('Este evento foi encerrado.')).toBeVisible()
+  await expect(page.getByLabel('Nome do evento')).toBeDisabled()
+  await expect(page.getByLabel('Imagem de capa (opcional)')).toHaveCount(0)
+  const style = await page.getByLabel('Nome do evento').evaluate(el => getComputedStyle(el).borderStyle)
+  expect(style).toBe('dashed')
+  await expectAccessible(page)
 })

@@ -92,7 +92,7 @@ function Summary({ summary }: { summary: PanelSummary }) {
   const rows: [string, number][] = [[responseLabels.yes, inv.yes], [responseLabels.maybe, inv.maybe], [responseLabels.no, inv.no], [responseLabels.pending, inv.pending]]
   return <section className="mt-4" aria-labelledby="summary-title">
     <h2 id="summary-title" className="text-2xl font-semibold">Resumo</h2>
-    <div className="mt-5 grid gap-4 md:grid-cols-2">
+    <div className="stagger mt-5 grid gap-4 md:grid-cols-2">
       <article className="card" aria-labelledby="people-title"><h3 id="people-title" className="eyebrow">Pessoas</h3>
         <Figure value={summary.people_confirmed}>pessoas confirmadas</Figure>
         <p className="hint mt-3">Pessoas informadas nos convites com a resposta “{responseLabels.yes}”.</p>
@@ -112,7 +112,7 @@ function Diapers({ items, eventId }: { items: PanelItem[]; eventId: string }) {
   return <section className="mt-10" aria-labelledby="diaper-totals"><h2 id="diaper-totals" className="text-2xl font-semibold">Fraldas por tamanho</h2>
     <p className="mt-2 text-stone-600">Pacotes comprometidos: os que os convidados vão levar e os que já informaram ter comprado.</p>
     {!items.length ? <div className="mt-5"><EmptyState title="Nenhum tamanho de fralda na lista.">Prepare a lista do chá para acompanhar os pacotes por tamanho.</EmptyState></div> :
-      <ul className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{items.map(item => {
+      <ul className="stagger mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{items.map(item => {
         const available = availableOf(item)
         const filled = item.limit ? Math.min(100, Math.round(item.committed / item.limit * 100)) : 0
         return <li className="card" key={item.id}><h3 className="eyebrow">Tamanho {item.diaper_size}</h3>

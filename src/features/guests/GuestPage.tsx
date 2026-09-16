@@ -87,19 +87,19 @@ function GuestEvent({ access }: { access: { token: string; snapshot: Snapshot } 
       <div><p className="eyebrow">Um encontro cheio de carinho</p><h1>{data.event.title}</h1><p className="mt-5 text-lg">{data.invitation.name}, este convite é para você{data.invitation.kind === 'family' ? ' e sua família' : ''}.</p><p className="mt-4 whitespace-pre-line text-stone-600">{data.event.description}</p></div>
       {data.event.cover_path ? <img className="h-64 w-full rounded-3xl object-cover" src={coverUrl(data.event.cover_path)} alt="Capa do chá de bebê" /> : <div className="guest-art" aria-hidden="true"><span>✳</span><p>Pequenos começos.<br />Muito amor.</p></div>}
     </div>
-    <div className="mt-6 grid gap-4 md:grid-cols-2"><div className="card"><p className="eyebrow">Quando</p><p className="text-xl">{new Date(data.event.starts_at).toLocaleString('pt-BR', { dateStyle: 'full', timeStyle: 'short', timeZone: 'America/Sao_Paulo' })}</p><p className="hint mt-2">Horário de Brasília</p></div><div className="card"><p className="eyebrow">Onde vamos celebrar</p><p className="whitespace-pre-line">{data.event.address || 'Local a combinar com a organização.'}</p><p className="mt-3 whitespace-pre-line text-stone-600">{data.event.instructions}</p></div></div>
+    <div className="stagger mt-6 grid gap-4 md:grid-cols-2"><div className="card"><p className="eyebrow">Quando</p><p className="text-xl">{new Date(data.event.starts_at).toLocaleString('pt-BR', { dateStyle: 'full', timeStyle: 'short', timeZone: 'America/Sao_Paulo' })}</p><p className="hint mt-2">Horário de Brasília</p></div><div className="card"><p className="eyebrow">Onde vamos celebrar</p><p className="whitespace-pre-line">{data.event.address || 'Local a combinar com a organização.'}</p><p className="mt-3 whitespace-pre-line text-stone-600">{data.event.instructions}</p></div></div>
     {closed && <p className="notice mt-6">O evento foi encerrado. Você ainda pode consultar suas escolhas, cancelar ou informar uma compra enquanto seu convite estiver válido.</p>}
     <RefreshStatus fetching={query.isFetching} failed={query.isError} onRetry={() => void query.refetch()} label="Atualizando informações…" />
-    <nav aria-label="Seu convite" className="category-nav">{[['presenca', 'Presença'], ['fralda', 'Fraldas'], ['mimo', 'Mimos']].map(([id, label]) => <button key={id} className={tab === id ? 'button' : 'secondary'} aria-pressed={tab === id} onClick={() => setTab(id)}>{label}</button>)}</nav>
+    <nav aria-label="Seu convite" className="category-nav"><div className="segmented">{[['presenca', 'Presença'], ['fralda', 'Fraldas'], ['mimo', 'Mimos']].map(([id, label]) => <button key={id} aria-pressed={tab === id} onClick={() => setTab(id)}>{label}</button>)}</div></nav>
     {notice && <div className="mb-6">{notice.ok ? <SuccessMessage>{notice.text}</SuccessMessage> : <p role="status" className="notice">{notice.text}</p>}</div>}
     {error !== null && <div className="mb-6"><ErrorState message={guestMessage(error)} /></div>}
     {pending && !busy && <button className="secondary mb-6" onClick={() => { const request = pending!; void mutate(request.action, Object.fromEntries(Object.entries(request.payload).filter(([name]) => name !== 'request_id'))) }}>Verificar tentativa anterior</button>}
-    {tab === 'presenca' ? <Presence data={data} busy={busy || closed} save={mutate} /> : <>
+    <div key={tab} className="fade-swap">{tab === 'presenca' ? <Presence data={data} busy={busy || closed} save={mutate} /> : <>
       <h2 className="text-3xl font-semibold">{tab === 'fralda' ? 'Qual tamanho você vai levar?' : 'Um mimo, se quiser'}</h2>
       <p className="mt-3 max-w-2xl text-stone-600">{tab === 'fralda' ? 'Escolha um ou mais pacotes. As quantidades disponíveis ajudam a equilibrar os tamanhos para o bebê.' : 'Sua presença é o principal. Se quiser levar um carinho a mais, escolha os mimos e informe quantas unidades. Não há limite de mimos.'}</p>
-      <div className="mt-6 grid gap-5 md:grid-cols-2 lg:grid-cols-3">{data.items.filter(item => item.category === tab).map(item => <GuestGift key={item.id} item={item} alternatives={data.items.filter(candidate => candidate.category === 'fralda' && candidate.id !== item.id)} busy={busy} closed={closed} save={mutate} />)}</div>
+      <div className="stagger mt-6 grid gap-5 md:grid-cols-2 lg:grid-cols-3">{data.items.filter(item => item.category === tab).map(item => <GuestGift key={item.id} item={item} alternatives={data.items.filter(candidate => candidate.category === 'fralda' && candidate.id !== item.id)} busy={busy} closed={closed} save={mutate} />)}</div>
       {!data.items.some(item => item.category === tab) && <div className="mt-6"><EmptyState title="A organização está preparando esta lista.">Volte em breve para escolher.</EmptyState></div>}
-    </>}
+    </>}</div>
   </section>
 }
 const successMessages: Record<string, string> = {
