@@ -33,17 +33,19 @@ const full: Dashboard = {
   ],
 }
 
-type Reply = () => { status: number; json: unknown; headers?: Record<string, string> }
+type Reply = (request: { url: URL; body: Record<string, unknown> }) => { status: number; json: unknown; headers?: Record<string, string> }
 const none: Reply = () => ({ status: 200, json: [], headers: { 'content-range': '*/0' } })
 async function backend(page: Page, dashboard: Reply, events: Reply = () => ({ status: 200, json: [event] }), rest: Record<string, Reply> = {}) {
   await page.addInitScript(value => localStorage.setItem('sb-e2e-auth-token', JSON.stringify(value)), session())
   await page.route('https://e2e.supabase.co/**', async route => {
-    const path = new URL(route.request().url()).pathname
+    const url = new URL(route.request().url())
+    const path = url.pathname
+    const body = route.request().postDataJSON() ?? {}
     let result: ReturnType<Reply> = { status: 500, json: { message: 'Unexpected test request' } }
     if (path === '/auth/v1/user') result = { status: 200, json: session().user }
-    else if (path === '/rest/v1/events') result = events()
-    else if (path === '/rest/v1/rpc/organizer_invitations') result = dashboard()
-    else if (rest[path]) result = rest[path]()
+    else if (path === '/rest/v1/events') result = events({ url, body })
+    else if (path === '/rest/v1/rpc/organizer_invitations') result = dashboard({ url, body })
+    else if (rest[path]) result = rest[path]({ url, body })
     await route.fulfill({ status: result.status, contentType: 'application/json', body: JSON.stringify(result.json), headers: { 'access-control-expose-headers': 'content-range', ...result.headers } })
   })
 }
@@ -173,3 +175,107 @@ test('evento encerrado fica só para leitura, sem envio de imagem', async ({ pag
   expect(style).toBe('dashed')
   await expectAccessible(page)
 })
+
+test('falha ao conferir a lista avisa no catálogo e some quando a consulta volta', async ({ page }) => {
+  let failing = true
+  const g = product(1, 'G')
+  await backend(page, () => ({ status: 200, json: full }), undefined, {
+    '/rest/v1/event_items': ({ url, body }) => !url.searchParams.get('select')?.startsWith('product_id,') ? none({ url, body })
+      : failing ? { status: 500, json: { message: 'unavailable' } }
+      : { status: 200, json: [{ product_id: g.id, diaper_size: 'G' }], headers: { 'content-range': '0-0/1' } },
+    '/rest/v1/products': () => ({ status: 200, json: [g, product(2, 'M')], headers: { 'content-range': '0-1/2' } }),
+  })
+  await page.goto(`/eventos/${eventId}/presentes`)
+  const catalog = page.getByRole('region', { name: 'Incluir itens avulsos' })
+  const alert = catalog.getByRole('alert')
+  await expect(alert).toContainText('Não foi possível conferir o que já está na lista', { timeout: 15_000 })
+  await expectAccessible(page)
+  // Enquanto confere de novo, o aviso continua no lugar e o botão fica indisponível.
+  const retry = alert.getByRole('button', { name: 'Tentar novamente' })
+  await retry.click()
+  await expect(retry).toBeDisabled()
+  await expect(retry).toBeEnabled({ timeout: 10_000 })
+  failing = false
+  await retry.click()
+  await expect(alert).toHaveCount(0)
+  await expect(catalog.getByRole('article').filter({ hasText: 'Fraldas tamanho G' })).toContainText('Já na lista')
+  await expect(catalog.getByRole('button', { name: 'Adicionar Fraldas tamanho M à lista' })).toBeVisible()
+})
+
+const rotated = { id: full.invitations[2].id, token: 'b'.repeat(64) }
+function actions(replies: Record<string, ReturnType<Reply>>): Reply {
+  return ({ body }) => replies[String(body.p_action)] ?? { status: 200, json: full }
+}
+async function openEdit(page: Page) {
+  await page.goto(`/eventos/${eventId}/convites`)
+  await page.getByRole('button', { name: 'Editar convite de Convidado fictício 1' }).click()
+  return { create: page.getByRole('region', { name: 'Convide alguém especial' }), edit: page.getByRole('region', { name: 'Editar convite' }) }
+}
+async function confirmAnd(page: Page, invitation: string, action: string) {
+  page.once('dialog', dialog => void dialog.accept())
+  await page.getByRole('listitem').filter({ hasText: invitation }).getByRole('button', { name: action }).click()
+}
+
+test('reemitir link com edição aberta mostra o aviso junto do link novo', async ({ page }) => {
+  await backend(page, actions({ rotate: { status: 200, json: rotated } }))
+  const { create, edit } = await openEdit(page)
+  await confirmAnd(page, 'Convidado fictício 3', 'Reemitir link')
+  await expect(create.getByRole('status')).toHaveText('Convite pronto. Copie o link e envie pelo WhatsApp.')
+  await expect(create.getByLabel('Link para compartilhar')).toBeFocused()
+  await expect(edit.getByRole('status')).toHaveCount(0)
+  await expect(edit).toBeVisible()
+})
+
+test('revogar com edição aberta avisa no formulário de convite', async ({ page }) => {
+  await backend(page, actions({ revoke: { status: 200, json: { id: full.invitations[2].id } } }))
+  const { create, edit } = await openEdit(page)
+  await confirmAnd(page, 'Convidado fictício 3', 'Revogar acesso')
+  await expect(create.getByRole('status')).toContainText('Convite revogado.')
+  await expect(edit.getByRole('status')).toHaveCount(0)
+  await expect(edit).toBeVisible()
+})
+
+test('erro ao revogar com edição aberta aparece no formulário de convite', async ({ page }) => {
+  await backend(page, actions({ revoke: { status: 400, json: { message: 'INVITATION_NOT_FOUND' } } }))
+  const { create, edit } = await openEdit(page)
+  await confirmAnd(page, 'Convidado fictício 3', 'Revogar acesso')
+  await expect(create.getByRole('alert')).toHaveText('Convite não encontrado ou sem permissão.')
+  await expect(edit.getByRole('alert')).toHaveCount(0)
+})
+
+test('erro ao salvar fica na edição, não muda de lugar ao copiar e some ao cancelar', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+  await backend(page, actions({ rotate: { status: 200, json: rotated }, update: { status: 400, json: { message: 'INVITATION_VERSION_CONFLICT' } } }))
+  const { create, edit } = await openEdit(page)
+  await confirmAnd(page, 'Convidado fictício 3', 'Reemitir link')
+  await expect(create.getByLabel('Link para compartilhar')).toBeFocused()
+  await edit.getByRole('button', { name: 'Salvar convite' }).click()
+  await expect(edit.getByRole('alert')).toHaveText('Este convite mudou. Atualize o painel e revise os dados antes de salvar.')
+  await expect(create.getByRole('status')).toHaveCount(0)
+  await expect(create.getByRole('alert')).toHaveCount(0)
+  await expectAccessible(page)
+
+  await create.getByRole('button', { name: 'Copiar convite' }).click()
+  await expect(create.getByRole('status')).toHaveText('Link copiado.')
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(`${new URL(page.url()).origin}/convite#${rotated.token}`)
+  await expect(page.getByRole('alert')).toHaveCount(0)
+  await expect(edit.getByRole('status')).toHaveCount(0)
+
+  await edit.getByRole('button', { name: 'Salvar convite' }).click()
+  await expect(edit.getByRole('alert')).toBeVisible()
+  await edit.getByRole('button', { name: 'Cancelar edição' }).click()
+  await expect(edit).toHaveCount(0)
+  await expect(page.getByRole('alert')).toHaveCount(0)
+})
+
+for (const status of ['published', 'closed'] as const) {
+  test(`detalhes do evento (${status}) cabem em 320 px com texto a 200%`, async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 740 })
+    await backend(page, () => ({ status: 200, json: full }), () => ({ status: 200, json: [{ ...event, status }] }))
+    await page.goto(`/eventos/${eventId}`)
+    await expect(page.getByLabel('Término')).toBeVisible()
+    await page.addStyleTag({ content: 'html { font-size: 200% !important; }' })
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+    expect(overflow).toBe(0)
+  })
+}

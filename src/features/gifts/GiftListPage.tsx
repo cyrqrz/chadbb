@@ -35,6 +35,8 @@ function GiftList({ eventId, title, closed }: { eventId: string; title: string; 
   }
   const listed = useQuery({ queryKey: [...giftKeys.items(eventId), 'listed', session?.user.id], queryFn: () => listedProducts(eventId), ...live })
   const empty = listed.data?.length === 0
+  // Sem dado anterior, a nova tentativa volta a consulta para "pending" e zera isError;
+  // comparar as datas mantém o aviso na tela durante a tentativa.
   return <section className="page">
     <Link className="text-link" to={`/eventos/${eventId}`}>← Detalhes do evento</Link>
     <p className="eyebrow mt-7 break-words">{title}</p><h1 className="page-title">Lista de presentes</h1>
@@ -63,7 +65,7 @@ function GiftList({ eventId, title, closed }: { eventId: string; title: string; 
         </>}
       </>}
     </section>
-    {!closed && <Catalog key={category} eventId={eventId} category={category} listed={listed.data} />}
+    {!closed && <Catalog key={category} eventId={eventId} category={category} listed={listed.data} listedFailed={listed.errorUpdatedAt > listed.dataUpdatedAt} listedFetching={listed.isFetching} retryListed={() => void listed.refetch()} />}
   </section>
 }
 function ItemCard({ item, closed }: { item: EventItem; closed: boolean }) {
@@ -112,7 +114,9 @@ function ItemCard({ item, closed }: { item: EventItem; closed: boolean }) {
     {message && <div className="mt-4"><SuccessMessage>{message}</SuccessMessage></div>}
   </article>
 }
-function Catalog({ eventId, category, listed }: { eventId: string; category: Category; listed?: { product_id: string; diaper_size: DiaperSize | null }[] }) {
+function Catalog({ eventId, category, listed, listedFailed, listedFetching, retryListed }: {
+  eventId: string; category: Category; listed?: { product_id: string; diaper_size: DiaperSize | null }[]; listedFailed: boolean; listedFetching: boolean; retryListed: () => void
+}) {
   const { session } = useAuth()
   const [search, setSearch] = useState('')
   const [term, setTerm] = useState('')
@@ -124,6 +128,7 @@ function Catalog({ eventId, category, listed }: { eventId: string; category: Cat
   return <section aria-labelledby="catalog-title" className="mt-14 border-t border-stone-300 pt-10">
     <h2 id="catalog-title" className="text-2xl font-bold">Incluir itens avulsos</h2>
     <p className="mt-2 max-w-2xl text-stone-600">Use o catálogo só para algo que não veio na lista pronta. O que já está na lista aparece marcado; para mudar a quantidade, use o cartão acima.</p>
+    {listedFailed && <div className="mt-4"><ErrorState message="Não foi possível conferir o que já está na lista. Se um item já estiver incluído, o sistema recusa a repetição." busy={listedFetching} onRetry={retryListed} /></div>}
     <form onSubmit={submit} role="search" className="mt-6 flex flex-wrap items-end gap-3"><label className="field min-w-0 flex-1">Buscar produto<input type="search" maxLength={120} value={search} onChange={e => setSearch(e.target.value)} placeholder={category === 'fralda' ? 'Ex.: tamanho M' : 'Ex.: mamadeira'} /></label><button className="secondary">Buscar</button></form>
     {query.isPending ? <LoadingState>Carregando catálogo…</LoadingState> : query.isError ? <div className="mt-6"><ErrorState message={errorMessage(query.error)} busy={query.isFetching} onRetry={() => void query.refetch()} retryLabel="Recarregar catálogo" /></div> : <>
       {!query.data.count ? <div className="mt-6"><EmptyState title={term ? 'Nenhum produto encontrado.' : 'O catálogo ainda não tem produtos disponíveis.'}>{term && 'Tente outro nome.'}</EmptyState></div> : <div className="stagger mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{query.data.products.map(product => <ProductCard key={product.id} product={product} eventId={eventId} listed={isListed(product) ?? false} />)}</div>}

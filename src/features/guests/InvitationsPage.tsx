@@ -25,13 +25,15 @@ export function InvitationsPage() {
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
   const [copyFailed, setCopyFailed] = useState(false)
+  // Só o "Salvar convite" responde no cartão de edição; o resto, junto do link novo.
+  const [feedbackAt, setFeedbackAt] = useState<'create' | 'edit'>('create')
   const [error, setError] = useState('')
   const linkField = useRef<HTMLInputElement>(null)
   // O link novo pode ter sido pedido lá embaixo, na lista: o foco vai até ele.
   useEffect(() => { if (link) linkField.current?.focus() }, [link])
   async function act(action: string, payload: Record<string, unknown>) {
     if (busy) return
-    setBusy(true); setError(''); setNotice(''); setCopyFailed(false)
+    setBusy(true); setError(''); setNotice(''); setCopyFailed(false); setFeedbackAt(action === 'update' ? 'edit' : 'create')
     try {
       const result = await invitations(id, action, payload)
       if (result.token) { setLink(`${window.location.origin}/convite#${result.token}`); setNotice('Convite pronto. Copie o link e envie pelo WhatsApp.') }
@@ -62,8 +64,8 @@ export function InvitationsPage() {
       <label className="field">Tipo de convite<select value={kind} disabled={busy || !ready} onChange={e => setKind(e.target.value)}><option value="individual">Individual</option><option value="family">Família</option></select></label>
       {kind === 'family' && <label className="field">Máximo de pessoas neste convite<input type="number" min={1} max={50} required value={capacity} disabled={busy || !ready} onChange={e => setCapacity(e.target.value)} /></label>}
       <button className="button justify-center" disabled={busy || !ready}>{busy ? 'Aguarde…' : 'Criar convite'}</button></form>
-      {link && <div className="notice mt-5"><label className="field">Link para compartilhar<input ref={linkField} readOnly value={link} onFocus={e => e.target.select()} /></label><p className="hint mt-2">Guarde este link. Por segurança, ele só aparece na emissão.</p>{copyFailed && <p role="status" className="mt-2 font-semibold">Não foi possível copiar. Selecione o campo do link e copie manualmente.</p>}<button className="secondary mt-3" onClick={() => void navigator.clipboard.writeText(link).then(() => { setCopyFailed(false); setNotice('Link copiado.') }).catch(() => { setNotice(''); setCopyFailed(true) })}>Copiar convite</button></div>}
-      {!editing && feedback}
+      {link && <div className="notice mt-5"><label className="field">Link para compartilhar<input ref={linkField} readOnly value={link} onFocus={e => e.target.select()} /></label><p className="hint mt-2">Guarde este link. Por segurança, ele só aparece na emissão.</p>{copyFailed && <p role="status" className="mt-2 font-semibold">Não foi possível copiar. Selecione o campo do link e copie manualmente.</p>}<button className="secondary mt-3" onClick={() => void navigator.clipboard.writeText(link).then(() => { setCopyFailed(false); setError(''); setFeedbackAt('create'); setNotice('Link copiado.') }).catch(() => { setNotice(''); setCopyFailed(true) })}>Copiar convite</button></div>}
+      {(!editing || feedbackAt === 'create') && feedback}
     </section>
     {editing && <section className="card mt-8" aria-labelledby="edit-invitation"><h2 id="edit-invitation" className="text-2xl font-semibold">Editar convite</h2>
       <form className="mt-5 grid gap-4" onSubmit={e => { e.preventDefault(); void act('update', { id: editing.id, version: editing.version, name: editing.name, kind: editing.kind, capacity: editing.capacity }) }}>
@@ -71,9 +73,9 @@ export function InvitationsPage() {
         <label className="field">Tipo atualizado<select disabled={busy} value={editing.kind} onChange={e => setEditing({ ...editing, kind: e.target.value as Invitation['kind'], capacity: e.target.value === 'individual' ? 1 : editing.capacity })}><option value="individual">Individual</option><option value="family">Família</option></select></label>
         <label className="field">Limite de pessoas<input required type="number" min={1} max={editing.kind === 'individual' ? 1 : 50} disabled={busy} value={editing.capacity} onChange={e => setEditing({ ...editing, capacity: Number(e.target.value) })} /></label>
         <p className="hint">O limite deve comportar todas as pessoas já confirmadas.</p>
-        <div className="flex flex-wrap gap-4"><button className="button" disabled={busy || !ready}>Salvar convite</button><button type="button" className="secondary" disabled={busy} onClick={() => setEditing(null)}>Cancelar edição</button></div>
+        <div className="flex flex-wrap gap-4"><button className="button" disabled={busy || !ready}>Salvar convite</button><button type="button" className="secondary" disabled={busy} onClick={() => { setEditing(null); if (feedbackAt === 'edit') setError('') }}>Cancelar edição</button></div>
       </form>
-      {feedback}
+      {feedbackAt === 'edit' && feedback}
     </section>}
     <section className="mt-10" aria-labelledby="invites-title"><h2 id="invites-title" className="text-2xl font-semibold">Quem vai celebrar com vocês</h2>
       {!data.invitations.length ? <div className="mt-4"><EmptyState title="Nenhum convite ainda.">Crie o primeiro convite no formulário acima.</EmptyState></div> :

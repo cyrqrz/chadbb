@@ -43,6 +43,8 @@
   ::selection { background: var(--blush); color: var(--ink); }
   :focus-visible { outline: 3px solid var(--brand); outline-offset: 3px; border-radius: 0.35rem; }
   input, select, textarea, button { font: inherit; }
+  /* fieldset não encolhe abaixo do conteúdo por padrão; com texto a 200% isso rolava a tela para o lado. */
+  fieldset { min-width: 0; }
 }
 
 @layer components {

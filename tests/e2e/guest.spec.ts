@@ -87,3 +87,29 @@ test('link inválido explica como recuperar o acesso', async ({ page }) => {
   await expect(page.getByRole('alert')).toContainText('Reabra o convite original')
   await expectAccessible(page)
 })
+
+test('aviso de falha não muda enquanto a tela tenta de novo sozinha', async ({ page }) => {
+  let failing = false
+  await backend(page, { failReads: () => failing })
+  await page.goto(`/convite#${token}`)
+  await expect(page.getByRole('heading', { name: 'Podemos contar com você?' })).toBeVisible()
+  failing = true
+  const alert = page.getByRole('alert')
+  await expect(alert).toContainText('Os dados abaixo são da última consulta.', { timeout: 15_000 })
+  // Conta mutações dentro do aviso durante a próxima tentativa automática.
+  await alert.evaluate(el => {
+    const w = window as unknown as { mutations: number }
+    w.mutations = 0
+    new MutationObserver(list => { w.mutations += list.length }).observe(el, { subtree: true, childList: true, characterData: true })
+  })
+  await page.waitForResponse(r => r.url().endsWith('/functions/v1/guest') && r.request().postDataJSON().action === 'read', { timeout: 20_000 })
+  await page.waitForTimeout(300)
+  expect(await page.evaluate(() => (window as unknown as { mutations: number }).mutations)).toBe(0)
+  // Na tentativa manual, o botão fica indisponível sem trocar o nome.
+  const retry = alert.getByRole('button', { name: 'Tentar novamente' })
+  await page.route('https://e2e.supabase.co/functions/v1/guest', async route => { await new Promise(done => setTimeout(done, 800)); await route.fallback() })
+  await retry.click()
+  await expect(retry).toBeDisabled()
+  await expect(retry).toBeEnabled({ timeout: 10_000 })
+  expect(await page.evaluate(() => (window as unknown as { mutations: number }).mutations)).toBe(0)
+})

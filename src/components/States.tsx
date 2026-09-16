@@ -33,7 +33,8 @@ export function RefreshStatus({ fetching, failed, onRetry, label = 'Atualizando�
 }) {
   if (failed) return <div role="alert" className="state state-error mt-4">
     <p>Não foi possível atualizar. Os dados abaixo são da última consulta.</p>
-    <button type="button" className="secondary" disabled={fetching} onClick={onRetry}>{fetching ? 'Atualizando…' : 'Tentar novamente'}</button>
+    {/* Texto fixo: a região de alerta é relida a cada mudança, e a tela tenta de novo sozinha. */}
+    <button type="button" className="secondary" disabled={fetching} onClick={onRetry}>Tentar novamente</button>
   </div>
   return <p className="refresh-status" aria-hidden={!fetching}>{fetching ? label : ''}</p>
 }
