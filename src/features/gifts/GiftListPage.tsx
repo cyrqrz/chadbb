@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../auth/context'
 import { eventKeys, getEvent } from '../events/api'
 import { errorMessage } from '../../lib/errors'
-import { live } from '../../lib/query'
+import { failedLast, live } from '../../lib/query'
+import { useLastError } from '../../lib/useLastError'
 import { EmptyState, ErrorState, LoadingState, RefreshStatus, SuccessMessage } from '../../components/States'
+import { BackLink, Button, Pagination } from '../../components/ui'
 import { addItem, giftKeys, listedProducts, listItems, listProducts, PAGE_SIZE, prepareList, setQuantity } from './api'
 import { parseQuantity, platformLabels, categoryLabels } from './model'
 import type { Category, DiaperSize, EventItem, Product } from './model'
@@ -15,9 +17,10 @@ export function GiftListPage() {
   const { id = '' } = useParams()
   const { session } = useAuth()
   const event = useQuery({ queryKey: [...eventKeys.detail(id), session?.user.id], queryFn: () => getEvent(id), retry: false, ...live })
-  if (event.isPending) return <section className="page"><LoadingState>Carregando evento…</LoadingState></section>
-  if (event.isError) return <section className="page"><h1 className="page-title">Lista de presentes</h1><div className="mt-6"><ErrorState title="Não foi possível abrir a lista." message={errorMessage(event.error)} busy={event.isFetching} onRetry={() => void event.refetch()} /></div></section>
-  if (!event.data) return <section className="page"><h1 className="page-title">Evento não encontrado</h1><p className="mt-4">Confira o endereço e se está na conta correta.</p><Link className="text-link mt-6 inline-block" to="/eventos">← Seus eventos</Link></section>
+  const loadError = useLastError(event.error)
+  if (event.isPending && !(failedLast(event) && loadError)) return <section className="page"><LoadingState>Carregando evento…</LoadingState></section>
+  if (event.data === undefined) return <section className="page"><h1 className="page-title">Lista de presentes</h1><div className="mt-6"><ErrorState title="Não foi possível abrir a lista." message={errorMessage(loadError)} busy={event.isFetching} onRetry={() => void event.refetch()} /></div></section>
+  if (!event.data) return <section className="page"><h1 className="page-title">Evento não encontrado</h1><p className="mt-4">Confira o endereço e se está na conta correta.</p><div className="mt-6"><BackLink to="/eventos">Seus eventos</BackLink></div></section>
   return <GiftList key={id} eventId={id} title={event.data.title || 'Evento sem título'} closed={event.data.status === 'closed'} />
 }
 function GiftList({ eventId, title, closed }: { eventId: string; title: string; closed: boolean }) {
@@ -33,12 +36,13 @@ function GiftList({ eventId, title, closed }: { eventId: string; title: string; 
     try { const count = await prepareList(eventId); await cache.invalidateQueries({ queryKey: giftKeys.items(eventId) }); setNotice({ ok: true, text: count ? 'Lista do chá preparada.' : 'Os itens do chá já estão na lista.' }) }
     catch (cause) { setNotice({ ok: false, text: errorMessage(cause) }) } finally { setPreparing(false) }
   }
+  const listError = useLastError(query.error)
   const listed = useQuery({ queryKey: [...giftKeys.items(eventId), 'listed', session?.user.id], queryFn: () => listedProducts(eventId), ...live })
   const empty = listed.data?.length === 0
   // Sem dado anterior, a nova tentativa volta a consulta para "pending" e zera isError;
   // comparar as datas mantém o aviso na tela durante a tentativa.
   return <section className="page">
-    <Link className="text-link" to={`/eventos/${eventId}`}>← Detalhes do evento</Link>
+    <BackLink to={`/eventos/${eventId}`}>Detalhes do evento</BackLink>
     <p className="eyebrow mt-7 break-words">{title}</p><h1 className="page-title">Lista de presentes</h1>
     <p className="mt-4 max-w-2xl text-stone-600">Fraldas por tamanho e mimos de livre escolha. Os convidados veem esta lista pelo link do convite.</p>
     {!closed && <section aria-labelledby="quick-start" className={empty ? 'quick-start mt-8' : 'card mt-8'}>
@@ -57,11 +61,11 @@ function GiftList({ eventId, title, closed }: { eventId: string; title: string; 
     <nav aria-label="Categorias de presentes" className="mt-10"><div className="segmented">{(['fralda', 'mimo'] as Category[]).map(value => <button key={value} aria-pressed={category === value} onClick={() => { setCategory(value); setPage(0) }}>{categoryLabels[value]}</button>)}</div></nav>
     <section key={`list-${category}`} aria-labelledby="list-title" className="fade-swap mt-6">
       <h2 id="list-title" className="text-2xl font-bold">{categoryLabels[category]} na lista</h2>
-      {query.isPending ? <LoadingState>Carregando a lista…</LoadingState> : !query.data ? <div className="mt-5"><ErrorState message={errorMessage(query.error)} busy={query.isFetching} onRetry={() => void query.refetch()} retryLabel="Recarregar lista" /></div> : <>
+      {query.isPending && !(failedLast(query) && listError) ? <LoadingState>Carregando a lista…</LoadingState> : !query.data ? <div className="mt-5"><ErrorState message={errorMessage(listError)} busy={query.isFetching} onRetry={() => void query.refetch()} retryLabel="Recarregar lista" /></div> : <>
         <RefreshStatus fetching={query.isFetching} failed={query.isError} onRetry={() => void query.refetch()} label={`${query.data.count} ${query.data.count === 1 ? 'item' : 'itens'} · atualizando…`} />
         {!query.data.count ? <div className="mt-3"><EmptyState title={category === 'fralda' ? 'Nenhum tamanho de fralda na lista.' : 'Nenhum mimo na lista.'}>{closed ? 'Nenhum presente foi incluído nesta categoria.' : 'Use a lista pronta do chá acima ou inclua um item pelo catálogo abaixo.'}</EmptyState></div> : <>
           <div className="stagger mt-3 grid gap-5 md:grid-cols-2">{query.data.items.map(item => <ItemCard key={item.id} item={item} closed={closed} />)}</div>
-          <Pagination page={page} count={query.data.count} onChange={setPage} name="lista" />
+          <Pagination page={page} count={query.data.count} pageSize={PAGE_SIZE} onChange={setPage} label="Paginação da lista" />
         </>}
       </>}
     </section>
@@ -107,10 +111,10 @@ function ItemCard({ item, closed }: { item: EventItem; closed: boolean }) {
     </form>}
     {outdated && <p role="status" className="mt-4 text-sm">Existe uma versão mais recente desta quantidade.</p>}
     {error && <div className="mt-4"><ErrorState message={error} /></div>}
-    {(error || outdated) && <button className="text-link mt-3" disabled={busy} onClick={() => {
+    {(error || outdated) && <Button variant="ghost" size="sm" className="mt-3" disabled={busy} onClick={() => {
       if (quantity !== String(baseline.quantity_requested ?? '') && !window.confirm('Descartar a quantidade digitada e carregar a versão salva?')) return
       setBaseline(item); setValue(String(item.quantity_requested ?? '')); setError(null); setMessage('Quantidade recarregada.')
-    }}>Recarregar quantidade</button>}
+    }}>Recarregar quantidade</Button>}
     {message && <div className="mt-4"><SuccessMessage>{message}</SuccessMessage></div>}
   </article>
 }
@@ -122,6 +126,7 @@ function Catalog({ eventId, category, listed, listedFailed, listedFetching, retr
   const [term, setTerm] = useState('')
   const [page, setPage] = useState(0)
   const query = useQuery({ queryKey: [...giftKeys.catalog, session?.user.id, category, term, page], queryFn: () => listProducts(term, page, category) })
+  const catalogError = useLastError(query.error)
   function submit(e: FormEvent) { e.preventDefault(); setTerm(search.trim()); setPage(0) }
   // Fralda é por tamanho: outro produto do mesmo tamanho também conta como já incluído.
   const isListed = (product: Product) => listed?.some(row => row.product_id === product.id || (product.diaper_size !== null && row.diaper_size === product.diaper_size))
@@ -130,9 +135,9 @@ function Catalog({ eventId, category, listed, listedFailed, listedFetching, retr
     <p className="mt-2 max-w-2xl text-stone-600">Use o catálogo só para algo que não veio na lista pronta. O que já está na lista aparece marcado; para mudar a quantidade, use o cartão acima.</p>
     {listedFailed && <div className="mt-4"><ErrorState message="Não foi possível conferir o que já está na lista. Se um item já estiver incluído, o sistema recusa a repetição." busy={listedFetching} onRetry={retryListed} /></div>}
     <form onSubmit={submit} role="search" className="mt-6 flex flex-wrap items-end gap-3"><label className="field min-w-0 flex-1">Buscar produto<input type="search" maxLength={120} value={search} onChange={e => setSearch(e.target.value)} placeholder={category === 'fralda' ? 'Ex.: tamanho M' : 'Ex.: mamadeira'} /></label><button className="secondary">Buscar</button></form>
-    {query.isPending ? <LoadingState>Carregando catálogo…</LoadingState> : query.isError ? <div className="mt-6"><ErrorState message={errorMessage(query.error)} busy={query.isFetching} onRetry={() => void query.refetch()} retryLabel="Recarregar catálogo" /></div> : <>
+    {query.isPending && !(failedLast(query) && catalogError) ? <LoadingState>Carregando catálogo…</LoadingState> : !query.data ? <div className="mt-6"><ErrorState message={errorMessage(catalogError)} busy={query.isFetching} onRetry={() => void query.refetch()} retryLabel="Recarregar catálogo" /></div> : <>
       {!query.data.count ? <div className="mt-6"><EmptyState title={term ? 'Nenhum produto encontrado.' : 'O catálogo ainda não tem produtos disponíveis.'}>{term && 'Tente outro nome.'}</EmptyState></div> : <div className="stagger mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{query.data.products.map(product => <ProductCard key={product.id} product={product} eventId={eventId} listed={isListed(product) ?? false} />)}</div>}
-      <Pagination page={page} count={query.data.count} onChange={setPage} name="catálogo" />
+      <Pagination page={page} count={query.data.count} pageSize={PAGE_SIZE} onChange={setPage} label="Paginação do catálogo" />
     </>}
   </section>
 }
@@ -173,8 +178,4 @@ function ProductCard({ product, eventId, listed }: { product: Product; eventId: 
     </div>
     {message && <div className="mt-4"><SuccessMessage>{message}</SuccessMessage></div>}{error && <div className="mt-4"><ErrorState message={error} /></div>}
   </article>
-}
-function Pagination({ page, count, onChange, name }: { page: number; count: number; onChange: (page: number) => void; name: string }) {
-  if (count <= PAGE_SIZE) return null
-  return <nav aria-label={`Paginação do ${name}`} className="mt-6 flex flex-wrap items-center gap-4"><button className="secondary" disabled={page === 0} onClick={() => onChange(page - 1)}>Anterior</button><span>Página {page + 1}</span><button className="secondary" disabled={(page + 1) * PAGE_SIZE >= count} onClick={() => onChange(page + 1)}>Próxima</button></nav>
 }

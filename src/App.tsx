@@ -14,6 +14,8 @@ const EventPage = lazy(() => import('./features/events/EventPage').then(m => ({ 
 const GiftListPage = lazy(() => import('./features/gifts/GiftListPage').then(m => ({ default: m.GiftListPage })))
 
 const GuestPage = lazy(() => import('./features/guests/GuestPage').then(m => ({ default: m.GuestPage })))
+// Amostras do design system: só no servidor de desenvolvimento (fora do build).
+const SpecimensPage = import.meta.env.DEV ? lazy(() => import('./features/specimens/SpecimensPage').then(m => ({ default: m.SpecimensPage }))) : null
 const InvitationsPage = lazy(() => import('./features/guests/InvitationsPage').then(m => ({ default: m.InvitationsPage })))
 
 export function App() {
@@ -23,6 +25,7 @@ export function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/convite" element={<GuestPage />} />
         <Route path="/entrar" element={<LoginPage />} />
+        {SpecimensPage && <Route path="/amostras" element={<SpecimensPage />} />}
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route element={<RequireAuth />}>
           <Route path="/eventos" element={<EventsPage />} />
