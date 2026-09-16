@@ -17,6 +17,13 @@ Suporte técnico: o próprio usuário. Ele escreve em português; responda em po
 - SMTP Resend e login real validados em 2026-09-16. Próximo gate do back:
   medição remota T-B5; ver `docs/PLANO-DESEMPENHO-T-B5.md`.
 
+## Início de sessão do Codex
+
+Ao abrir uma sessão nova neste clone, sem outra tarefa pedida, o Codex lê
+`docs/TROCA-DE-MAQUINA.md` (seção de retomada mais recente) e
+`docs/TAREFAS-AGENTES.md`, resume em poucas linhas onde parou e propõe o próximo
+passo. Nada destrutivo ou remoto roda sem aprovação (ver Regras obrigatórias).
+
 ## Divisão de trabalho
 
 Cada agente trabalha no próprio clone e na própria branch. Nenhum dos dois altera
