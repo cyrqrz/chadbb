@@ -53,6 +53,7 @@ Evidências: `npm run check`, `npm run test:e2e`, página de antes/depois.
 | G0 | — | Baseline em 3 commits, PR | 16–17/09 |
 | G1 | 1 · Audit | `docs/design/audit.md` (páginas, componentes, estados, cores e espaçamentos fixos, contraste, pontos de toque) | 17/09 |
 | G2 | 2 · Foundation (+ 7 · Login, só acabamento) | Tokens, fontes, componentes base e `docs/design/foundation.md`; página de amostras | 18–20/09 |
+| G2.1 | — | Forma e hierarquia de ações (`docs/design/G2.1-FORMA-E-ACOES.md`), no mesmo PR do G2 | 16–17/09 |
 | G3 | 3 · Convite | Nova página do convidado (hero editorial, presença, fraldas, mimos, local) | 21–25/09 |
 | G4 | 4 · Shell + 5 · Painel + 6 · Lista | Cabeçalho do evento, resumo, fraldas como progresso, mimos, lista com menos caixas | 26–30/09 |
 | G5 | 8 · Estados + 9 · QA | Skeleton, offline, somente leitura; QA visual, funcional, acessibilidade e desempenho | 01/10 |
