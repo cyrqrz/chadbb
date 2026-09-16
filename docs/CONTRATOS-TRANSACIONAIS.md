@@ -107,9 +107,34 @@ zero somente enquanto a tabela não existe; com tabela presente falha explicitam
 Não é evidência de proteção contra excesso de reservas. Executar os cenários
 concorrentes do plano com conexões independentes e início coordenado.
 
-Duração de sessão, limites por convite e ações depois de encerramento ainda seguem
-as propostas do contrato do piloto. Resolver essas decisões antes de implementar os
-respectivos fluxos. Até lá, nenhuma exceção de encerramento está habilitada.
+### Encerramento e pós-evento implementados (conferência em 2026-09-16)
+
+O protocolo disponível é `public.guest_action`, acessado pela Edge `guest`;
+os nomes individuais da tabela acima continuam históricos, não são RPCs públicas.
+O organizador encerra explicitamente com `transition_event`; a passagem de
+`starts_at`/`ends_at` não encerra automaticamente o evento. A data de confirmação
+de 18/10 é conteúdo do convite, sem bloqueio automático de RSVP no schema atual.
+
+| Ação com evento `closed` | Comportamento implementado |
+| --- | --- |
+| Abrir/reabrir convite e consultar | Permitido com convite/sessão válidos |
+| Nova reserva, alteração de quantidade, troca de tamanho e RSVP | `EVENT_CLOSED` |
+| Informar compra de reserva existente | Permitido; quantidade continua comprometida |
+| Cancelar reserva ou compra informada | Permitido; libera quantidade uma vez |
+| Informar compra de reserva cancelada | `INVALID_RESERVATION_STATE` |
+| Repetir pedido já confirmado com mesma chave/payload | Resultado anterior e snapshot atual, sem nova mutação |
+| Consultar painel do organizador | Permitido; reservas canceladas ficam fora da lista comprometida |
+
+O prazo é `private.invitations.expires_at`, gerado no banco como
+`events.starts_at + interval '7 days'`; não é sete dias depois do clique em
+encerrar nem de `ends_at`. Sessões duram no máximo duas horas e nunca ultrapassam
+a validade do convite. Revogação/expiração bloqueiam inclusive leitura, compra,
+cancelamento e replay. O front não recalcula esses prazos.
+
+Cobertura em `tests/database/events.integration.mjs`: leitura/reabertura após
+encerrar, mutações bloqueadas, compra/cancelamento, replay e expiração. Os testes
+de concorrência existentes verificam a ordem dos bloqueios contra encerramento.
+Este registro descreve o comportamento existente; não altera a política remota.
 
 ## Extensão planejada — fraldas e mimos
 
