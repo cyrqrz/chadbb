@@ -6,6 +6,7 @@ import { HomePage } from './features/home/HomePage'
 import { Layout } from './components/Layout'
 import { AuthProvider } from './features/auth/AuthProvider'
 import { AuthCallback, LoginPage, RequireAuth } from './features/auth/LoginPage'
+import { LoadingState } from './components/States'
 
 const EventsPage = lazy(() => import('./features/events/EventsPage').then(m => ({ default: m.EventsPage })))
 const EventPage = lazy(() => import('./features/events/EventPage').then(m => ({ default: m.EventPage })))
@@ -17,7 +18,7 @@ const InvitationsPage = lazy(() => import('./features/guests/InvitationsPage').t
 
 export function App() {
   return <QueryClientProvider client={queryClient}><BrowserRouter><AuthProvider>
-    <Suspense fallback={<p role="status" className="p-10">Carregando…</p>}>
+    <Suspense fallback={<section className="page"><LoadingState>Carregando…</LoadingState></section>}>
       <Routes><Route element={<Layout />}>
         <Route path="/" element={<HomePage />} />
         <Route path="/convite" element={<GuestPage />} />

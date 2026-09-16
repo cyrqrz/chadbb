@@ -22,12 +22,14 @@ irmão depende.
 
 ## Claude — front (`chadbb-claude`, `claude/front`)
 
-- [ ] **T-F1 · Visual e estados das telas (M1).** Em `GuestPage`, `GiftListPage`,
+- [x] **T-F1 · Visual e estados das telas (M1).** _(2026-09-16: componentes comuns
+  em `src/components/States.tsx`; aguardando revisão.)_ Em `GuestPage`, `GiftListPage`,
   `InvitationsPage` e `EventPage`: estados de vazio, carregando, sucesso e erro com
   o mesmo acabamento; uma ação principal por etapa ("Confirmar presença",
   "Escolher presente", "Cancelar reserva"); explicar que "Já comprei" é só uma
   declaração do convidado.
-- [ ] **T-F2 · Painel do organizador.** Conferir se o `InvitationsPage` mostra
+- [ ] **T-F2 · Painel do organizador.** _(2026-09-16: resumo, fraldas, mimos e
+  escolhas separados; aguardando T-B7 para remover o cálculo provisório.)_ Conferir se o `InvitationsPage` mostra
   convites respondidos separados de pessoas confirmadas, fraldas comprometidas e
   disponíveis por tamanho (P 6 / M 19 / G 19 / XG 6) e mimos em separado. Se
   faltar dado, registrar um pedido para o Codex abaixo; não calcular no front.
@@ -74,7 +76,24 @@ irmão depende.
 
 ## Pedidos do front para o back
 
-_Nenhum no momento._
+- [ ] 2026-09-16 · Claude → Codex · **Resumo do painel calculado no servidor (T-F2).**
+  Hoje o `InvitationsPage` soma `attending` e conta respostas no navegador, e
+  também conta convites revogados. Pedido: em `organizer_invitations` (ação
+  `list`), incluir
+  `summary: { invitations: { total, answered, yes, no, maybe, pending, revoked }, people_confirmed }`,
+  com a regra (ex.: se convite revogado conta) definida só no banco.
+  Registrar em `docs/CONTRATOS-TRANSACIONAIS.md`.
+- [ ] 2026-09-16 · Claude → Codex · **Saldo por item vindo do servidor (T-F2).**
+  O front calcula `limit - committed` no painel e no convite (seletor de troca de
+  tamanho). Pedido: `available` (inteiro ≥ 0; `null` para mimos) em cada item de
+  `organizer_invitations.items` e de `snapshot.items` da função `guest`.
+- [ ] 2026-09-16 · Claude → Codex · **`id` nas reservas do painel.** `reservations`
+  não traz identificador, e o front usa o índice como chave da lista. Pedido:
+  incluir `id` (da reserva) em cada item.
+
+Enquanto os campos não chegam, o front usa `summary`/`available` quando existem e
+mantém o cálculo antigo só como transição, isolado em `src/features/guests/api.ts`
+(`panelSummary` e `availableOf`). Depois da entrega, o Claude remove o cálculo.
 
 ## Pedidos do back para o front
 
@@ -84,7 +103,7 @@ _Nenhum no momento._
 
 | Agente | Tarefa | Branch | Situação |
 |---|---|---|---|
-| Claude | — | `claude/front` | livre |
+| Claude | T-F1 e T-F2 prontos; T-F2 aguarda T-B7 | `claude/front` | em revisão (2026-09-16) |
 | Codex | — | `codex/back` | livre |
 
 ## Concluídas

@@ -4,15 +4,16 @@ import { Link, Navigate, Outlet } from 'react-router-dom'
 import { backend, supabase } from '../../lib/supabase'
 import { errorMessage } from '../../lib/errors'
 import { useAuth } from './context'
+import { LoadingState } from '../../components/States'
 
 export function RequireAuth() {
   const { session, loading } = useAuth()
-  if (loading) return <p role="status" className="py-12">Verificando seu acesso…</p>
+  if (loading) return <section className="page"><LoadingState>Verificando seu acesso…</LoadingState></section>
   return session ? <Outlet /> : <Navigate to="/entrar" replace />
 }
 export function AuthCallback() {
   const { session, loading, error } = useAuth()
-  if (loading) return <p role="status" className="py-12">Concluindo seu acesso…</p>
+  if (loading) return <section className="page"><LoadingState>Concluindo seu acesso…</LoadingState></section>
   if (session) return <Navigate to="/eventos" replace />
   return <section className="page"><h1 className="page-title">Não foi possível entrar</h1><p role="alert" className="mt-6">{error ?? 'Solicite um novo link para acessar.'}</p><Link to="/entrar" className="button mt-6">Solicitar novo link</Link></section>
 }
@@ -32,7 +33,7 @@ export function LoginPage() {
       setSent(true)
     } catch (cause) { setError(errorMessage(cause)) } finally { setBusy(false) }
   }
-  if (loading) return <p role="status" className="py-12">Verificando seu acesso…</p>
+  if (loading) return <section className="page"><LoadingState>Verificando seu acesso…</LoadingState></section>
   if (session) return <Navigate to="/eventos" replace />
   return <section className="page max-w-xl">
     <p className="eyebrow">Seu encontro começa aqui</p><h1 className="page-title">Entre para organizar</h1>

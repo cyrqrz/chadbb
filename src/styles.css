@@ -43,3 +43,18 @@
   .choice input { flex-shrink: 0; width: 1.2rem; height: 1.2rem; accent-color: #823b55; }
   @media (min-width: 768px) { .guest-hero { grid-template-columns: 1.3fr 1fr; } }
 }
+
+@layer components {
+  .state { display: flex; flex-direction: column; align-items: flex-start; gap: 0.75rem; border-radius: 1rem; padding: 1rem 1.25rem; }
+  .state-loading { flex-direction: row; align-items: center; margin-block: 2rem; padding-inline: 0; color: #57534e; }
+  .state-error { border: 1px solid #efbcbc; border-left-width: 6px; background: #fdf0f0; color: #7f1d1d; }
+  .state-empty { border: 1px dashed #a8a29e; background: #fffafb; }
+  .state-success { border: 1px solid #b7d8c2; border-left-width: 6px; background: #edf7f0; color: #1d4d2f; }
+  .spinner { width: 1.25rem; height: 1.25rem; flex-shrink: 0; border: 3px solid #f0d3de; border-top-color: #823b55; border-radius: 999px; animation: spin 0.9s linear infinite; }
+  .refresh-status { min-height: 1.5rem; margin-top: 0.5rem; font-size: 0.875rem; color: #57534e; }
+  .stat { font-size: 2.25rem; line-height: 1.1; font-weight: 650; }
+  .meter { height: 0.6rem; overflow: hidden; border-radius: 999px; background: #f0e4e8; }
+  .meter > span { display: block; height: 100%; border-radius: inherit; background: #823b55; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spinner { animation: none; border-top-color: #f0d3de; border-right-color: #823b55; } }
+}
