@@ -1,0 +1,77 @@
+# Contexto para agentes (Claude e Codex)
+
+Leia este arquivo antes de qualquer tarefa. Ele vale para os dois agentes.
+
+## Projeto
+
+MVP para o chá de bebê da Liz: **01/11/2026, 12h (Brasília)**, cerca de 50
+convidados. A confirmação de presença vai até **18/10/2026**. As prioridades são
+uso simples no celular, design profissional, acessibilidade e dados confiáveis.
+Suporte técnico: o próprio usuário. Ele escreve em português; responda em português.
+
+- Stack: React + Vite + Tailwind + TanStack Query no front; Supabase (Postgres,
+  Auth, Storage, Edge Functions) no back; Cloudflare Pages para hospedagem
+  (`https://chadbb.pages.dev`). Arquitetura: `docs/ADR-001-arquitetura-mvp-eventos-presentes.md`.
+- Ponto de retomada: `docs/TROCA-DE-MAQUINA.md` (mais recente) e
+  `docs/PROXIMOS-PASSOS-M6.md`. `docs/OPERACAO-M6.md` tem o histórico.
+- Pendência principal: SMTP no Resend. Sem ele ninguém consegue entrar.
+
+## Divisão de trabalho
+
+Cada agente trabalha no próprio clone e na própria branch. Nenhum dos dois altera
+a pasta `~/projetos/chadbb`, que fica na `main` e é só do usuário.
+
+| Agente | Clone | Branch | Responsável por |
+|---|---|---|---|
+| **Claude** | `~/projetos/chadbb-claude` | `claude/front` | Front: `src/`, `public/`, `index.html`, estilos, acessibilidade, testes de navegador (`tests/browser`, e2e) |
+| **Codex** | `~/projetos/chadbb-codex` | `codex/back` | Back e tarefas mais difíceis: `supabase/` (migrations, functions, testes pgTAP), `functions/`, `scripts/`, `.github/workflows/`, testes de banco/API |
+
+- Um agente não altera arquivos da área do outro. Se o front precisar mudar um
+  contrato (RPC, tabela, payload de função), registre o pedido em
+  `docs/TAREFAS-AGENTES.md`. O contrato vigente fica em `docs/CONTRATOS-TRANSACIONAIS.md`.
+- A integração é feita por PR para a `main`; quem faz o merge é o usuário. Para
+  receber o trabalho do outro agente depois do merge, rode `git pull origin main`
+  na sua branch.
+- Os agentes não se veem em tempo real. A comunicação entre eles passa por
+  commits e por `docs/TAREFAS-AGENTES.md`.
+
+## Ambiente compartilhado
+
+- Os dois clones usam o mesmo Docker. **O Supabase local (`npm run db:start`)
+  roda só no clone do Codex.** O front usa essa stack pelo `.env.local`
+  (`127.0.0.1:54321`).
+- Vite na porta 5173. Os testes de navegador e de e-mail exigem essa porta
+  livre; pare o `npm run dev` do outro clone antes de rodá-los.
+- Node 22 (`.nvmrc`). Use `npm ci`, sem misturar com o npm do Windows.
+
+## Comandos
+
+```sh
+npm run dev      # front local
+npm run check    # lint + typecheck + testes + build: rodar antes de todo PR
+npm run test:e2e # Playwright com backend simulado (não precisa de Docker)
+```
+
+Os demais comandos (`db:*`, `test:api`, `test:browser:local` etc.) estão no
+`README.md`.
+
+## Regras obrigatórias
+
+1. **Aprovação manual antes de qualquer passo destrutivo ou remoto.** Pare e
+   mostre o diff ou a saída de dry-run antes de: `db:reset` local, `db push`,
+   `secrets set`, Vault, `functions deploy`, smoke tests remotos,
+   `backup:remote` e qualquer escrita no projeto `chadbb-cha`
+   (ref `fcykqrlnofmdtmewlejr`). Commit e push só depois de o usuário revisar o diff.
+2. **Nunca usar `supabase link`, `--linked` ou `--db-url`** contra produção nos scripts.
+3. **Segredos** ficam em `~/.config/chadbb/` (chmod 600), fora do Git. Nunca
+   exiba em saída, log, diff ou docs: senha do banco, service_role/secret key,
+   `RETENTION_CRON_SECRET`, conteúdo do Vault, `r2.env`. Leia sem `echo`.
+4. No front, só as variáveis públicas `VITE_SUPABASE_URL` e
+   `VITE_SUPABASE_PUBLISHABLE_KEY`. Nunca uma chave secreta.
+5. **LGPD:** a auditoria guarda só contagens técnicas. Nenhuma pessoa ou evento
+   real em testes; os testes criam e removem dados fictícios.
+6. **Regra de negócio com uma única fonte** (ex.: `private.retention_due_at`).
+   O front não recalcula prazos.
+7. **Dados sempre atualizados:** as telas reconsultam o servidor. Nunca apresente
+   cache como dado novo, e nunca sobrescreva o que o usuário está digitando.
+8. Planos devem nomear os gates (G1, G2...) e trazer evidências antes de cada aprovação.
