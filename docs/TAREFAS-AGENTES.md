@@ -103,6 +103,15 @@ Enquanto os campos não chegam, o front usa `summary`/`available` quando existem
 mantém o cálculo antigo só como transição, isolado em `src/features/guests/api.ts`
 (`panelSummary` e `availableOf`). Depois da entrega, o Claude remove o cálculo.
 
+- [ ] 2026-09-16 · Claude → Codex · **Deadlock intermitente no teste de navegador.**
+  Em `npm run test:browser:local` (PR #7, commit `7746e9c`), o teste “M5: outro
+  convite e fragmento inválido na mesma aba…” falhou uma vez com
+  `deadlock detected`; passou isolado e em duas rodadas completas seguidas.
+  Suspeita: a limpeza dos dados fictícios (`cleanupUsers` em
+  `tests/support/local.mjs`) concorrendo com uma chamada da função `guest`
+  ainda em andamento (sessão ou `guest_requests`). Pedido: investigar e tornar
+  a limpeza ou a função resistentes a isso.
+
 - [ ] 2026-09-16 · Usuário → Codex · **Depois do MVP: outras formas de entrar.**
   No MVP o organizador entra só pelo link por e-mail. Para o produto, avaliar
   login com Google/Apple e cadastro com nome (ideia do usuário a partir de
