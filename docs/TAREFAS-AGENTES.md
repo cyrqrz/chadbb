@@ -40,13 +40,14 @@ irmão depende.
 - [ ] **T-F4 · Contrato de atualização no front (M2).** Distinguir "salvo" de
   "painel ainda não atualizado"; mostrar perda de conexão; nunca sobrescrever o
   que está sendo digitado em nenhum formulário, inclusive na edição de convite.
-- [ ] **T-F5 · Prévia do link no WhatsApp.** Prévia genérica bem apresentada
+- [x] **T-F5 · Prévia do link no WhatsApp.** _(2026-09-16, G3: tags `og:` e imagem
+  genérica `public/og-image.png`; prévia por evento fica para depois do MVP.)_ Prévia genérica bem apresentada
   (meta tags em `index.html`). Prévia personalizada por evento é opcional.
 - [ ] **T-F7 · Refatoração visual (plano em `docs/design/PLANO-VISUAL.md`).**
   Gates G0–G5 até o ensaio; congelamento a partir de 05/10. Absorve T-F3, T-F4
   e T-F5 nos gates indicados no plano. G0 e G1 mergeados (PR #7, 2026-09-16);
   G2 e G2.1 (foundation, forma e hierarquia de ações; fontes Manrope + Fraunces
-  aprovadas) em PR. Próximo: G3 (convite).
+  aprovadas) mergeados (PR #8). G3 (convite, página inicial e prévia) em revisão.
 - [ ] **T-F6 · Testes.** Ampliar os testes e2e para o que mudar; `npm run check`
   antes de cada PR.
 
@@ -128,9 +129,13 @@ _Nenhum no momento._
 
 | Agente | Tarefa | Branch | Situação |
 |---|---|---|---|
-| Claude | T-F7 · G2 + G2.1 em PR; G3 (convite) a seguir | `claude/front` | aguardando merge (2026-09-16) |
+| Claude | T-F7 · G3 pronto (sem aprovação); G3.1 (cards) em andamento — ver `docs/design/RETOMADA-CLAUDE.md` | `claude/front` | WIP salvo para outra máquina (2026-09-16) |
 | Codex | — | `codex/back` | livre |
 
 ## Concluídas
 
 - 2026-09-16 · Claude · T-F1 (estados das telas), G0 (baseline visual) e G1 (audit), PR #7.
+- 2026-09-16 · Claude · G2 e G2.1 (foundation e hierarquia de ações), PR #8.
+- 2026-09-16 · Claude · Pedido do Codex (na `codex/back`) sobre “Conheça o chadbb”:
+  o botão da página inicial agora leva a “Começar a organizar” (`/entrar`) ou
+  “Ir para seus eventos”, e o aviso “Convites estão em preparação” saiu (G3).
