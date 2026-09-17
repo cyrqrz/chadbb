@@ -11,12 +11,16 @@ import { Availability, Button, QuantityField, StatusBadge, Tabs } from '../../co
 
 // O efeito reutiliza a promessa no StrictMode, sem compartilhar credenciais
 // entre montagens. Abrir outro fragmento invalida o acesso anterior imediatamente.
+// Sem código na URL (página recarregada ou endereço digitado) não é erro do
+// convidado: o código sai da barra de endereço depois da troca, por segurança.
+// "#conteudo" vem do link "Pular para o conteúdo" e também não é um código.
 function openInvite() {
   const token = window.location.hash.slice(1)
   window.history.replaceState(null, '', window.location.pathname)
+  if (!token || token === 'conteudo') return Promise.reject(new GuestError('INVITE_LINK_MISSING', 400))
   return /^[a-f0-9]{64}$/.test(token)
     ? guestCall(token, 'exchange').then(data => ({ token: data.session_token!, snapshot: data.snapshot }))
-    : Promise.reject(new GuestError('GUEST_SESSION_INVALID', 401))
+    : Promise.reject(new GuestError('INVITE_LINK_INCOMPLETE', 400))
 }
 export function GuestPage() {
   const [access, setAccess] = useState<{ token: string; snapshot: Snapshot } | null>(null)
@@ -41,6 +45,7 @@ export function GuestPage() {
     window.addEventListener('hashchange', reopen)
     return () => { active = false; window.removeEventListener('hashchange', reopen) }
   }, [])
+  if (error instanceof GuestError && error.message === 'INVITE_LINK_MISSING') return <section className="page"><p className="eyebrow">Seu convite</p><h1 className="page-title">Abra o convite pelo link recebido</h1><div className="state state-empty mt-6"><p>Por segurança, o convite não fica salvo nesta página. Toque de novo no link que você recebeu pelo WhatsApp.</p></div></section>
   if (error) return <section className="page"><p className="eyebrow">Seu convite</p><h1 className="page-title">Vamos recuperar seu acesso</h1><div className="mt-6"><ErrorState message={guestMessage(error)} /></div></section>
   if (!access) return <section className="page"><LoadingState>Abrindo seu convite…</LoadingState></section>
   return <GuestEvent access={access} />

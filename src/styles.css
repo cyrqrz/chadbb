@@ -164,6 +164,9 @@
   /* Superfícies */
   .card { min-width: 0; border: 1px solid var(--card-border); border-radius: var(--card-radius); background: var(--card-surface); padding: var(--card-padding); box-shadow: var(--shadow-sm); transition: border-color var(--duration-fast), box-shadow var(--duration-normal) var(--ease-standard), transform var(--duration-normal) var(--ease-standard); }
   .card-link:hover { border-color: var(--color-line-strong); box-shadow: var(--shadow-md); transform: translateY(-2px); }
+  /* Card com ações (ex.: evento encerrado): o link cobre só o conteúdo, sem o botão dentro. */
+  .card:has(> .card-main:hover) { border-color: var(--color-line-strong); box-shadow: var(--shadow-md); }
+  .card-main { border-radius: calc(var(--card-radius) - 8px); }
   .notice { border-radius: var(--radius-surface); background: var(--color-brand-soft); padding: 0.9rem 1.1rem; }
   .badge { display: inline-flex; align-items: center; gap: 0.35rem; border: 1px solid transparent; border-radius: var(--radius-pill); background: var(--color-brand-soft); color: var(--color-brand-hover); padding: 0.25rem 0.7rem; font-size: var(--text-caption); font-weight: 650; }
   .badge-neutral { background: var(--color-surface-soft); color: var(--color-ink); }

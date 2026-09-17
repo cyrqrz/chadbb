@@ -74,7 +74,7 @@ o ensaio familiar no celular continua pendente.
   e T-F5 nos gates indicados no plano. G0 e G1 mergeados (PR #7, 2026-09-16);
   G2 e G2.1 (foundation, forma e hierarquia de ações; fontes Manrope + Fraunces
   aprovadas) mergeados (PR #8). G3 (convite, página inicial e prévia) e G3.1 (sistema de cards,
-  `docs/design/CARDS.md`) aprovados em 2026-09-16; PR aberto para a `main`.
+  `docs/design/CARDS.md`) mergeados (PR #9, 2026-09-17). Próximo: G4.
 - [ ] **T-F6 · Testes.** Ampliar os testes e2e para o que mudar; `npm run check`
   antes de cada PR.
 
@@ -176,7 +176,7 @@ mantém o cálculo antigo só como transição, isolado em `src/features/guests/
 
 | Agente | Tarefa | Branch | Situação |
 |---|---|---|---|
-| Claude | T-F7 · G3 pronto (sem aprovação); G3.1 (cards) em andamento — ver `docs/design/RETOMADA-CLAUDE.md` | `claude/front` | WIP salvo para outra máquina (2026-09-16) |
+| Claude | Convite (motivo certo ao não abrir) e “Excluir evento”: PR #11 em rascunho, merge só depois do G5/G6 do back. Depois: T-F7 · G4 (26–30/09) — ver `docs/design/RETOMADA-CLAUDE.md` | `claude/front` | aguardando G5/G6 |
 | Codex | Exclusão de evento: G5/G6 aguardando aprovação; T-B5 pausada (plano em PLANO-DESEMPENHO-T-B5.md, remoto não autorizado) | `codex/back` | PR aberta para a `main` |
 
 ## Concluídas
@@ -186,6 +186,11 @@ mantém o cálculo antigo só como transição, isolado em `src/features/guests/
 - 2026-09-16 · Claude · Pedido do Codex (na `codex/back`) sobre “Conheça o chadbb”:
   o botão da página inicial agora leva a “Começar a organizar” (`/entrar`) ou
   “Ir para seus eventos”, e o aviso “Convites estão em preparação” saiu (G3).
+- 2026-09-17 · Claude · G3 e G3.1 (convite e sistema de cards), PR #9.
+- 2026-09-17 · Claude · Revisão do Codex sobre a quantidade no convite (R1, R2):
+  corrigida em `4dc63ae`, com o foco mantido durante o envio; entrou no PR #9.
+- 2026-09-17 · Claude · Convite com o motivo certo ao não abrir e botão
+  “Excluir evento” (Edge `delete-event`), PR #11 em rascunho.
 
 - 2026-09-16 · Codex · Agente de apoio `tdd_senior` configurado por solicitação
   do usuário em `.codex/agents/tdd-senior.toml`, com delegação descrita no

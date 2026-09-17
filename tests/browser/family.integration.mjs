@@ -68,7 +68,7 @@ for (const [device, viewport] of [['desktop', { width: 1280, height: 900 }], ['m
       assert.equal(dash.reservations.length, 1)
       assert.deepEqual(errors, [])
       await page.reload()
-      await expect(page.getByRole('heading', { name: 'Vamos recuperar seu acesso' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Abra o convite pelo link recebido' })).toBeVisible()
     } finally { await ctx.close(); await f.cleanup() }
   }, { timeout: 90000 })
 }
