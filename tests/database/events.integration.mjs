@@ -972,3 +972,71 @@ test('revisão 4: rascunho com data passada nunca é expurgado; evento vencido n
   await assert.rejects(save(due, alice, { date: new Date(Date.now() + 86400000).toISOString() }), /EVENT_RETENTION_DUE/)
   assert.equal((await admin.query('select * from public.retention_run() where event_id=$1', [f.event.id])).rowCount, 1)
 })
+
+const deleteEvent = (event, version = event.version, client) => client
+  ? client.query('select public.delete_event($1,$2) data', [event.id, version]).then(r => r.rows[0].data)
+  : as(alice, 'select public.delete_event($1,$2) data', [event.id, version]).then(r => r.rows[0].data)
+const eventRows = async eventId => ({
+  events: await count('select count(*) n from public.events where id=$1', [eventId]),
+  items: await count('select count(*) n from public.event_items where event_id=$1', [eventId]),
+  ...await guestData(eventId),
+})
+const deletion = async eventId => (await admin.query('select * from private.event_deletions where event_id=$1', [eventId])).rows[0]
+
+test('exclusão: reserva em curso termina antes e entra na contagem da exclusão', async () => {
+  const f = await populatedEvent()
+  const closed = await transition((await admin.query('select * from public.events where id=$1', [f.event.id])).rows[0], 'closed')
+  const m = f.snapshot.items.find(i => i.diaper_size === 'M')
+  const guest = server.getPgClient(); const owner = await connectAs(alice); await guest.connect()
+  try {
+    await guest.query('begin')
+    await guestAction(f.token, 'purchase', request({ item_id: f.p.id, version: 1 }), guest)
+    const pending = deleteEvent(closed, closed.version, owner)
+    await new Promise(resolve => setTimeout(resolve, 150))
+    await guest.query('commit')
+    const result = await pending
+    assert.deepEqual(result, { event_id: f.event.id, items_removed: 27, invitations_removed: 2, reservations_removed: 2, storage_cleanup: 'pending' })
+    assert.deepEqual(await eventRows(f.event.id), { events: 0, items: 0, invitations: 0, guest_requests: 0, reservations: 0, guest_sessions: 0 })
+    const audit = await deletion(f.event.id)
+    assert.deepEqual([audit.previous_status, audit.guest_requests_removed, audit.guest_sessions_removed, audit.storage_prefix],
+      ['closed', 4, 2, `${alice}/${f.event.id}`])
+    await assert.rejects(guestAction(f.token, 'read'), /GUEST_SESSION_INVALID/)
+    await assert.rejects(guestAction(f.token, 'reserve', request({ item_id: m.id, quantity: 1, version: null })), /GUEST_SESSION_INVALID/)
+  } finally { await guest.query('rollback'); await Promise.all([guest.end(), owner.end()]) }
+})
+
+test('exclusão: quando obtém o bloqueio primeiro, ação do convidado recebe sessão inválida', async () => {
+  const f = await populatedEvent()
+  const closed = await transition((await admin.query('select * from public.events where id=$1', [f.event.id])).rows[0], 'closed')
+  const owner = await connectAs(alice); const guest = server.getPgClient(); const late = server.getPgClient()
+  await Promise.all([guest.connect(), late.connect()])
+  try {
+    await owner.query('begin')
+    await deleteEvent(closed, closed.version, owner)
+    const attempts = Promise.allSettled([
+      guestAction(f.token, 'cancel', request({ item_id: f.p.id, version: 1 }), guest),
+      guestAction(f.invite.token, 'exchange', {}, late),
+    ])
+    await new Promise(resolve => setTimeout(resolve, 150))
+    await owner.query('commit')
+    for (const result of await attempts) {
+      assert.equal(result.status, 'rejected')
+      assert.match(result.reason.message, /GUEST_SESSION_INVALID/)
+    }
+    assert.deepEqual(await eventRows(f.event.id), { events: 0, items: 0, invitations: 0, guest_requests: 0, reservations: 0, guest_sessions: 0 })
+  } finally { await owner.query('rollback'); await Promise.all([owner.end(), guest.end(), late.end()]) }
+})
+
+test('exclusão: evento expurgado e encerrado pode ser excluído; publicado nunca', async () => {
+  const f = await populatedEvent()
+  let event = await transition((await admin.query('select * from public.events where id=$1', [f.event.id])).rows[0], 'closed')
+  event = await endAt(event.id, "now()-interval '31 days'")
+  assert.equal(await purge(event.id), 'purged')
+  event = (await admin.query('select * from public.events where id=$1', [event.id])).rows[0]
+  const result = await deleteEvent(event)
+  assert.deepEqual([result.invitations_removed, result.reservations_removed, result.items_removed], [0, 0, 27])
+  const other = await familyFixture()
+  await assert.rejects(deleteEvent(other.event), /EVENT_NOT_DELETABLE/)
+  await assert.rejects(as(bob, 'select public.delete_event($1,$2)', [other.event.id, other.event.version]), /EVENT_NOT_FOUND/)
+  assert.equal((await eventRows(other.event.id)).events, 1)
+})

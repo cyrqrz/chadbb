@@ -29,6 +29,25 @@ o ensaio familiar no celular continua pendente.
   Correção e testes preparados em
   [patch](reviews/2026-09-17-claude-front.patch); reprodução e evidências em
   [revisão](reviews/2026-09-17-claude-front.md). Base: `2f321dc`.
+- [ ] **2026-09-17 · Codex → Claude · Tela de exclusão de evento.** O back está
+  pronto na `codex/back` e validado no Supabase local, mas **ainda não foi publicado** (gates G5–G6).
+  O front chama a Edge Function `delete-event` (POST), com o JWT do organizador,
+  enviando `{ event_id, version }`. Pode usar `supabase.functions.invoke('delete-event', { body })`.
+  Não chame a RPC `delete_event` direto: nesse caminho a capa só é removida no
+  cron diário. Sucesso `200`: `{ event_id, items_removed, invitations_removed,
+  reservations_removed, storage_cleanup: 'done' | 'pending' }`. Erros em
+  `{ error }`: `EVENT_NOT_DELETABLE` (409, evento publicado: encerrar antes),
+  `EVENT_VERSION_CONFLICT` (409: recarregar e confirmar de novo),
+  `EVENT_NOT_FOUND` (404: já excluído ou sem acesso), `AUTH_REQUIRED` (401),
+  `INVALID_PAYLOAD` (400), `TEMPORARILY_UNAVAILABLE` (503: pode repetir).
+  Oferecer a ação só para `draft` e `closed`. Pedir confirmação explícita com as
+  contagens de convites e reservas que serão apagados, e dizer que não há como
+  desfazer. `pending` não é erro: o evento já foi excluído. Depois do sucesso,
+  invalidar as consultas e sair da tela do evento. **Não fazer merge do botão antes
+  do deploy do back (G6):** sem ele, o botão aparece e falha. No preview a Edge
+  responde `ORIGIN_DENIED` de propósito, porque só `https://chadbb.pages.dev` é
+  liberado. Use o backend simulado nos e2e. Contrato completo em
+  `CONTRATOS-TRANSACIONAIS.md`, seção "Exclusão de evento".
 - [ ] **T-F1 · Visual e estados das telas (M1).** Em `GuestPage`, `GiftListPage`,
   `InvitationsPage` e `EventPage`: estados de vazio, carregando, sucesso e erro com
   o mesmo acabamento; uma ação principal por etapa ("Confirmar presença",
@@ -52,6 +71,21 @@ o ensaio familiar no celular continua pendente.
 
 ## Codex — back e tarefas difíceis (`chadbb-codex`, `codex/back`)
 
+- [ ] **2026-09-17 · Exclusão de evento (`delete_event` + Edge `delete-event`).**
+  G1–G4 concluídos: plano, testes vermelhos, migration
+  `20260917000000_delete_event.sql`, suíte portátil 65/65. G4 (aprovado em
+  2026-09-17): `supabase migration up --local`, `npm run db:test` 99/99 e
+  `npm run test:api` 26/26, sem sobra de dados de teste. Pendentes, cada um com
+  a própria aprovação: G5, `db push` no `chadbb-cha`; G6, deploy de
+  `delete-event` e `retention`. No G6, conferir (sem exibir o valor) se
+  `GUEST_ALLOWED_ORIGINS` tem `https://chadbb.pages.dev`; sem isso a Edge
+  responde `ORIGIN_DENIED`. **Não liberar o preview**
+  (`claude-front.chadbb.pages.dev`): ele usa o banco de produção e viraria uma
+  segunda porta para os convites reais. Ordem da publicação: PR do back →
+  G5 → G6 → merge do front com o botão. Teste na produção com um evento de
+  rascunho criado só para isso.
+  Códigos: `AUTH_REQUIRED`, `EVENT_NOT_FOUND`, `EVENT_VERSION_CONFLICT`,
+  `EVENT_NOT_DELETABLE`.
 - [x] **T-B1 · SMTP pelo Resend no Auth do `chadbb-cha`.** Bloqueio principal:
   sem ele o organizador não entra. Validar um login real pelo link de e-mail
   depois. **Gate:** escrita remota; mostrar o plano e aguardar aprovação.
