@@ -254,8 +254,8 @@ function GuestGift({ item, alternatives, busy, closed, save, feedback }: { item:
     {active && <p className="card-reservation"><span>Sua reserva</span> <strong>{own.quantity} {units(own.quantity)}</strong></p>}
     {purchased && <p className="hint">Compra informada por você. Para mudar a quantidade ou o tamanho, cancele a reserva e escolha de novo.</p>}
     {!purchased && !full && !closed && <form onSubmit={submit} className="flex flex-col gap-3">
-      <QuantityField context={item.title} unit={diaper ? 'pacotes' : 'unidades'} value={quantity}
-        max={available === null ? 1000 : Math.min(1000, available + (active ? own.quantity : 0))} onChange={text => setDraft({ text, version: own?.version ?? null })} />
+      <QuantityField context={item.title} unit={diaper ? 'pacotes' : 'unidades'} value={quantity} busy={busy}
+        max={available === null ? 1000 : Math.min(1000, available + (active ? own.quantity : 0))} onChange={text => setDraft(previous => ({ text, version: previous ? previous.version : own?.version ?? null }))} />
       <Button type="submit" className="self-start" busy={busy}>{active ? 'Atualizar quantidade' : 'Escolher presente'}</Button>
     </form>}
     {draft && draft.version !== (own?.version ?? null) && <p role="status">A escolha mudou em outra sessão. <button type="button" className="text-link" onClick={() => setDraft(null)}>Usar escolha atual</button></p>}
