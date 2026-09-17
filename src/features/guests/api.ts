@@ -1,5 +1,6 @@
 import { readPublicConfig } from '../../lib/config'
 import { getClient } from '../events/api'
+import { isEventId } from '../events/model'
 import type { Category, DiaperSize } from '../gifts/model'
 export type ResponseChoice = 'pending' | 'yes' | 'no' | 'maybe'
 export type Reservation = { id: string; quantity: number; version: number; status: 'reserved' | 'purchase_declared' | 'cancelled' }
@@ -36,6 +37,7 @@ export function availableOf(item: Pick<GuestItem, 'limit' | 'committed' | 'avail
   return item.limit === null ? null : Math.max(0, item.limit - item.committed)
 }
 export async function invitations(eventId: string, action = 'list', payload: Record<string, unknown> = {}) {
+  if (!isEventId(eventId)) throw new Error('EVENT_NOT_FOUND')
   const { data, error } = await getClient().rpc('organizer_invitations', { p_event_id: eventId, p_action: action, p_payload: payload })
   if (error) throw error
   return data

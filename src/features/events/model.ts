@@ -9,6 +9,11 @@ export type EventRecord = {
 export type EventDraft = Pick<EventRecord, 'title' | 'public_description' | 'private_address' | 'private_instructions' | 'cover_path'> & { localDate: string; localEndDate: string }
 export const statusLabels: Record<EventStatus, string> = { draft: 'Rascunho', published: 'Publicado', closed: 'Encerrado' }
 
+// O id do evento vem do endereço, que qualquer um pode digitar ou colar errado.
+// Um texto que não é uuid faz o Postgres responder 400, e a tela acaba culpando
+// a conexão do convidado; aqui isso vira "evento não encontrado", que é a verdade.
+export const isEventId = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+
 // Início e término são sempre digitados e exibidos no horário de Brasília,
 // independentemente do navegador. O prazo de retenção é calculado só no banco.
 export const EVENT_TIME_ZONE = 'America/Sao_Paulo'

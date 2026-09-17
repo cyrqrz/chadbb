@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { daysUntil, fromLocalDate, toLocalDate, validateDraft, validateImage } from '../src/features/events/model'
+import { daysUntil, fromLocalDate, isEventId, toLocalDate, validateDraft, validateImage } from '../src/features/events/model'
 import { errorMessage } from '../src/lib/errors'
 
 const draft = { title: '', public_description: '', private_address: '', private_instructions: '', localDate: '', localEndDate: '', cover_path: null }
@@ -24,6 +24,14 @@ describe('evento', () => {
     expect(toLocalDate(fromLocalDate(value))).toBe(value)
     expect(toLocalDate(null)).toBe('')
     expect(fromLocalDate('2026-02-30T12:00')).toBeNull()
+  })
+  // Endereço digitado à mão (ou um placeholder colado) não pode virar consulta:
+  // o Postgres recusa o texto como uuid e o erro 400 vira "confira sua conexão".
+  it('só reconhece como evento um id em formato uuid', () => {
+    expect(isEventId('20000000-0000-4000-8000-000000000002')).toBe(true)
+    expect(isEventId('20000000-0000-4000-8000-000000000002'.toUpperCase())).toBe(true)
+    for (const invalid of ['<id>', '', 'abc', '20000000-0000-4000-8000', '20000000-0000-4000-8000-00000000000g', ' 20000000-0000-4000-8000-000000000002'])
+      expect(isEventId(invalid)).toBe(false)
   })
   it('limita campos mesmo em rascunho', () => expect(validateDraft({ ...draft, private_address: 'a'.repeat(501) })).not.toBeNull())
 })
