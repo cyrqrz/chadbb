@@ -76,8 +76,10 @@ jobs:
           done
           echo 'Edge guest não ficou pronta dentro do prazo.' >&2
           exit 1
-      - run: npm run test:api
+      # O runner do T-B5 (tests/api/event-performance) abre o Chromium na fase de
+      # pré-requisitos; sem o navegador instalado, a suíte da API falha antes do ensaio.
       - run: npx playwright install --with-deps chromium
+      - run: npm run test:api
       - run: npm run test:browser:local
       - run: npm run test:email:local
       - if: always()
