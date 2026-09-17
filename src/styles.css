@@ -274,6 +274,22 @@
   .size-chips strong { color: var(--color-brand-hover); }
   .product-listed { border-style: dashed; background: var(--color-surface-soft); box-shadow: none; }
 
+  /* Cabeçalho e abas do evento (G4). */
+  .event-header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 1rem 1.5rem; margin-top: 1.25rem; }
+  .event-header-text { display: flex; min-width: 0; flex: 1 1 18rem; flex-direction: column; gap: 0.5rem; }
+  .event-tabs { display: flex; flex-wrap: wrap; gap: 0.25rem 1.25rem; margin-top: 1.5rem; border-bottom: 1px solid var(--color-line); }
+  .event-tabs a { display: inline-flex; align-items: center; min-height: var(--touch-min); margin-bottom: -1px; border-bottom: 3px solid transparent; font-weight: 650; color: var(--color-muted); transition: color var(--duration-fast), border-color var(--duration-fast); }
+  .event-tabs a:hover { color: var(--color-ink); }
+  .event-tabs a[aria-current="page"] { border-bottom-color: var(--color-brand); color: var(--color-ink); }
+  .tab-panel { margin-top: 2rem; }
+  .tab-title { font-size: var(--text-h2); line-height: var(--text-h2--line-height); font-weight: 700; }
+  .progress-list { display: flex; flex-direction: column; gap: 0; padding-block: 0.5rem; }
+  .progress-row { display: flex; flex-direction: column; gap: 8px; padding-block: 14px; }
+  .progress-row + .progress-row { border-top: 1px solid var(--divider-color); }
+  .progress-row-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.75rem; }
+  .progress-row-figure { margin-inline-start: auto; font-variant-numeric: tabular-nums; }
+  .preview-bar { display: flex; flex-direction: column; align-items: flex-start; gap: 0.75rem; padding-bottom: 0; }
+
   /* Sistema de cards (G3.1): cabeçalho, conteúdo, área interativa e ações. */
   .card-stack { display: flex; flex-direction: column; gap: var(--card-gap); }
   .card-header { display: flex; flex-direction: column; gap: 8px; }

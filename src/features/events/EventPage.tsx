@@ -1,16 +1,17 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { coverUrl, eventKeys, getEvent, saveEvent, transitionEvent, uploadCover } from './api'
-import { statusLabels, toDraft, validateDraft, validateImage } from './model'
+import { toDraft, validateDraft, validateImage } from './model'
 import type { EventDraft, EventRecord } from './model'
 import { errorMessage } from '../../lib/errors'
 import { failedLast, live } from '../../lib/query'
 import { useLastError } from '../../lib/useLastError'
 import { useAuth } from '../auth/context'
 import { ErrorState, LoadingState, RefreshStatus, SlowRefresh, SuccessMessage } from '../../components/States'
-import { BackLink, Button } from '../../components/ui'
+import { Button } from '../../components/ui'
+import { EventNotFound } from './EventLayout'
 
 export function EventPage() {
   const { id = '' } = useParams()
@@ -18,9 +19,9 @@ export function EventPage() {
   const query = useQuery({ queryKey: [...eventKeys.detail(id), session?.user.id], queryFn: () => getEvent(id), retry: false, ...live })
   const loadError = useLastError(query.error)
   // Erro só substitui a tela enquanto nada foi carregado; depois, o editor fica e avisa.
-  if (query.isPending && !(failedLast(query) && loadError)) return <section className="page"><LoadingState>Carregando evento…</LoadingState></section>
-  if (query.data === undefined) return <section className="page"><h1 className="page-title">Detalhes do evento</h1><div className="mt-6"><ErrorState title="Não foi possível abrir o evento." message={errorMessage(loadError)} busy={query.isFetching} onRetry={() => void query.refetch()} /></div></section>
-  if (!query.data) return <section className="page"><h1 className="page-title">Evento não encontrado</h1><p className="mt-4">Confira o endereço e se está na conta correta.</p><div className="mt-6"><BackLink to="/eventos">Seus eventos</BackLink></div></section>
+  if (query.isPending && !(failedLast(query) && loadError)) return <LoadingState>Carregando evento…</LoadingState>
+  if (query.data === undefined) return <div className="tab-panel"><h2 className="tab-title">Dados do evento</h2><div className="mt-6"><ErrorState title="Não foi possível abrir o evento." message={errorMessage(loadError)} busy={query.isFetching} onRetry={() => void query.refetch()} /></div></div>
+  if (!query.data) return <EventNotFound />
   return <EventEditor key={query.data.id} server={query.data} refreshing={query.isFetching} refreshFailed={query.isError} retry={() => void query.refetch()} />
 }
 // `server` acompanha a consulta; `record` é a versão que este formulário editou.
@@ -84,13 +85,10 @@ function EventEditor({ server, refreshing, refreshFailed, retry }: { server: Eve
     try { const latest = await getEvent(record.id); if (!latest) throw new Error('EVENT_NOT_FOUND'); await accept(latest); setMessage('Dados recarregados.') }
     catch (cause) { setError(errorMessage(cause)) } finally { setBusy(false) }
   }
-  return <section className="page max-w-3xl">
-    <BackLink to="/eventos">Seus eventos</BackLink>
-    <div className="mt-7 flex flex-wrap items-center gap-4"><h1 className="page-title">Detalhes do evento</h1><span className="badge">{statusLabels[record.status]}</span></div>
-    <SlowRefresh fetching={refreshing} />
+  return <div className="tab-panel max-w-3xl">
+    <div className="flex flex-wrap items-center gap-4"><h2 className="tab-title">Dados do evento</h2><SlowRefresh fetching={refreshing} className="mt-0" /></div>
     {refreshFailed && <RefreshStatus fetching={refreshing} failed onRetry={retry} />}
     {outdated && <div role="status" className="notice mt-6"><p>Este evento mudou em outra sessão. O que você digitou continua aqui.</p><Button variant="secondary" size="sm" className="mt-3" disabled={busy} onClick={() => void reload()}>Recarregar dados</Button></div>}
-    <nav aria-label="Áreas do evento" className="stagger mt-6 flex flex-wrap gap-3"><Link to={`/eventos/${record.id}/convites`} className="secondary">Convites e confirmações →</Link><Link to={`/eventos/${record.id}/presentes`} className="secondary">Lista de presentes →</Link></nav>
     {purged ? <p className="notice mt-6">Os dados pessoais deste evento foram excluídos conforme a política de retenção. Restam apenas título e datas.</p> :
       closed && <p className="notice mt-6">Este evento foi encerrado. Os detalhes estão disponíveis apenas para consulta.</p>}
     <form onSubmit={save} className="mt-8 space-y-8">
@@ -121,5 +119,5 @@ function EventEditor({ server, refreshing, refreshFailed, retry }: { server: Eve
         confirmClose ? <div className="notice"><p>Encerrar este evento? Ele não poderá receber novas reservas nem ser reaberto.</p><div className="mt-4 flex flex-wrap gap-4"><button className="btn-danger btn-danger-strong" disabled={busy || dirty} onClick={() => void transition('closed')}>Confirmar encerramento</button><Button variant="ghost" disabled={busy} onClick={() => setConfirmClose(false)}>Continuar com evento aberto</Button></div></div> :
           <button className="btn-danger" disabled={busy || dirty} onClick={() => setConfirmClose(true)}>Encerrar evento</button>}
     </div>}
-  </section>
+  </div>
 }

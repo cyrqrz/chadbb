@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fromLocalDate, toLocalDate, validateDraft, validateImage } from '../src/features/events/model'
+import { daysUntil, fromLocalDate, toLocalDate, validateDraft, validateImage } from '../src/features/events/model'
 import { errorMessage } from '../src/lib/errors'
 
 const draft = { title: '', public_description: '', private_address: '', private_instructions: '', localDate: '', localEndDate: '', cover_path: null }
@@ -37,4 +37,20 @@ describe('erros exibidos', () => {
     expect(errorMessage({ status: 401 })).toContain('sessão expirou')
   })
   it('não expõe mensagens internas do servidor', () => expect(errorMessage(new Error('secret token address'))).not.toContain('secret'))
+})
+
+describe('contagem de dias até o evento (horário de Brasília)', () => {
+  const at = (iso: string) => new Date(iso).getTime()
+  it('conta dias de calendário em Brasília, não horas corridas', () => {
+    expect(daysUntil('2035-09-10T17:30:00Z', at('2035-09-01T12:00:00-03:00'))).toBe(9)
+    // 23h de Brasília do dia 9 → evento no dia 10: falta 1 dia.
+    expect(daysUntil('2035-09-10T17:30:00Z', at('2035-09-09T23:00:00-03:00'))).toBe(1)
+    // 01h UTC do dia 10 ainda é dia 9 em Brasília.
+    expect(daysUntil('2035-09-10T17:30:00Z', at('2035-09-10T01:00:00Z'))).toBe(1)
+    expect(daysUntil('2035-09-10T17:30:00Z', at('2035-09-10T08:00:00-03:00'))).toBe(0)
+    expect(daysUntil('2035-09-10T17:30:00Z', at('2035-09-12T08:00:00-03:00'))).toBe(-2)
+  })
+  it('sem data não há contagem', () => {
+    expect(daysUntil(null, at('2035-09-01T12:00:00Z'))).toBeNull()
+  })
 })

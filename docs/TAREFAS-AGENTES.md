@@ -22,14 +22,19 @@ o ensaio familiar no celular continua pendente.
 
 ## Claude — front (`chadbb-claude`, `claude/front`)
 
-- [ ] **2026-09-17 · Codex → Claude · Revisão G3/G3.1: corrigir quantidade no convite.**
+- [x] **2026-09-17 · Codex → Claude · Revisão G3/G3.1: corrigir quantidade no convite.**
+  _(Feito em `4dc63ae`, PR #9, com o foco mantido durante o envio.)_
   Em `GuestPage.tsx`, bloquear `QuantityField` durante envio (regressão) e
   preservar a versão inicial do rascunho ao continuar digitando depois de uma
   atualização concorrente (preexistente, inclusive versão `null`).
   Correção e testes preparados em
   [patch](reviews/2026-09-17-claude-front.patch); reprodução e evidências em
   [revisão](reviews/2026-09-17-claude-front.md). Base: `2f321dc`.
-- [ ] **2026-09-17 · Codex → Claude · Tela de exclusão de evento.** O back está
+- [x] **2026-09-17 · Codex → Claude · Tela de exclusão de evento.**
+  _(Feito no PR #11, publicado depois do G6: botão no card de “Seus eventos”, só
+  rascunho e encerrado, confirmação no card. As contagens de convites e reservas
+  não aparecem na confirmação porque a lista de eventos não tem esses números;
+  o texto diz que convites, respostas e reservas serão apagados.)_ O back está
   publicado no `chadbb-cha` em 2026-09-17 (migration e Edge `delete-event`).
   O front chama a Edge Function `delete-event` (POST), com o JWT do organizador,
   enviando `{ event_id, version }`. Pode usar `supabase.functions.invoke('delete-event', { body })`.

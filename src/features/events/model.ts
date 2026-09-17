@@ -21,6 +21,12 @@ function wallClock(time: number) {
 export function toLocalDate(value: string | null) {
   return value ? wallClock(new Date(value).getTime()).text : ''
 }
+// Só apresentação (“faltam N dias”): dias de calendário no horário de Brasília.
+export function daysUntil(value: string | null, now = Date.now()): number | null {
+  if (!value) return null
+  const day = (time: number) => { const { text } = wallClock(time); return Date.UTC(+text.slice(0, 4), +text.slice(5, 7) - 1, +text.slice(8, 10)) }
+  return Math.round((day(new Date(value).getTime()) - day(now)) / 86_400_000)
+}
 export function fromLocalDate(local: string): string | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(local)
   if (!match) return null

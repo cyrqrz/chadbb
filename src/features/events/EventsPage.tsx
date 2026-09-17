@@ -31,7 +31,7 @@ export function EventsPage() {
   }
   const create = useMutation({ mutationFn: createEvent, onSuccess: async event => {
     await cache.invalidateQueries({ queryKey: eventKeys.all })
-    navigate(`/eventos/${event.id}`)
+    navigate(`/eventos/${event.id}/dados`)
   } })
   const loadError = useLastError(query.error)
   function submit(e: FormEvent) { e.preventDefault(); if (!create.isPending) create.mutate(title) }
