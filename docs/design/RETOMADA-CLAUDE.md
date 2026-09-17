@@ -1,77 +1,79 @@
-# Retomada do Claude (front) — atualizada em 2026-09-17
+# Retomada do Claude (front) — 2026-09-17, fim da sessão
 
-G3 e G3.1 estão na `main` (PR #9, squash `315e22c`, mergeado em 2026-09-17)
-e publicados em `chadbb.pages.dev`. O próximo trabalho é a G4.
+Sessão encerrada às pressas para trocar de máquina (PC de casa). Tudo o que
+importa está **no GitHub**, em três branches. Nada foi perdido.
 
-## Como retomar (PC do trabalho)
+## Como retomar
 
-1. `cd ~/projetos/chadbb-claude && git checkout claude/front && git pull`.
-2. `npm ci` (Node 22): nenhuma dependência nova, mas é barato.
-3. Ler `AGENTS.md`, `docs/TAREFAS-AGENTES.md`, `docs/design/PLANO-VISUAL.md`,
-   `docs/design/CARDS.md` e este arquivo.
-4. `git pull origin main` se houver PR novo mergeado.
-5. `test:browser:local` precisa da stack do Codex **e** de
-   `npm run functions:serve` aberto em `~/projetos/chadbb-codex`. Se o banco
-   local estiver antigo (erro `relation "private.retention_audit" does not exist`),
-   ele tem menos migrations que o repositório: pedir aprovação e rodar
-   `npm run db:reset` no clone do Codex.
+1. `cd ~/projetos/chadbb-claude && git fetch origin`
+2. `git checkout claude/front && git pull` (traz `746a282`).
+3. `npm ci` (Node 22). Docker só é necessário para `test:browser:local` e
+   `test:email:local`, que usam a stack do clone do Codex, com
+   `npm run functions:serve` aberto lá.
+4. Ler `AGENTS.md`, `docs/TAREFAS-AGENTES.md`, `docs/design/PLANO-VISUAL.md`,
+   `docs/design/CARDS.md`, `docs/design/G4-PAINEL.md` e este arquivo.
 
-## Onde paramos
+## Onde cada coisa está
 
-| Gate | Situação |
-|---|---|
-| G0, G1 | mergeados (PR #7) |
-| G2, G2.1 | mergeados (PR #8); fontes Manrope + Fraunces aprovadas |
-| G3 (convite, página inicial, prévia WhatsApp) | **aprovado** em 2026-09-16 |
-| G3.1 (sistema de cards, `docs/design/CARDS.md`) | **aprovado** em 2026-09-16: check 44/44, e2e 164/164, browser 8/8, QA com ressalvas em `CARDS.md` §4. Revisão: https://claude.ai/artifact/5T2XkXsw1iyJvkWY5seSWN |
-| **PR #9 (G3 + G3.1)** | **mergeado** em 2026-09-17 (squash `315e22c`). Inclui as correções R1/R2 da revisão do Codex (`4dc63ae`: quantidade bloqueada durante o envio com foco mantido; versão do rascunho preservada em conflito). Evidências: check 44/44, e2e 172/172, browser 8/8 |
-| G4 (shell do evento, painel, lista) | **próximo**, janela 26–30/09 |
+| Branch | Commit | O que é | Situação |
+|---|---|---|---|
+| `claude/front` | `746a282` | Entrar com o código do e-mail, fim da tremida na atualização, datas no iPhone | **PR #14 aberto**, CI verde (só o “Workers Builds”, que já falhava antes, está vermelho). **Falta o merge do usuário** |
+| `claude/wip-g4` | `efca345` | **G4**: painel como tela inicial do evento, abas, prévia do convite | Pronto e testado (check ok, e2e 244/244, browser 8/8), **aguardando aprovação**. Base `17d5096`, antes do PR #14 |
+| `claude/wip-ausencia` | `56be8f8` | Aviso de ausência com presente reservado + selo no painel, **mais ajustes visuais não revisados** | **WIP.** Ver “Como limpar” abaixo |
 
-## Próximos passos
+Páginas de revisão (privadas):
+- G4: https://claude.ai/artifact/J26doK6fi4dgZdhAE3hVqu
+- Login com código e tremida: https://claude.ai/artifact/RBG4SZoQQ2QkEtMMhQst3u
 
-1. **G4** (`PLANO-VISUAL.md` §3): cabeçalho do evento, resumo, fraldas como
-   progresso, mimos, lista com menos caixas. Levar junto:
-   - ressalvas da G3.1 (`CARDS.md` §4): prop `error` no `QuantityField`,
-     título antes dos selos no DOM, número repetido no painel, estado
-     “Adicionando…” e foco depois de incluir; estado visual e “Enviando…”
-     no campo e no CTA do convite; foco dos controles com `disabled={busy}`;
-   - componentes React para os cards, `ActionMenu` e `ConfirmDialog` (Radix);
-   - audit A11–A14 e A16–A19;
-   - axe nas telas do organizador (T-F3).
-   Fluxo: plano com gates → testes antes (TDD) → código → QA (`qa-ux`) →
-   capturas + página de revisão → aprovação → commit/PR.
-2. Depois: G5 (estados globais, offline, QA) em 01/10; congelamento em 05/10;
-   ensaio em 02–04/10.
+## Próximos passos, em ordem
 
-## SMTP (T-B1, do Codex) — situação conhecida
+1. **Mergear o PR #14** (login com código). É o mais urgente: sem ele, quem abre
+   o link do e-mail em outro navegador (Safari do iPhone) não entra. Depois do
+   merge, testar na produção: pedir o código num navegador e digitá-lo em outro,
+   ou usar “Já tenho um código”.
+2. **G4** (`claude/wip-g4`): trazer a `main` nova, rodar `npm run check`, e2e e
+   `test:browser:local`, pedir aprovação e abrir o PR. O QA já revisou e
+   aprovou com ressalvas.
+3. **Ausência com presente** (`claude/wip-ausencia`): ver abaixo.
+4. Depois: **G4b** (lista de presentes com menos caixas, A11–A13) e **G5**
+   (estados globais, offline, QA) em 01/10. Congelamento em 05/10; ensaio
+   em 02–04/10.
 
-- O usuário já criou uma chave de API no Resend **no PC do trabalho**.
-- Na máquina de casa não existe `~/.config/chadbb/resend-api-key`, o arquivo
-  que `docs/PLANO-SMTP-T-B1.md` espera. No PC do trabalho, conferir se o
-  arquivo existe (só `ls -l`, nunca exibir o conteúdo) e se a chave já foi
-  configurada no Auth do `chadbb-cha`. Essa checagem é do Codex e, por ser
-  remota, precisa de aprovação.
-- Sem domínio próprio, o remetente é `onboarding@resend.dev` e só entrega ao
-  e-mail da conta Resend (o organizador).
-- Sem SMTP, ninguém entra no site; por isso o usuário ainda não consegue ver
-  as telas novas em `chadbb.pages.dev`. Localmente: `npm run dev` + Inbucket
-  (`http://127.0.0.1:54324`) para o link de login.
+## Como limpar a `claude/wip-ausencia`
 
-## Máquina de casa (para quando voltar a ela)
+O commit mistura duas coisas.
 
-- Os 3 clones em `~/projetos`: `chadbb` (main), `chadbb-codex` (codex/back),
-  `chadbb-claude` (claude/front).
-- Docker Desktop com integração WSL ligada; stack local com as 20 migrations.
-- Bibliotecas do Chromium instaladas (`libnss3`, `libnspr4`, `libasound2t64`).
-- `.env.local` só com as variáveis públicas do Supabase local.
-- Falta instalar e autenticar o `gh` (`sudo apt install gh` + `gh auth login`).
+**Revisado e testado** antes dos ajustes visuais (e2e 264/264, browser 8/8):
 
-## Pendências gerais
+- `GuestPage.tsx` (`Presence`): quem responde “Não poderá ir” com reserva ativa
+  vê um aviso com a lista do que está reservado e escolhe entre “Cancelar
+  reserva(s)” e “Manter: vou enviar o presente”. Decisão do usuário: **não
+  cancelar sozinho**, porque muita gente não vai e mesmo assim envia o presente.
+- `InvitationsPage.tsx`: selo “Vai enviar presente” no card de quem não vai. O
+  vínculo é **pelo nome**; o pedido de `invitation_id` nas reservas já está no
+  quadro, em “Pedidos do front para o back”.
+- Testes: grupo “ausência com presente reservado” em `tests/e2e/guest.spec.ts` e
+  um teste em `tests/e2e/panel.spec.ts`.
 
-- Pedidos ao Codex no quadro: resumo do painel, `available`, `id` das
-  reservas, `diapers` no resumo, deadlock intermitente.
-- A branch `codex/back` está em WIP de retomada; não mergear sem revisão.
-- Testes que falharam uma vez com a máquina carregada e passaram isolados:
-  “G2.1 · só uma ação domina”, “tentar de novo pelo teclado mantém o foco” e
-  “falha de atualização nos detalhes não apaga…”. Observar; se repetir, tratar
-  como teste instável.
+**Não revisado** (o agente de QA foi interrompido no meio): cartões dos passos
+na página inicial (`HomePage.tsx`, `.step-card`, `.step-number`), destaque do
+“É convidado?” (`.login-guest`), `.stagger` com `animation … backwards`, e
+testes novos em `guest.spec.ts`, `login.spec.ts` e `panel.spec.ts`.
+`npm run check` passa, mas **o e2e completo não rodou depois desses ajustes**.
+
+Sugestão: rodar o e2e completo; separar o que passar e fizer sentido num commit
+próprio (“visual da página inicial”) e descartar o resto. Depois chamar o agente
+`qa-ux` de novo, porque a revisão desta parte não terminou.
+
+## Pendências e avisos
+
+- **Prévia do WhatsApp:** o site entrega as tags certas (conferido com o robô do
+  WhatsApp e do Facebook: 200 com `og:title`, `og:description` e `og:image`).
+  Quando o cartão não aparece, é porque a mensagem foi encaminhada ou o app não
+  buscou o site a tempo. Colar o link e esperar 2–3 s resolve.
+- **O evento “cha da liz” está encerrado** na produção, e encerrado não reabre.
+  Se era o evento real, é preciso criar e publicar outro.
+- **Exclusão de evento** já está publicada (Edge `delete-event`, PR #10 e #11).
+  O botão só aparece em evento em rascunho ou encerrado.
+- A `codex/back` segue com o back; a comunicação continua pelo quadro
+  (`docs/TAREFAS-AGENTES.md`).
