@@ -76,6 +76,52 @@ o ensaio familiar no celular continua pendente.
   - Testes: `tests/local/email-code.test.mjs` já cobre o back (código em outro
     cliente, código errado e reúso). Se o texto do botão mudar, ajustar
     `tests/local/email-login.test.mjs`. Limite local: 2 e-mails por hora.
+- [ ] **2026-09-17 · Usuário → Claude · Refazer o visual do convite (prioridade alta).**
+  Pedido do titular, com capturas de 17/09. Vale para `GuestPage.tsx`,
+  `styles.css` e componentes de `src/components/ui`. Nada aqui muda contrato:
+  todos os dados já vêm de `snapshot` (`guest_action`).
+  - **Cabeçalho.** Dar mais evidência ao nome do convidado: hoje ele aparece
+    dentro de uma frase, em corpo de texto. Promovê-lo na hierarquia (ex.:
+    saudação com o nome em destaque acima ou abaixo do título do evento),
+    sem perder o título. Reorganizar "Quando" e "Onde" com ritmo e alinhamento
+    mais claros; hoje ficam soltos abaixo do texto.
+  - **Cartão de data ao lado.** Onde hoje há o bloco "01 / Novembro", entregar
+    um cartão de calendário de verdade: dia da semana, dia, mês, horário e
+    **"Adicionar ao calendário"**. Gerar um `.ics` no próprio navegador
+    (`Blob` + `URL.createObjectURL`, sem servidor e sem CSP nova) e, opcional,
+    link para Google Agenda. Usar `starts_at`/`ends_at` do snapshot, fuso
+    `America/Sao_Paulo`; não recalcular prazos. Quando houver capa, ela
+    continua no lugar do cartão.
+  - **Local com mapa.** Em "Local e instruções", mostrar um mapa. Ver as
+    ressalvas do Codex abaixo antes de escolher a solução; manter sempre o
+    botão "Abrir no mapa" e o endereço em texto.
+  - **Presença, presentes e mimos.** Aplicar o mesmo sistema de cartões:
+    hierarquia igual entre os cartões, espaçamento consistente, estados
+    (reservado, completo, compra informada) legíveis sem depender só de cor.
+    Hoje os cartões de fralda variam de altura e as ações secundárias
+    ("Trocar tamanho", "Já comprei", "Cancelar reserva") competem com a ação
+    principal.
+  - **Movimento.** Animações discretas no hover/focus dos cartões e botões
+    (elevação e borda, 120–200 ms). Respeitar `prefers-reduced-motion` e nunca
+    animar layout que cause deslocamento ao ler. Foco visível continua igual.
+  - **Acessibilidade e responsivo (não regredir):** 320 px com texto a 200%,
+    alvos de 44 px, contraste AA, teclado e leitor de tela. Conferir no iPhone,
+    onde os campos de data hoje cortam (pedido separado).
+  - **Testes:** ampliar os e2e do convite e rodar `npm run check` antes do PR.
+
+  **Ressalvas do Codex sobre o mapa (privacidade e CSP).** O endereço é dado
+  privado do convite, mostrado só a quem tem o link.
+  1. Incorporar um mapa de terceiro (iframe do Google Maps, Leaflet/OSM) envia
+     o endereço e o IP do convidado a esse serviço em toda visita. Isso muda a
+     política de privacidade do piloto e precisa de decisão do titular.
+  2. Exige afrouxar a CSP de `public/_headers`: `frame-src` para o iframe ou
+     `img-src`/`connect-src` para os blocos do mapa. Hoje é `default-src 'self'`.
+  3. Alternativa sem vazamento: manter o endereço em texto com o botão "Abrir no
+     mapa" (já existe) e, se quiser imagem, carregar o mapa **só depois de um
+     clique** do convidado ("Ver o mapa aqui"), avisando que abre um serviço
+     externo. É a opção que o Codex recomenda.
+  Escolhida a opção, registre aqui o pedido de CSP; a alteração de
+  `public/_headers` é do front, mas o Codex revisa a regra.
 - [ ] **2026-09-17 · Codex → Claude · Erro de envio do link aparece como "conexão".**
   Se o Auth não consegue enviar o e-mail, `/auth/v1/otp` responde **500**
   `unexpected_failure` ("Error sending confirmation email"). Hoje isso acontece
