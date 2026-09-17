@@ -150,7 +150,9 @@ o painel do organizador atualiza conforme o contrato de dados. O fluxo de retorn
 - [x] Integrar `private.committed_quantity` na migration de reservas; nunca assumir zero quando já houver comprometimento.
 - [x] Permitir cancelar e indicar “Já comprei”, mantendo quantidade comprometida enquanto reservado/comprado; deixar claro que a compra é informada pelo convidado.
 - [x] Impedir escrita direta em reservas e alteração de identidade/evento pelo cliente. Preservar RLS, grants mínimos e funções privilegiadas restritas.
-- [ ] Integrar encerramento e regras pós-evento do contrato familiar.
+- [x] Integrar encerramento e regras pós-evento do contrato familiar. Conferência
+  em 2026-09-16: contrato atualizado e 62/62 testes de Postgres portátil; ações
+  novas bloqueadas, compra/cancelamento com convite válido e expiração cobertos.
 - [x] Cobrir os cenários abaixo com PostgreSQL real, conexões independentes e API autorizada. Evidências: revisão técnica e continuação M4/M5 no registro de execução.
 
 | Cenário obrigatório | Resultado |

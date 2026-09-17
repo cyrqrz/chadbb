@@ -29,6 +29,63 @@ Encerramento: evento `FOR UPDATE`; transição `published` → `closed`, sem rea
 Publicação: `draft` → `published`, título não vazio e data futura. Bloqueios de
 edição/adição da lista são incompatíveis com o encerramento.
 
+## Exclusão de evento (2026-09-17)
+
+Implementado em `20260917000000_delete_event.sql`. Validado no Supabase local em
+2026-09-17 (G4). **Aguarda `db push` e deploy (gates G5–G6).** A Edge só aceita
+as origens de `GUEST_ALLOWED_ORIGINS`, que em produção lista apenas
+`https://chadbb.pages.dev`. O preview fica de fora de propósito, porque usa o banco real. O front chama a Edge Function;
+a RPC fica exposta a `authenticated` porque a Edge a executa com o JWT do próprio
+organizador.
+
+| Operação | Entrada | Ator e resultado | Erros de domínio |
+| --- | --- | --- | --- |
+| Edge `delete-event` (POST) | `Authorization: Bearer <JWT do organizador>`; corpo `{ "event_id": uuid, "version": inteiro }` | `200` com `{ event_id, items_removed, invitations_removed, reservations_removed, storage_cleanup }`; `storage_cleanup` é `done` ou `pending` | `401 AUTH_REQUIRED`, `404 EVENT_NOT_FOUND`, `409 EVENT_VERSION_CONFLICT`, `409 EVENT_NOT_DELETABLE`, `400 INVALID_PAYLOAD`, `403 ORIGIN_DENIED`, `503 TEMPORARILY_UNAVAILABLE` |
+| `delete_event` | `p_event_id uuid`, `p_version integer` | `security definer`, só o dono (`auth.uid()`); retorna o mesmo `jsonb`, sempre com `storage_cleanup: pending` | `AUTH_REQUIRED` (42501), `EVENT_NOT_FOUND` (42501), `EVENT_VERSION_CONFLICT` (P0001), `EVENT_NOT_DELETABLE` (P0001) |
+
+Ajustes em relação à proposta:
+
+- **A capa não sai pela RPC.** O Supabase bloqueia `DELETE` direto em
+  `storage.objects` (`storage.protect_delete`), e apagar só a linha deixaria o
+  arquivo órfão. A RPC registra a pasta `<owner_id>/<event_id>` em
+  `private.event_deletions`. A Edge remove os arquivos dos buckets
+  `event-public` e `event-private` pela API de Storage logo em seguida. Se isso
+  falhar, a resposta continua `200` com `pending`, e a Edge `retention` repete
+  no cron diário. A pasta é registrada mesmo sem capa, porque um envio
+  concorrente pode ter gravado um arquivo. Um arquivo usado como capa por outro
+  evento é preservado, pela mesma regra da retenção.
+- **Não dono, inexistente e `null`** recebem o mesmo `EVENT_NOT_FOUND`, como nas
+  demais RPCs, para não revelar que o evento existe. Uma repetição depois da
+  exclusão também recebe `EVENT_NOT_FOUND`.
+- **Versão antes do estado.** Com versão ausente ou antiga, a resposta é
+  `EVENT_VERSION_CONFLICT`, mesmo se o evento estiver publicado. A tela recarrega
+  e passa a mostrar o estado real. `EVENT_NOT_DELETABLE` vale para `published`.
+  Evento `closed` já expurgado pela retenção pode ser excluído.
+- `guest_action` agora devolve `GUEST_SESSION_INVALID` quando o convite ou o
+  evento some enquanto a ação espera o bloqueio. Antes, a abertura do convite
+  terminava em erro SQL de `NOT NULL`. A regra não mudou.
+
+Transação única. Ordem dos bloqueios: evento `FOR UPDATE` → convites
+`FOR UPDATE` → exclusões. A ação de convidado em curso termina antes e entra na
+contagem; a que chega depois recebe `GUEST_SESSION_INVALID`. A exclusão apaga,
+nesta ordem: respostas registradas (`guest_requests`), reservas (inclusive
+canceladas), sessões, convites, itens e o evento. O catálogo e a conta do
+organizador permanecem.
+
+Auditoria (LGPD): `private.event_deletions` guarda o identificador técnico do
+evento, a data, o estado anterior e as contagens (itens, convites, respostas,
+reservas, sessões, arquivos removidos, falhas de limpeza). Não guarda nomes,
+títulos ou endereços. A pasta só fica guardada até a limpeza terminar. Nenhum
+cliente lê a tabela, nem a `service_role`. A `service_role` só executa
+`event_deletion_pending`, `event_deletion_storage_done` e
+`event_deletion_storage_failed`.
+
+Cobertura: `supabase/tests/delete_event.test.sql` (permissões, dono, estado,
+versão, cascata, fila da capa, auditoria),
+`tests/database/events.integration.mjs` (concorrência com convidado, evento
+expurgado) e `tests/api/delete-event.integration.mjs` (Edge, Storage real,
+falha e nova tentativa pela retention).
+
 ## Fraldas e mimos no protocolo da lista
 
 `products.category` (`fralda`/`mimo`) e `products.diaper_size` (`P`/`M`/`G`/`XG`)
@@ -107,9 +164,34 @@ zero somente enquanto a tabela não existe; com tabela presente falha explicitam
 Não é evidência de proteção contra excesso de reservas. Executar os cenários
 concorrentes do plano com conexões independentes e início coordenado.
 
-Duração de sessão, limites por convite e ações depois de encerramento ainda seguem
-as propostas do contrato do piloto. Resolver essas decisões antes de implementar os
-respectivos fluxos. Até lá, nenhuma exceção de encerramento está habilitada.
+### Encerramento e pós-evento implementados (conferência em 2026-09-16)
+
+O protocolo disponível é `public.guest_action`, acessado pela Edge `guest`;
+os nomes individuais da tabela acima continuam históricos, não são RPCs públicas.
+O organizador encerra explicitamente com `transition_event`; a passagem de
+`starts_at`/`ends_at` não encerra automaticamente o evento. A data de confirmação
+de 18/10 é conteúdo do convite, sem bloqueio automático de RSVP no schema atual.
+
+| Ação com evento `closed` | Comportamento implementado |
+| --- | --- |
+| Abrir/reabrir convite e consultar | Permitido com convite/sessão válidos |
+| Nova reserva, alteração de quantidade, troca de tamanho e RSVP | `EVENT_CLOSED` |
+| Informar compra de reserva existente | Permitido; quantidade continua comprometida |
+| Cancelar reserva ou compra informada | Permitido; libera quantidade uma vez |
+| Informar compra de reserva cancelada | `INVALID_RESERVATION_STATE` |
+| Repetir pedido já confirmado com mesma chave/payload | Resultado anterior e snapshot atual, sem nova mutação |
+| Consultar painel do organizador | Permitido; reservas canceladas ficam fora da lista comprometida |
+
+O prazo é `private.invitations.expires_at`, gerado no banco como
+`events.starts_at + interval '7 days'`; não é sete dias depois do clique em
+encerrar nem de `ends_at`. Sessões duram no máximo duas horas e nunca ultrapassam
+a validade do convite. Revogação/expiração bloqueiam inclusive leitura, compra,
+cancelamento e replay. O front não recalcula esses prazos.
+
+Cobertura em `tests/database/events.integration.mjs`: leitura/reabertura após
+encerrar, mutações bloqueadas, compra/cancelamento, replay e expiração. Os testes
+de concorrência existentes verificam a ordem dos bloqueios contra encerramento.
+Este registro descreve o comportamento existente; não altera a política remota.
 
 ## Extensão planejada — fraldas e mimos
 

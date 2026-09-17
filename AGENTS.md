@@ -14,7 +14,15 @@ Suporte técnico: o próprio usuário. Ele escreve em português; responda em po
   (`https://chadbb.pages.dev`). Arquitetura: `docs/ADR-001-arquitetura-mvp-eventos-presentes.md`.
 - Ponto de retomada: `docs/TROCA-DE-MAQUINA.md` (mais recente) e
   `docs/PROXIMOS-PASSOS-M6.md`. `docs/OPERACAO-M6.md` tem o histórico.
-- Pendência principal: SMTP no Resend. Sem ele ninguém consegue entrar.
+- SMTP Resend e login real validados em 2026-09-16. Próximo gate do back:
+  medição remota T-B5; ver `docs/PLANO-DESEMPENHO-T-B5.md`.
+
+## Início de sessão do Codex
+
+Ao abrir uma sessão nova neste clone, sem outra tarefa pedida, o Codex lê
+`docs/TROCA-DE-MAQUINA.md` (seção de retomada mais recente) e
+`docs/TAREFAS-AGENTES.md`, resume em poucas linhas onde parou e propõe o próximo
+passo. Nada destrutivo ou remoto roda sem aprovação (ver Regras obrigatórias).
 
 ## Divisão de trabalho
 
@@ -34,6 +42,28 @@ a pasta `~/projetos/chadbb`, que fica na `main` e é só do usuário.
   na sua branch.
 - Os agentes não se veem em tempo real. A comunicação entre eles passa por
   commits e por `docs/TAREFAS-AGENTES.md`.
+
+## Apoio de qualidade — `tdd_senior`
+
+Por solicitação do usuário em 2026-09-16, o Codex conta com um subagente
+especialista sênior em TDD e testes, definido em `.codex/agents/tdd-senior.toml`.
+Ele apoia o Codex neste clone; não é um terceiro dono de branch nem substitui
+a divisão com o Claude. Herda o modelo e as permissões da sessão principal.
+
+- Delegue a ele uma subtarefa independente de revisão/testes em mudanças de
+  regras de negócio, permissões, concorrência, retenção ou runners remotos.
+- Em funcionalidade nova ou bug, prefira teste que falha antes da correção,
+  seguido da implementação mínima e regressão. Em código existente, faça revisão
+  e testes de regressão sem apresentar isso como TDD retroativo.
+- O padrão é revisão sem edição; escrita somente em arquivos de testes
+  explicitamente atribuídos da área do Codex. Achados de front vão ao quadro
+  do Claude. Coordenar uso de Docker, portas e dados; não disputar a mesma stack.
+- Alterações triviais de texto/estilo não exigem esse agente. Acione um agente
+  por subtarefa útil, evitando duplicação da suíte ou testes sem valor.
+- O Codex principal integra o parecer e conserva os gates. O especialista não
+  autoriza escrita remota, reset, commit, push ou deploy.
+
+Formato do perfil: [documentação oficial de subagentes](https://learn.chatgpt.com/docs/agent-configuration/subagents).
 
 ## Ambiente compartilhado
 

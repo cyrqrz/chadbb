@@ -1,5 +1,108 @@
 # Retomar o chadbb em outra máquina
 
+## Retomada prioritária — 2026-09-16, Codex/back
+
+Esta seção prevalece sobre o registro histórico abaixo. Clone do Codex:
+`~/projetos/chadbb-codex`, branch **`codex/back`**, remoto
+`https://github.com/cyrqrz/chadbb.git`. Não trabalhar na pasta `~/projetos/chadbb`
+do usuário nem no clone do Claude. O usuário seguirá com o Claude no front
+enquanto o back fica neste ponto de retomada.
+
+### Entregue e validado
+
+- **T-B1:** SMTP Resend configurado no Auth após aprovação. O próprio titular
+  assumiu como organizador, usando o e-mail da sua conta Resend. Confirmou
+  entrega, login, persistência após recarga, logout e proteção de `/eventos`.
+  Production do Pages tinha `│ ` antes da URL e espaço antes da chave pública;
+  corrigido com aprovação e rebuild validado. Preview já estava correto.
+- **T-B2/T-B3:** testes de convites e pós-evento ampliados; **62/62** no Postgres
+  portátil. Contrato atualizado para descrever cancelamento/compra após fechar,
+  com convite válido. Nenhuma migration nova ou alteração de política remota.
+- **T-B4:** runner isolado revisado e testado localmente; execução remota
+  autorizada condicionalmente pelo titular e concluída. Criar/editar/publicar
+  evento e lista e negar acesso cruzado passaram; limpeza restrita confirmou
+  zero contas, eventos e itens fictícios restantes.
+- **T-B5:** instrumento local preparado e revisado pelo especialista sênior.
+  Último ensaio: p95 leitura **711 ms**, escrita **692 ms**; atualização visual
+  **4960 / 4932 / 4965 ms**; zero erros e zero dados fictícios restantes.
+  Primeiro ensaio ultrapassou 2 s e continua registrado. **Não é prova remota.**
+- Agente de apoio `tdd_senior` em `.codex/agents/tdd-senior.toml`; modelo e
+  permissões herdados, sem autorização especial de produção. Achou problemas
+  reais no instrumento T-B5, corrigidos com testes RED/GREEN.
+- `npm run check` aprovado; gate de métricas **13/13**; isolamento/interrupção
+  T-B5 **3/3**; isolamento do smoke T-B4 **2/2**. Sem reset da stack compartilhada.
+
+### Onde retomar
+
+1. Ler `AGENTS.md`, `docs/TAREFAS-AGENTES.md` e
+   `docs/PLANO-DESEMPENHO-T-B5.md`.
+2. **Próximo gate é T-B5 remoto**, ainda sem aprovação específica: apresentar
+   dry-run de 1 conta, 1 evento, 27 itens, 50 convites e teto 420 POSTs guest.
+   Comando proposto está no plano. Não interpretar aprovação da T-B4 como
+   autorização de carga. Se p95 reprovar, investigar sem mudar o limite para
+   passar. Sincronização é medida após carga; não prova simultaneidade com 50.
+3. T-B6 continua pendente: sequência diária de backups, restauração com conteúdo
+   e Storage reais quando cadastrados, RTO completo e integração Workers Builds.
+   Não houve leitura nova do histórico de backups nesta sessão.
+4. T-B7: acompanhar pedidos do Claude em `TAREFAS-AGENTES.md`.
+
+Não executar o smoke antigo `tests/remote/smoke.mjs` em produção com dados reais:
+ele pressupõe ausência de tráfego real, limpa cotas compartilhadas e chama
+retenção global. Usar o runner isolado `tests/remote/organizer-smoke.mjs` apenas
+sob o gate correspondente. O remoto já tem ao menos a conta do titular; não
+reutilizar a premissa histórica de projeto vazio.
+
+### Código no PC de casa
+
+Após a publicação autorizada da branch, em uma pasta que ainda não exista:
+
+```sh
+git clone --branch codex/back https://github.com/cyrqrz/chadbb.git chadbb-codex
+cd chadbb-codex
+nvm use
+npm ci
+git status --short
+```
+
+Se o clone já existir, conferir alterações locais antes de atualizar a branch;
+nunca descartar trabalho para forçar sincronização. Commits/push/merge continuam
+dependendo dos gates do `AGENTS.md`. Integração com o front somente por PR/main
+e merge pelo usuário. Claude pode consultar os documentos da branch via
+`git show origin/codex/back:docs/TAREFAS-AGENTES.md` após fetch, sem misturar código.
+
+Docker Desktop: habilitar a distro WSL; nesta máquina é `Ubuntu-24.04`.
+Verificar `docker version`, iniciar Supabase somente no clone Codex se necessário
+(`npm run db:start`, sem reset), e servir Edge com `npm run functions:serve`.
+A porta 5173 precisa estar livre para o ensaio T-B5 local. O runner sobe e fecha
+seu Vite, sem encerrar servidor de outro agente. Node 22.
+
+Comandos independentes e seguros de preparação:
+
+```sh
+node tests/load/event-performance.mjs --dry-run
+node tests/remote/organizer-smoke.mjs --dry-run
+npm run check
+node --test tests/local/performance-gates.test.mjs
+```
+
+### Credenciais fora do Git
+
+A chave SMTP acrescentada nesta sessão é `~/.config/chadbb/resend-api-key`,
+modo 600. **Não está incluída automaticamente no pacote histórico de transferência.**
+SMTP já está configurado remotamente e o site continua funcionando sem o PC.
+Se precisar copiar a chave para casa, usar gerenciador de senhas ou transferência
+cifrada por canal seguro; nunca chat, docs ou repositório em texto claro.
+Os demais arquivos e sessões CLI seguem o procedimento histórico abaixo.
+
+### Recado para o front
+
+Login real está liberado. O titular relatou que “Conheça o chadbb” parece não
+fazer nada: hoje aponta para `#como-funciona`, já visível na tela. Pedido
+registrado para Claude tornar CTA claro e retirar “Convites estão em preparação”.
+Não alteramos arquivos do front nesta sessão.
+
+## Registro histórico — 2026-09-15
+
 Escrito em 2026-09-15, no PC do trabalho (`SFRNTTI01`), ao encerrar a sessão em
 que o backup diário entrou em operação. Substitui a seção equivalente de
 `OPERACAO-M6.md`, que não menciona `r2.env` nem a sessão do `wrangler`.

@@ -389,6 +389,63 @@ async function familyFixture(capacity = 3) {
 }
 function request(payload) { return { ...payload, request_id: crypto.randomUUID() } }
 
+test('M3: IDs de outro convite/evento não permitem editar, revogar ou trocar link', async () => {
+  const f = await familyFixture(); const other = await familyFixture()
+  const before = await organizerAction(f.event, 'list')
+  for (const action of ['update', 'revoke', 'rotate']) {
+    const payload = { id: f.invite.id, version: 1, name: 'Alteração indevida', kind: 'individual', capacity: 1 }
+    await assert.rejects(organizerAction(f.event, action, payload, bob), /EVENT_NOT_FOUND/)
+    await assert.rejects(organizerAction(other.event, action, payload), /INVITATION_NOT_FOUND/)
+  }
+  assert.deepEqual(await organizerAction(f.event, 'list'), before)
+  assert.ok((await guestAction(f.invite.token, 'exchange')).session_token)
+})
+
+test('M3: reabrir link após expirar sessão preserva RSVP e reserva sem duplicar', async () => {
+  const f = await familyFixture(); const item = f.snapshot.items.find(i => i.diaper_size === 'P')
+  await guestAction(f.token, 'rsvp', request({ response: 'yes', attending: 2, version: 1 }))
+  await guestAction(f.token, 'reserve', request({ item_id: item.id, quantity: 2, version: null }))
+  await admin.query("update private.guest_sessions set expires_at=clock_timestamp()-interval '1 second' where invitation_id=$1", [f.invite.id])
+  await assert.rejects(guestAction(f.token, 'read'), /GUEST_SESSION_INVALID/)
+  const reopened = await guestAction(f.invite.token, 'exchange')
+  assert.notEqual(reopened.session_token, f.token)
+  assert.equal(reopened.snapshot.invitation.attending, 2)
+  assert.equal(reopened.snapshot.invitation.version, 2)
+  assert.equal(reopened.snapshot.items.find(i => i.id === item.id).own.quantity, 2)
+  assert.equal(reopened.snapshot.items.find(i => i.id === item.id).committed, 2)
+  assert.equal((await organizerAction(f.event, 'list')).reservations.length, 1)
+})
+
+test('M3: convite expirado bloqueia link, leitura e escrita de sessão já aberta', async () => {
+  const f = await familyFixture()
+  await admin.query("update private.invitations set expires_at=clock_timestamp()-interval '1 second' where id=$1", [f.invite.id])
+  await assert.rejects(guestAction(f.invite.token, 'exchange'), /GUEST_SESSION_INVALID/)
+  await assert.rejects(guestAction(f.token, 'read'), /GUEST_SESSION_INVALID/)
+  await assert.rejects(guestAction(f.token, 'rsvp', request({ response: 'yes', attending: 1, version: 1 })), /GUEST_SESSION_INVALID/)
+  assert.equal((await organizerAction(f.event, 'list')).invitations[0].response, 'pending')
+})
+
+test('M3: respostas mudam contagem de pessoas sem alterar o outro convite', async () => {
+  const f = await familyFixture()
+  const second = await organizerAction(f.event, 'create', { name: 'Pessoa fictícia', kind: 'individual', capacity: 1 })
+  const token = (await guestAction(second.token, 'exchange')).session_token
+  await guestAction(token, 'rsvp', request({ response: 'yes', attending: 1, version: 1 }))
+  let version = 1
+  for (const [response, attending, total] of [['yes', 3, 4], ['yes', 2, 3], ['no', 0, 1], ['yes', 1, 2]]) {
+    const payload = request({ response, attending, version, invitation_id: second.id })
+    await guestAction(f.token, 'rsvp', payload)
+    await guestAction(f.token, 'rsvp', payload)
+    version++
+    const dashboard = await organizerAction(f.event, 'list')
+    assert.equal(dashboard.invitations.length, 2)
+    assert.equal(dashboard.invitations.reduce((sum, i) => sum + i.attending, 0), total)
+    assert.equal(dashboard.invitations.find(i => i.id === f.invite.id).version, version)
+    const untouched = dashboard.invitations.find(i => i.id === second.id)
+    assert.equal(untouched.attending, 1); assert.equal(untouched.version, 2)
+    assert.equal(dashboard.reservations.length, 0)
+  }
+})
+
 test('lista familiar: quatro cotas, 23 mimos ilimitados; preparação repetida não duplica', async () => {
   const f = await familyFixture()
   assert.equal(f.snapshot.items.length, 27)
@@ -767,6 +824,69 @@ test('regra confirmada: cota é global por tamanho, sem teto comercial de pacote
   assert.deepEqual(Object.fromEntries(after.items.filter(i => i.category === 'fralda').map(i => [i.diaper_size, i.committed])), { G: 19, M: 19, P: 6, XG: 6 })
 })
 
+test('M4: encerramento bloqueia novas mutações, preserva leitura e replay confirmado', async () => {
+  const f = await familyFixture(); const item = f.snapshot.items.find(i => i.diaper_size === 'P')
+  const destination = f.snapshot.items.find(i => i.diaper_size === 'M')
+  const payload = request({ item_id: item.id, quantity: 2, version: null })
+  const confirmed = await guestAction(f.token, 'reserve', payload)
+  await transition(f.event, 'closed')
+  const reopened = await guestAction(f.invite.token, 'exchange')
+  assert.equal(reopened.snapshot.event.status, 'closed')
+  assert.equal((await guestAction(f.token, 'read')).snapshot.event.status, 'closed')
+  const replay = await guestAction(reopened.session_token, 'reserve', payload)
+  assert.deepEqual(replay.result, confirmed.result)
+  assert.equal(replay.snapshot.items.find(i => i.id === item.id).committed, 2)
+  for (const [action, body] of [
+    ['reserve', { item_id: destination.id, quantity: 1, version: null }],
+    ['reserve', { item_id: item.id, quantity: 3, version: 1 }],
+    ['swap', { from_item_id: item.id, item_id: destination.id, version: 1, destination_version: null }],
+    ['rsvp', { response: 'yes', attending: 1, version: 1 }],
+  ]) await assert.rejects(guestAction(reopened.session_token, action, request(body)), /EVENT_CLOSED/)
+  const dashboard = await organizerAction(f.event, 'list')
+  assert.equal(dashboard.reservations.length, 1)
+  assert.equal(dashboard.invitations[0].response, 'pending')
+  assert.equal((await guestAction(f.token, 'read')).snapshot.items.find(i => i.id === destination.id).committed, 0)
+})
+
+test('M4: compra e cancelamento após encerrar preservam saldo e idempotência', async () => {
+  const f = await familyFixture(); const item = f.snapshot.items.find(i => i.diaper_size === 'P')
+  await guestAction(f.token, 'reserve', request({ item_id: item.id, quantity: 2, version: null }))
+  await transition(f.event, 'closed')
+  const buy = request({ item_id: item.id, version: 1 })
+  const purchased = await guestAction(f.token, 'purchase', buy)
+  assert.deepEqual((await guestAction(f.token, 'purchase', buy)).result, purchased.result)
+  const own = purchased.snapshot.items.find(i => i.id === item.id)
+  assert.equal(own.own.status, 'purchase_declared'); assert.equal(own.committed, 2)
+  const cancel = request({ item_id: item.id, version: 2 })
+  const cancelled = await guestAction(f.token, 'cancel', cancel)
+  assert.deepEqual((await guestAction(f.token, 'cancel', cancel)).result, cancelled.result)
+  assert.equal(cancelled.snapshot.items.find(i => i.id === item.id).committed, 0)
+  await assert.rejects(guestAction(f.token, 'purchase', request({ item_id: item.id, version: 3 })), /INVALID_RESERVATION_STATE/)
+  assert.equal(cancelled.snapshot.items.find(i => i.id === item.id).own.status, 'cancelled')
+  assert.equal((await organizerAction(f.event, 'list')).reservations.length, 0)
+})
+
+test('M4: validade pós-evento vem do início mais 7 dias e limita todas as ações', async () => {
+  const f = await familyFixture(); const item = f.snapshot.items.find(i => i.diaper_size === 'P')
+  const validity = (await admin.query("select expires_at = $2::timestamptz + interval '7 days' correct from private.invitations where id=$1", [f.invite.id, f.event.starts_at])).rows[0]
+  assert.equal(validity.correct, true)
+  await guestAction(f.token, 'reserve', request({ item_id: item.id, quantity: 2, version: null }))
+  await transition(f.event, 'closed')
+  await admin.query("update private.invitations set expires_at=clock_timestamp()+interval '1 minute' where id=$1", [f.invite.id])
+  const access = await guestAction(f.invite.token, 'exchange')
+  const expiry = (await admin.query('select expires_at from private.invitations where id=$1', [f.invite.id])).rows[0].expires_at
+  assert.equal(new Date(access.expires_at).getTime(), expiry.getTime())
+  const buy = request({ item_id: item.id, version: 1 })
+  await guestAction(access.session_token, 'purchase', buy)
+  await admin.query("update private.invitations set expires_at=clock_timestamp()-interval '1 second' where id=$1", [f.invite.id])
+  for (const [token, action, body] of [
+    [f.invite.token, 'exchange', {}], [access.session_token, 'read', {}],
+    [access.session_token, 'purchase', buy],
+    [access.session_token, 'cancel', request({ item_id: item.id, version: 2 })],
+  ]) await assert.rejects(guestAction(token, action, body), /GUEST_SESSION_INVALID/)
+  assert.equal((await organizerAction(f.event, 'list')).reservations[0].status, 'purchase_declared')
+})
+
 test('M4: cancelamento simultâneo com mesma chave libera o saldo uma única vez', async () => {
   const f = await familyFixture(); const item = f.snapshot.items.find(i => i.diaper_size === 'P')
   await guestAction(f.token, 'reserve', request({ item_id: item.id, quantity: 6, version: null }))
@@ -851,4 +971,72 @@ test('revisão 4: rascunho com data passada nunca é expurgado; evento vencido n
   const due = await endAt(f.event.id, "now()-interval '31 days'")
   await assert.rejects(save(due, alice, { date: new Date(Date.now() + 86400000).toISOString() }), /EVENT_RETENTION_DUE/)
   assert.equal((await admin.query('select * from public.retention_run() where event_id=$1', [f.event.id])).rowCount, 1)
+})
+
+const deleteEvent = (event, version = event.version, client) => client
+  ? client.query('select public.delete_event($1,$2) data', [event.id, version]).then(r => r.rows[0].data)
+  : as(alice, 'select public.delete_event($1,$2) data', [event.id, version]).then(r => r.rows[0].data)
+const eventRows = async eventId => ({
+  events: await count('select count(*) n from public.events where id=$1', [eventId]),
+  items: await count('select count(*) n from public.event_items where event_id=$1', [eventId]),
+  ...await guestData(eventId),
+})
+const deletion = async eventId => (await admin.query('select * from private.event_deletions where event_id=$1', [eventId])).rows[0]
+
+test('exclusão: reserva em curso termina antes e entra na contagem da exclusão', async () => {
+  const f = await populatedEvent()
+  const closed = await transition((await admin.query('select * from public.events where id=$1', [f.event.id])).rows[0], 'closed')
+  const m = f.snapshot.items.find(i => i.diaper_size === 'M')
+  const guest = server.getPgClient(); const owner = await connectAs(alice); await guest.connect()
+  try {
+    await guest.query('begin')
+    await guestAction(f.token, 'purchase', request({ item_id: f.p.id, version: 1 }), guest)
+    const pending = deleteEvent(closed, closed.version, owner)
+    await new Promise(resolve => setTimeout(resolve, 150))
+    await guest.query('commit')
+    const result = await pending
+    assert.deepEqual(result, { event_id: f.event.id, items_removed: 27, invitations_removed: 2, reservations_removed: 2, storage_cleanup: 'pending' })
+    assert.deepEqual(await eventRows(f.event.id), { events: 0, items: 0, invitations: 0, guest_requests: 0, reservations: 0, guest_sessions: 0 })
+    const audit = await deletion(f.event.id)
+    assert.deepEqual([audit.previous_status, audit.guest_requests_removed, audit.guest_sessions_removed, audit.storage_prefix],
+      ['closed', 4, 2, `${alice}/${f.event.id}`])
+    await assert.rejects(guestAction(f.token, 'read'), /GUEST_SESSION_INVALID/)
+    await assert.rejects(guestAction(f.token, 'reserve', request({ item_id: m.id, quantity: 1, version: null })), /GUEST_SESSION_INVALID/)
+  } finally { await guest.query('rollback'); await Promise.all([guest.end(), owner.end()]) }
+})
+
+test('exclusão: quando obtém o bloqueio primeiro, ação do convidado recebe sessão inválida', async () => {
+  const f = await populatedEvent()
+  const closed = await transition((await admin.query('select * from public.events where id=$1', [f.event.id])).rows[0], 'closed')
+  const owner = await connectAs(alice); const guest = server.getPgClient(); const late = server.getPgClient()
+  await Promise.all([guest.connect(), late.connect()])
+  try {
+    await owner.query('begin')
+    await deleteEvent(closed, closed.version, owner)
+    const attempts = Promise.allSettled([
+      guestAction(f.token, 'cancel', request({ item_id: f.p.id, version: 1 }), guest),
+      guestAction(f.invite.token, 'exchange', {}, late),
+    ])
+    await new Promise(resolve => setTimeout(resolve, 150))
+    await owner.query('commit')
+    for (const result of await attempts) {
+      assert.equal(result.status, 'rejected')
+      assert.match(result.reason.message, /GUEST_SESSION_INVALID/)
+    }
+    assert.deepEqual(await eventRows(f.event.id), { events: 0, items: 0, invitations: 0, guest_requests: 0, reservations: 0, guest_sessions: 0 })
+  } finally { await owner.query('rollback'); await Promise.all([owner.end(), guest.end(), late.end()]) }
+})
+
+test('exclusão: evento expurgado e encerrado pode ser excluído; publicado nunca', async () => {
+  const f = await populatedEvent()
+  let event = await transition((await admin.query('select * from public.events where id=$1', [f.event.id])).rows[0], 'closed')
+  event = await endAt(event.id, "now()-interval '31 days'")
+  assert.equal(await purge(event.id), 'purged')
+  event = (await admin.query('select * from public.events where id=$1', [event.id])).rows[0]
+  const result = await deleteEvent(event)
+  assert.deepEqual([result.invitations_removed, result.reservations_removed, result.items_removed], [0, 0, 27])
+  const other = await familyFixture()
+  await assert.rejects(deleteEvent(other.event), /EVENT_NOT_DELETABLE/)
+  await assert.rejects(as(bob, 'select public.delete_event($1,$2)', [other.event.id, other.event.version]), /EVENT_NOT_FOUND/)
+  assert.equal((await eventRows(other.event.id)).events, 1)
 })
