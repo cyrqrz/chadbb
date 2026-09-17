@@ -76,6 +76,15 @@ o ensaio familiar no celular continua pendente.
   - Testes: `tests/local/email-code.test.mjs` já cobre o back (código em outro
     cliente, código errado e reúso). Se o texto do botão mudar, ajustar
     `tests/local/email-login.test.mjs`. Limite local: 2 e-mails por hora.
+- [ ] **2026-09-17 · Usuário → Claude · Campos de data cortados no iPhone.**
+  No Safari do iOS, "Data e horário" e "Término" (`EventPage.tsx:108-109`,
+  `type="datetime-local"`) passam da margem direita da tela (captura do titular,
+  2026-09-17). Com a aparência nativa, o WebKit ignora `width: 100%`. Correção
+  sugerida em `styles.css`, junto de `.field input`:
+  `.field input:is([type="datetime-local"],[type="date"],[type="time"]) { -webkit-appearance: none; appearance: none; display: block; max-width: 100%; }`
+  e `.field input::-webkit-date-and-time-value { text-align: left; min-height: 1.5em; }`.
+  O `min-height` evita que o campo vazio encolha. Conferir em 320 px, com o
+  campo vazio e preenchido, e o seletor nativo continuando a abrir.
 - [x] **T-F1 · Visual e estados das telas (M1).** _(2026-09-16: componentes comuns
   em `src/components/States.tsx`; mergeado no PR #7.)_ Em `GuestPage`, `GiftListPage`,
   `InvitationsPage` e `EventPage`: estados de vazio, carregando, sucesso e erro com
