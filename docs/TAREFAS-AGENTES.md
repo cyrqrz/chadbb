@@ -30,7 +30,7 @@ o ensaio familiar no celular continua pendente.
   [patch](reviews/2026-09-17-claude-front.patch); reprodução e evidências em
   [revisão](reviews/2026-09-17-claude-front.md). Base: `2f321dc`.
 - [ ] **2026-09-17 · Codex → Claude · Tela de exclusão de evento.** O back está
-  pronto na `codex/back` e validado no Supabase local, mas **ainda não foi publicado** (gates G5–G6).
+  publicado no `chadbb-cha` em 2026-09-17 (migration e Edge `delete-event`).
   O front chama a Edge Function `delete-event` (POST), com o JWT do organizador,
   enviando `{ event_id, version }`. Pode usar `supabase.functions.invoke('delete-event', { body })`.
   Não chame a RPC `delete_event` direto: nesse caminho a capa só é removida no
@@ -43,11 +43,48 @@ o ensaio familiar no celular continua pendente.
   Oferecer a ação só para `draft` e `closed`. Pedir confirmação explícita com as
   contagens de convites e reservas que serão apagados, e dizer que não há como
   desfazer. `pending` não é erro: o evento já foi excluído. Depois do sucesso,
-  invalidar as consultas e sair da tela do evento. **Não fazer merge do botão antes
-  do deploy do back (G6):** sem ele, o botão aparece e falha. No preview a Edge
+  invalidar as consultas e sair da tela do evento. O deploy do back (G6) já foi feito,
+  então o botão pode entrar na `main` com a CI verde. No preview a Edge
   responde `ORIGIN_DENIED` de propósito, porque só `https://chadbb.pages.dev` é
   liberado. Use o backend simulado nos e2e. Contrato completo em
   `CONTRATOS-TRANSACIONAIS.md`, seção "Exclusão de evento".
+- [ ] **2026-09-17 · Codex → Claude · Entrar com código do e-mail (urgente).**
+  O titular não conseguiu entrar: pediu o link num navegador e o abriu em outro
+  (o Safari do iPhone). O PKCE só funciona no navegador do pedido. Nos logs do
+  Auth, o `/verify` deu 303 e nenhum `/token` foi chamado. O e-mail passa a
+  trazer um **código de 8 dígitos**, além do link (modelo
+  `supabase/templates/acesso.html`, já validado localmente).
+  - Em `/entrar`, depois do envio, mostrar o campo "Código de 8 dígitos"
+    (`inputmode="numeric"`, `autocomplete="one-time-code"`) e o botão
+    "Entrar". O e-mail já digitado fica preservado.
+  - Chamar `supabase.auth.verifyOtp({ email, token, type: 'email' })`. No
+    sucesso, ir para `/eventos`.
+  - Erros: código errado ou expirado (`otp_expired` ou 403) → "Código inválido
+    ou expirado. Peça um novo."; limite de tentativas (429) → pedir para esperar.
+    O código vale 1 h e só uma vez; um pedido novo invalida o anterior.
+  - Textos: o envio passa a dizer "Enviamos um código e um link para seu
+    e-mail". O link continua valendo no mesmo navegador.
+  - Bug em `/auth/callback`: quando a troca do código falha e ao mesmo tempo
+    chega outro evento de sessão (por exemplo, `SIGNED_OUT` de uma sessão
+    antiga), `AuthProvider` descarta o erro, e a tela mostra só "Solicite um
+    novo link". Mostrar a mensagem específica: abrir no mesmo navegador ou usar
+    o código.
+  - Pedido de link/código: desabilitar o botão durante o envio e, após o envio,
+    mostrar contagem regressiva de 60 s antes de permitir outro pedido (o Auth
+    recusa com 429 antes disso). Em 17/09 houve ~15 pedidos em 12 s.
+    Mensagem de 429 deve dizer quanto esperar, sem prometer liberação imediata.
+  - Testes: `tests/local/email-code.test.mjs` já cobre o back (código em outro
+    cliente, código errado e reúso). Se o texto do botão mudar, ajustar
+    `tests/local/email-login.test.mjs`. Limite local: 2 e-mails por hora.
+- [ ] **2026-09-17 · Usuário → Claude · Campos de data cortados no iPhone.**
+  No Safari do iOS, "Data e horário" e "Término" (`EventPage.tsx:108-109`,
+  `type="datetime-local"`) passam da margem direita da tela (captura do titular,
+  2026-09-17). Com a aparência nativa, o WebKit ignora `width: 100%`. Correção
+  sugerida em `styles.css`, junto de `.field input`:
+  `.field input:is([type="datetime-local"],[type="date"],[type="time"]) { -webkit-appearance: none; appearance: none; display: block; max-width: 100%; }`
+  e `.field input::-webkit-date-and-time-value { text-align: left; min-height: 1.5em; }`.
+  O `min-height` evita que o campo vazio encolha. Conferir em 320 px, com o
+  campo vazio e preenchido, e o seletor nativo continuando a abrir.
 - [x] **T-F1 · Visual e estados das telas (M1).** _(2026-09-16: componentes comuns
   em `src/components/States.tsx`; mergeado no PR #7.)_ Em `GuestPage`, `GiftListPage`,
   `InvitationsPage` e `EventPage`: estados de vazio, carregando, sucesso e erro com
@@ -80,19 +117,29 @@ o ensaio familiar no celular continua pendente.
 
 ## Codex — back e tarefas difíceis (`chadbb-codex`, `codex/back`)
 
-- [ ] **2026-09-17 · Exclusão de evento (`delete_event` + Edge `delete-event`).**
-  G1–G4 concluídos: plano, testes vermelhos, migration
-  `20260917000000_delete_event.sql`, suíte portátil 65/65. G4 (aprovado em
-  2026-09-17): `supabase migration up --local`, `npm run db:test` 99/99 e
-  `npm run test:api` 26/26, sem sobra de dados de teste. Pendentes, cada um com
-  a própria aprovação: G5, `db push` no `chadbb-cha`; G6, deploy de
-  `delete-event` e `retention`. No G6, conferir (sem exibir o valor) se
-  `GUEST_ALLOWED_ORIGINS` tem `https://chadbb.pages.dev`; sem isso a Edge
-  responde `ORIGIN_DENIED`. **Não liberar o preview**
-  (`claude-front.chadbb.pages.dev`): ele usa o banco de produção e viraria uma
-  segunda porta para os convites reais. Ordem da publicação: PR do back →
-  G5 → G6 → merge do front com o botão. Teste na produção com um evento de
-  rascunho criado só para isso.
+- [ ] **2026-09-17 · Login por código no e-mail.** G1 local concluído:
+  - modelo `supabase/templates/acesso.html` e `config.toml` com código de 8
+    dígitos, igual à produção;
+  - `tests/local/email-code.test.mjs` passou antes em vermelho e depois em verde;
+  - `test:email:local` continua passando.
+
+  G2 concluído em 2026-09-17: o titular aplicou o modelo no `chadbb-cha` com
+  `scripts/auth/email-templates.mjs --apply`. Uma nova prévia, só leitura,
+  confirmou 4 campos iguais ao repositório (sha256 `f7a2d46df7f0`, código de 8
+  dígitos, validade de 1 h). O e-mail real já traz o código e o link. Pendente:
+  G3, a tela do Claude (pedido acima); até lá, entrar pelo link no mesmo
+  navegador em que foi pedido.
+  Em 2026-09-17 o limite de e-mails do Auth subiu de 2 para 10 por hora no
+  projeto (`rate_limit_email_sent`), aplicado pelo titular e conferido por
+  leitura; o valor 2 bloqueou o login após dois pedidos. Mantido o
+  intervalo de 60 s por e-mail (`smtp_max_frequency`).
+- [x] **2026-09-17 · Exclusão de evento (`delete_event` + Edge `delete-event`).**
+  G1–G6 concluídos (detalhes em "Concluídas"). Falta só o teste pelo botão na
+  produção, depois do merge da PR #11, com um evento de rascunho criado só para
+  isso; em seguida o Codex confere, só com leitura, o registro em
+  `private.event_deletions`. **Não liberar o preview**
+  (`claude-front.chadbb.pages.dev`) em `GUEST_ALLOWED_ORIGINS`: ele usa o banco
+  de produção e viraria uma segunda porta para os convites reais.
   Códigos: `AUTH_REQUIRED`, `EVENT_NOT_FOUND`, `EVENT_VERSION_CONFLICT`,
   `EVENT_NOT_DELETABLE`.
 - [x] **T-B1 · SMTP pelo Resend no Auth do `chadbb-cha`.** Bloqueio principal:
@@ -176,11 +223,25 @@ mantém o cálculo antigo só como transição, isolado em `src/features/guests/
 
 | Agente | Tarefa | Branch | Situação |
 |---|---|---|---|
-| Claude | Convite (motivo certo ao não abrir) e “Excluir evento”: PR #11 em rascunho, merge só depois do G5/G6 do back. Depois: T-F7 · G4 (26–30/09) — ver `docs/design/RETOMADA-CLAUDE.md` | `claude/front` | aguardando G5/G6 |
-| Codex | Exclusão de evento: G5/G6 aguardando aprovação; T-B5 pausada (plano em PLANO-DESEMPENHO-T-B5.md, remoto não autorizado) | `codex/back` | PR aberta para a `main` |
+| Claude | PR #11 (convite e “Excluir evento”) mergeada em 17/09, depois do G5/G6. Próximos: pedidos urgentes de 17/09 (código no login, botão de envio, campos de data no iPhone); depois T-F7 · G4 (26–30/09) — ver `docs/design/RETOMADA-CLAUDE.md` | `claude/front` | pedidos de 17/09 |
+| Codex | Exclusão de evento publicada; aguarda o teste pelo botão (PR #11). T-B5 pausada (plano em PLANO-DESEMPENHO-T-B5.md, remoto não autorizado) | `codex/back` | livre para a próxima tarefa |
 
 ## Concluídas
 
+- 2026-09-17 · Codex · Exclusão de evento, PR #10 (merge `7293685`).
+  - G1–G3: testes antes da implementação e migration `20260917000000_delete_event.sql`.
+  - G4, local: `db:test` 99/99, `test:db:portable` 65/65, `test:api` 26/26 e
+    `npm run check`. O CI da PR ficou verde depois que o Chromium passou a ser
+    instalado antes da suíte da API.
+  - G5: `db push` no `chadbb-cha`, só com essa migration. O `migration list`
+    remoto ficou igual ao local (21/21). Tabela, funções e permissões conferidas
+    só com leitura.
+  - G6: `delete-event` v1 e `retention` v2 publicadas (`ACTIVE`,
+    `verify_jwt=false`). `GUEST_ALLOWED_ORIGINS` conferido pelo digest: contém só
+    `https://chadbb.pages.dev`.
+  - Smoke sem dados: GET 405; origem de terceiros e preview 403; sem login e com
+    login inválido 401; preflight 204 para o site; `retention` sem segredo 401;
+    `guest` sem mudança.
 - 2026-09-16 · Claude · T-F1 (estados das telas), G0 (baseline visual) e G1 (audit), PR #7.
 - 2026-09-16 · Claude · G2 e G2.1 (foundation e hierarquia de ações), PR #8.
 - 2026-09-16 · Claude · Pedido do Codex (na `codex/back`) sobre “Conheça o chadbb”:

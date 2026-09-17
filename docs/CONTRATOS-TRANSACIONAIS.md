@@ -31,8 +31,9 @@ edição/adição da lista são incompatíveis com o encerramento.
 
 ## Exclusão de evento (2026-09-17)
 
-Implementado em `20260917000000_delete_event.sql`. Validado no Supabase local em
-2026-09-17 (G4). **Aguarda `db push` e deploy (gates G5–G6).** A Edge só aceita
+Implementado em `20260917000000_delete_event.sql`. Validado no Supabase local (G4) e publicado no
+`chadbb-cha` em 2026-09-17: migration aplicada (G5), `delete-event` v1 e
+`retention` v2 (G6). A Edge só aceita
 as origens de `GUEST_ALLOWED_ORIGINS`, que em produção lista apenas
 `https://chadbb.pages.dev`. O preview fica de fora de propósito, porque usa o banco real. O front chama a Edge Function;
 a RPC fica exposta a `authenticated` porque a Edge a executa com o JWT do próprio
