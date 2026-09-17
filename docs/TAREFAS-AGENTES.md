@@ -30,7 +30,7 @@ o ensaio familiar no celular continua pendente.
   [patch](reviews/2026-09-17-claude-front.patch); reprodução e evidências em
   [revisão](reviews/2026-09-17-claude-front.md). Base: `2f321dc`.
 - [ ] **2026-09-17 · Codex → Claude · Tela de exclusão de evento.** O back está
-  pronto na `codex/back` e validado no Supabase local, mas **ainda não foi publicado** (gates G5–G6).
+  publicado no `chadbb-cha` em 2026-09-17 (migration e Edge `delete-event`).
   O front chama a Edge Function `delete-event` (POST), com o JWT do organizador,
   enviando `{ event_id, version }`. Pode usar `supabase.functions.invoke('delete-event', { body })`.
   Não chame a RPC `delete_event` direto: nesse caminho a capa só é removida no
@@ -43,8 +43,8 @@ o ensaio familiar no celular continua pendente.
   Oferecer a ação só para `draft` e `closed`. Pedir confirmação explícita com as
   contagens de convites e reservas que serão apagados, e dizer que não há como
   desfazer. `pending` não é erro: o evento já foi excluído. Depois do sucesso,
-  invalidar as consultas e sair da tela do evento. **Não fazer merge do botão antes
-  do deploy do back (G6):** sem ele, o botão aparece e falha. No preview a Edge
+  invalidar as consultas e sair da tela do evento. O deploy do back (G6) já foi feito,
+  então o botão pode entrar na `main` com a CI verde. No preview a Edge
   responde `ORIGIN_DENIED` de propósito, porque só `https://chadbb.pages.dev` é
   liberado. Use o backend simulado nos e2e. Contrato completo em
   `CONTRATOS-TRANSACIONAIS.md`, seção "Exclusão de evento".
@@ -80,19 +80,13 @@ o ensaio familiar no celular continua pendente.
 
 ## Codex — back e tarefas difíceis (`chadbb-codex`, `codex/back`)
 
-- [ ] **2026-09-17 · Exclusão de evento (`delete_event` + Edge `delete-event`).**
-  G1–G4 concluídos: plano, testes vermelhos, migration
-  `20260917000000_delete_event.sql`, suíte portátil 65/65. G4 (aprovado em
-  2026-09-17): `supabase migration up --local`, `npm run db:test` 99/99 e
-  `npm run test:api` 26/26, sem sobra de dados de teste. Pendentes, cada um com
-  a própria aprovação: G5, `db push` no `chadbb-cha`; G6, deploy de
-  `delete-event` e `retention`. No G6, conferir (sem exibir o valor) se
-  `GUEST_ALLOWED_ORIGINS` tem `https://chadbb.pages.dev`; sem isso a Edge
-  responde `ORIGIN_DENIED`. **Não liberar o preview**
-  (`claude-front.chadbb.pages.dev`): ele usa o banco de produção e viraria uma
-  segunda porta para os convites reais. Ordem da publicação: PR do back →
-  G5 → G6 → merge do front com o botão. Teste na produção com um evento de
-  rascunho criado só para isso.
+- [x] **2026-09-17 · Exclusão de evento (`delete_event` + Edge `delete-event`).**
+  G1–G6 concluídos (detalhes em "Concluídas"). Falta só o teste pelo botão na
+  produção, depois do merge da PR #11, com um evento de rascunho criado só para
+  isso; em seguida o Codex confere, só com leitura, o registro em
+  `private.event_deletions`. **Não liberar o preview**
+  (`claude-front.chadbb.pages.dev`) em `GUEST_ALLOWED_ORIGINS`: ele usa o banco
+  de produção e viraria uma segunda porta para os convites reais.
   Códigos: `AUTH_REQUIRED`, `EVENT_NOT_FOUND`, `EVENT_VERSION_CONFLICT`,
   `EVENT_NOT_DELETABLE`.
 - [x] **T-B1 · SMTP pelo Resend no Auth do `chadbb-cha`.** Bloqueio principal:
@@ -177,10 +171,24 @@ mantém o cálculo antigo só como transição, isolado em `src/features/guests/
 | Agente | Tarefa | Branch | Situação |
 |---|---|---|---|
 | Claude | T-F7 · G3 pronto (sem aprovação); G3.1 (cards) em andamento — ver `docs/design/RETOMADA-CLAUDE.md` | `claude/front` | WIP salvo para outra máquina (2026-09-16) |
-| Codex | Exclusão de evento: G5/G6 aguardando aprovação; T-B5 pausada (plano em PLANO-DESEMPENHO-T-B5.md, remoto não autorizado) | `codex/back` | PR aberta para a `main` |
+| Codex | Exclusão de evento publicada; aguarda o teste pelo botão (PR #11). T-B5 pausada (plano em PLANO-DESEMPENHO-T-B5.md, remoto não autorizado) | `codex/back` | livre para a próxima tarefa |
 
 ## Concluídas
 
+- 2026-09-17 · Codex · Exclusão de evento, PR #10 (merge `7293685`).
+  - G1–G3: testes antes da implementação e migration `20260917000000_delete_event.sql`.
+  - G4, local: `db:test` 99/99, `test:db:portable` 65/65, `test:api` 26/26 e
+    `npm run check`. O CI da PR ficou verde depois que o Chromium passou a ser
+    instalado antes da suíte da API.
+  - G5: `db push` no `chadbb-cha`, só com essa migration. O `migration list`
+    remoto ficou igual ao local (21/21). Tabela, funções e permissões conferidas
+    só com leitura.
+  - G6: `delete-event` v1 e `retention` v2 publicadas (`ACTIVE`,
+    `verify_jwt=false`). `GUEST_ALLOWED_ORIGINS` conferido pelo digest: contém só
+    `https://chadbb.pages.dev`.
+  - Smoke sem dados: GET 405; origem de terceiros e preview 403; sem login e com
+    login inválido 401; preflight 204 para o site; `retention` sem segredo 401;
+    `guest` sem mudança.
 - 2026-09-16 · Claude · T-F1 (estados das telas), G0 (baseline visual) e G1 (audit), PR #7.
 - 2026-09-16 · Claude · G2 e G2.1 (foundation e hierarquia de ações), PR #8.
 - 2026-09-16 · Claude · Pedido do Codex (na `codex/back`) sobre “Conheça o chadbb”:
