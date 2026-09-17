@@ -9,7 +9,7 @@ import { failedLast, live } from '../../lib/query'
 import { useLastError } from '../../lib/useLastError'
 import { ErrorState, LoadingState, RefreshStatus } from '../../components/States'
 import { useAuth } from '../auth/context'
-import { Pagination } from '../../components/ui'
+import { Pagination, StatusBadge } from '../../components/ui'
 
 export function EventsPage() {
   const { session } = useAuth()
@@ -31,7 +31,14 @@ export function EventsPage() {
     {query.isPending && !(failedLast(query) && loadError) ? <LoadingState>Carregando eventos…</LoadingState> : !query.data ? <div className="mt-10"><ErrorState title="Não foi possível carregar seus eventos." message={errorMessage(loadError)} busy={query.isFetching} onRetry={() => void query.refetch()} /></div> : <>
       {query.isError && <RefreshStatus fetching={query.isFetching} failed onRetry={() => void query.refetch()} />}
       {query.data.events.length === 0 ? <div className="card mt-10"><h2 className="text-xl font-semibold">Seu primeiro encontro começa aqui.</h2><p className="mt-3 text-stone-600">Crie um evento para preparar os detalhes do chá de bebê.</p></div> :
-        <div className="stagger mt-10 grid gap-5 md:grid-cols-2">{query.data.events.map(event => <Link className="card card-link block" to={`/eventos/${event.id}`} key={event.id}><span className="badge">{statusLabels[event.status]}</span><h2 className="mt-4 break-words text-2xl font-semibold">{event.title || 'Evento sem título'}</h2><p className="mt-3 text-stone-600">{event.starts_at ? new Date(event.starts_at).toLocaleString('pt-BR', { dateStyle: 'long', timeStyle: 'short', timeZone: 'America/Sao_Paulo' }) : 'Data a definir'}</p><span className="text-link mt-6 inline-block">Ver detalhes →</span></Link>)}</div>}
+        <div className="stagger mt-10 grid gap-5 md:grid-cols-2">{query.data.events.map(event => <Link className="card card-link card-stack" to={`/eventos/${event.id}`} key={event.id}>
+          <header className="card-header">
+            <div className="card-badges"><StatusBadge tone={event.status === 'published' ? 'success' : 'neutral'}>{statusLabels[event.status]}</StatusBadge></div>
+            <h2 className="card-title text-h2">{event.title || 'Evento sem título'}</h2>
+            <p className="card-description">{event.starts_at ? new Date(event.starts_at).toLocaleString('pt-BR', { dateStyle: 'long', timeStyle: 'short', timeZone: 'America/Sao_Paulo' }) : 'Data a definir'}</p>
+          </header>
+          <span className="text-link mt-auto self-start">Ver detalhes →</span>
+        </Link>)}</div>}
       <Pagination page={page} count={query.data.count} pageSize={12} onChange={setPage} label="Paginação dos eventos" />
     </>}
   </section>

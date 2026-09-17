@@ -8,7 +8,7 @@ import { errorMessage } from '../../lib/errors'
 import { failedLast, live } from '../../lib/query'
 import { useLastError } from '../../lib/useLastError'
 import { EmptyState, ErrorState, LoadingState, RefreshStatus, SuccessMessage } from '../../components/States'
-import { BackLink, Button, Pagination } from '../../components/ui'
+import { BackLink, Button, Pagination, QuantityField, StatusBadge } from '../../components/ui'
 import { addItem, giftKeys, listedProducts, listItems, listProducts, PAGE_SIZE, prepareList, setQuantity } from './api'
 import { parseQuantity, platformLabels, categoryLabels } from './model'
 import type { Category, DiaperSize, EventItem, Product } from './model'
@@ -79,11 +79,12 @@ function ItemCard({ item, closed }: { item: EventItem; closed: boolean }) {
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState('')
   const cache = useQueryClient()
+  const unchanged = quantity === String(baseline.quantity_requested ?? '')
   async function save(e: FormEvent) {
     e.preventDefault()
     const value = parseQuantity(quantity)
     if (value === null) { setError('Informe uma quantidade inteira entre 1 e 10.000.'); return }
-    if (busy || closed) return
+    if (busy || closed || unchanged) return
     setBusy(true); setError(null); setMessage('')
     try {
       const saved = await setQuantity(baseline, value)
@@ -101,21 +102,27 @@ function ItemCard({ item, closed }: { item: EventItem; closed: boolean }) {
   // Maior, e não diferente: uma resposta antiga da consulta periódica que chegue
   // depois de salvar não deve ser anunciada como alteração de outra sessão.
   const outdated = item.version > baseline.version
-  return <article className="card">
-    <span className="badge">{item.category === 'fralda' ? `Tamanho ${item.diaper_size}` : 'Mimo'}</span>
-    <h3 className="mt-3 break-words text-xl font-bold">{item.product.title}</h3>
-    {!item.product.active && <p className="mt-2 text-sm text-stone-600">Este produto saiu do catálogo. Ele continua na sua lista.</p>}
-    {item.category === 'mimo' ? <p className="notice mt-5">Sem limite de quantidade. Cada convidado informa quantos vai levar.</p> : <form onSubmit={save} className="mt-5 space-y-4">
-      <label className="field">Quantidade de {item.product.title}<input type="number" min={1} max={10000} step={1} inputMode="numeric" required disabled={busy || closed} value={quantity} onChange={e => { setValue(e.target.value); setMessage('') }} /></label>
-      {!closed && <button className="secondary" disabled={busy || quantity === String(baseline.quantity_requested ?? '')}>{busy ? 'Salvando…' : 'Atualizar quantidade'}</button>}
+  return <article className="card card-stack">
+    <header className="card-header">
+      <div className="card-badges">
+        <StatusBadge tone="neutral">{item.category === 'fralda' ? `Tamanho ${item.diaper_size}` : 'Mimo'}</StatusBadge>
+        {!item.product.active && <StatusBadge tone="warning">Fora do catálogo</StatusBadge>}
+      </div>
+      <h3 className="card-title">{item.product.title}</h3>
+      {!item.product.active && <p className="card-description">Este produto saiu do catálogo. Ele continua na sua lista.</p>}
+    </header>
+    {item.category === 'mimo' ? <p className="availability-text">Sem limite de quantidade. Cada convidado informa quantos vai levar.</p> : <form onSubmit={save} className="flex flex-col gap-3">
+      <QuantityField context={item.product.title} unit="pacotes" value={quantity} max={10000} disabled={busy || closed} onChange={text => { setValue(text); setMessage('') }} />
+      {/* busy (aria-disabled) em vez de disabled: o foco fica no botão durante e depois do envio. */}
+      {!closed && <Button type="submit" variant="secondary" className="self-start" busy={busy || unchanged}>{busy ? 'Salvando…' : 'Atualizar quantidade'}</Button>}
     </form>}
-    {outdated && <p role="status" className="mt-4 text-sm">Existe uma versão mais recente desta quantidade.</p>}
-    {error && <div className="mt-4"><ErrorState message={error} /></div>}
-    {(error || outdated) && <Button variant="ghost" size="sm" className="mt-3" disabled={busy} onClick={() => {
-      if (quantity !== String(baseline.quantity_requested ?? '') && !window.confirm('Descartar a quantidade digitada e carregar a versão salva?')) return
+    {outdated && <p role="status" className="text-sm">Existe uma versão mais recente desta quantidade.</p>}
+    {error && <ErrorState message={error} />}
+    {(error || outdated) && <Button variant="ghost" size="sm" className="self-start" disabled={busy} onClick={() => {
+      if (!unchanged && !window.confirm('Descartar a quantidade digitada e carregar a versão salva?')) return
       setBaseline(item); setValue(String(item.quantity_requested ?? '')); setError(null); setMessage('Quantidade recarregada.')
     }}>Recarregar quantidade</Button>}
-    {message && <div className="mt-4"><SuccessMessage>{message}</SuccessMessage></div>}
+    {message && <SuccessMessage>{message}</SuccessMessage>}
   </article>
 }
 function Catalog({ eventId, category, listed, listedFailed, listedFetching, retryListed }: {
@@ -164,18 +171,23 @@ function ProductCard({ product, eventId, listed }: { product: Product; eventId: 
       await cache.invalidateQueries({ queryKey: eventKeys.detail(eventId) })
     } finally { setBusy(false) }
   }
-  return <article className={`card flex flex-col ${listed ? 'product-listed' : ''}`}>
-    <div className="flex flex-wrap items-center gap-2">
-      {diaper && <span className="badge">Tamanho {product.diaper_size}</span>}
-      {product.platform !== 'manual' && <span className="badge">{platformLabels[product.platform]}</span>}
-      {listed && <span className="badge badge-success"><span aria-hidden="true">✓</span> Já na lista</span>}
+  return <article className={`card card-stack ${listed ? 'product-listed' : ''}`}>
+    <header className="card-header">
+      <div className="card-badges">
+        {diaper && <StatusBadge tone="neutral">Tamanho {product.diaper_size}</StatusBadge>}
+        {product.platform !== 'manual' && <StatusBadge tone="neutral">{platformLabels[product.platform]}</StatusBadge>}
+        {listed && <StatusBadge tone="success">Já na lista</StatusBadge>}
+      </div>
+      <h3 className="card-title">{product.title}</h3>
+      {!diaper && product.description && <p className="card-description whitespace-pre-line break-words">{product.description}</p>}
+    </header>
+    <div className="mt-auto">
+      {listed ? <p className="hint">{diaper ? 'Este tamanho já está na lista. Ajuste os pacotes no cartão acima.' : 'Os convidados já podem escolher este mimo.'}</p> :
+        <form onSubmit={add} className="flex flex-col gap-3">
+          {diaper ? <QuantityField label="Pacotes" context={product.title} unit="pacotes" value={quantity} max={10000} disabled={busy} onChange={text => { setValue(text); setMessage('') }} /> : <p className="hint">Sem limite de quantidade.</p>}
+          <Button type="submit" variant="secondary" className="self-start" busy={busy} aria-label={`Adicionar ${product.title} à lista`}>{busy ? 'Adicionando…' : 'Adicionar'}</Button>
+        </form>}
     </div>
-    <h3 className="mt-3 break-words text-lg font-bold">{product.title}</h3>
-    {!diaper && product.description && <p className="mt-2 whitespace-pre-line break-words text-sm text-stone-600">{product.description}</p>}
-    <div className="mt-auto pt-4">
-      {listed ? <p className="text-sm text-stone-600">{diaper ? 'Este tamanho já está na lista. Ajuste os pacotes no cartão acima.' : 'Os convidados já podem escolher este mimo.'}</p> :
-        <form onSubmit={add} className="flex flex-wrap items-end gap-3">{diaper ? <label className="field w-28">Pacotes<input type="number" min={1} max={10000} step={1} inputMode="numeric" required disabled={busy} value={quantity} aria-label={`Pacotes de ${product.title}`} onChange={e => { setValue(e.target.value); setMessage('') }} /></label> : <p className="w-full text-sm text-stone-600">Sem limite de quantidade.</p>}<button className="button" disabled={busy} aria-label={`Adicionar ${product.title} à lista`}>{busy ? 'Adicionando…' : 'Adicionar'}</button></form>}
-    </div>
-    {message && <div className="mt-4"><SuccessMessage>{message}</SuccessMessage></div>}{error && <div className="mt-4"><ErrorState message={error} /></div>}
+    {message && <SuccessMessage>{message}</SuccessMessage>}{error && <ErrorState message={error} />}
   </article>
 }

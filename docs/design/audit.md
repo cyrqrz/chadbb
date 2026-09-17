@@ -98,9 +98,11 @@ Problemas:
 | A12 | baixa | Se uma página da lista falha, a paginação some e só resta “Tentar novamente” | QA de UX (G2) | UX | G4 |
 | A13 | baixa | Na lista de presentes, falha só na consulta do evento não é avisada (o estado “encerrado” pode ficar desatualizado) | QA de UX (G2) | UX | G4 |
 | A14 | baixa | Durante a tentativa, o leitor de tela ouve só “Tentar novamente, indisponível”, sem dizer que está tentando | QA de UX (G2) | WCAG 4.1.3 | G5 |
-| A15 | baixa | “Tamanho completo” comunica um estado por meio de um botão indisponível (texto a ~3,1:1) | QA de UX (G2.1) | UX | G3 (selo “Completo” no lugar do botão) |
+| A15 | baixa | “Tamanho completo” comunicava um estado por meio de um botão indisponível (texto a ~3,1:1) | QA de UX (G2.1) | UX | **corrigido no G3** (selo “Completo”) |
 | A16 | baixa | Várias ações primárias por tela (uma por card de presente, por produto, e “Salvar convite” junto de “Criar convite”) | QA de UX (G2.1) | hierarquia | G3/G4 |
 | A17 | baixa | Confirmação de encerramento na própria tela, sem diálogo | QA de UX (G2.1) | UX | G4 (`ConfirmDialog`) |
+| A18 | baixa | No convite, se outro convidado esgota o tamanho enquanto a pessoa digita a quantidade, o formulário some sem explicação | QA de UX (G3) | UX, regra 7 do AGENTS.md | G5 (contrato de atualização) |
+| A19 | baixa | Quantidade acima do máximo só mostra a mensagem nativa do navegador; falta dica visível do limite | QA de UX (G3) | UX | G5 |
 
 Sem problema, medido:
 
