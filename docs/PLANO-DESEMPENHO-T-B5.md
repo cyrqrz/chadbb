@@ -142,3 +142,34 @@ causa, sem repetir até obter aprovação nem aumentar limites para passar.
    ensaio remoto **uma vez**.
 3. Se continuar reprovando: avaliar compute maior (plano pago) ou conexão direta
    da Edge ao Postgres pelo pooler, com decisão do titular.
+
+## G3.1 — Uma ida para as cotas (local, 2026-09-17)
+
+- A migration `20260917010000_guest_rates_batch.sql` cria
+  `public.check_guest_rates(text[])`, só para `service_role`. Ela confere as
+  cotas na mesma ordem (ip → credencial → global) e com a mesma regra de
+  `check_guest_rate`: para na primeira recusa, a contagem persiste e as cotas
+  seguintes não são consumidas.
+- A Edge `guest` passa de **4 para 2 idas** ao PostgREST por POST (cotas e ação).
+  A ação **continua em transação separada**. Juntá-la às cotas manteria a linha
+  global bloqueada durante toda a ação, criando uma fila entre os convidados, e
+  desfaria a contagem quando a ação falhasse.
+- A Edge registra no log só os tempos (`rate_ms`, `action_ms`), a ação e o
+  status, sem token, IP ou dados do convite, para diagnosticar a próxima
+  medição.
+- Testes: pgTAP `guest_rates.test.sql` falhou antes da migration (vermelho) e,
+  com ela, a suíte inteira passou (**115/115**); portátil 65/65; `test:api`
+  26/26. Na primeira rodada completa, os 2 testes de isolamento do T-B5
+  falharam; passaram isolados e na rodada completa seguinte, com a porta 5173
+  livre. A causa provável é a porta ocupada, **não confirmada**.
+- Ensaio local: leituras p95 **412 ms**, escritas p95 **375 ms**, zero erros;
+  sincronização **4996 / 4985 / 4991 ms**; limpeza zerada. É só indicativo,
+  pela variação do ambiente local.
+
+### G3.2 — Publicação e nova medição (aguardando aprovação)
+
+1. `db push` só com `20260917010000_guest_rates_batch.sql`, depois do dry-run.
+   A Edge atual continua funcionando: `check_guest_rate` não muda.
+2. Deploy só da Edge `guest`.
+3. Repetir o ensaio remoto **uma vez** e cruzar com os tempos registrados no log
+   da Edge.
