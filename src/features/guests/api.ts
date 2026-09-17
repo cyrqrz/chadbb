@@ -3,15 +3,38 @@ import { getClient } from '../events/api'
 import type { Category, DiaperSize } from '../gifts/model'
 export type ResponseChoice = 'pending' | 'yes' | 'no' | 'maybe'
 export type Reservation = { id: string; quantity: number; version: number; status: 'reserved' | 'purchase_declared' | 'cancelled' }
-export type GuestItem = { id: string; title: string; description: string; category: Category; diaper_size: DiaperSize | null; limit: number | null; committed: number; own: Reservation | null }
+// `available` virá do servidor (pedido T-F2 em docs/TAREFAS-AGENTES.md); até lá é opcional.
+export type GuestItem = { id: string; title: string; description: string; category: Category; diaper_size: DiaperSize | null; limit: number | null; committed: number; available?: number | null; own: Reservation | null }
 export type Snapshot = {
   invitation: { name: string; kind: 'individual' | 'family'; capacity: number; response: ResponseChoice; attending: number; version: number }
   event: { id: string; title: string; description: string; starts_at: string; address: string; instructions: string; cover_path: string | null; status: string }
   items: GuestItem[]
 }
 export type Invitation = Snapshot['invitation'] & { id: string; revoked: boolean; expires_at: string }
-export type Dashboard = { invitations: Invitation[]; items: GuestItem[]; reservations: { name: string; title: string; category: Category; diaper_size: DiaperSize | null; quantity: number; status: string }[] }
+export type PanelSummary = {
+  invitations: { total: number; answered: number; yes: number; no: number; maybe: number; pending: number; revoked: number }
+  people_confirmed: number
+}
+export type DashboardReservation = { id?: string; name: string; title: string; category: Category; diaper_size: DiaperSize | null; quantity: number; status: string }
+export type Dashboard = { invitations: Invitation[]; items: Omit<GuestItem, 'description' | 'own'>[]; reservations: DashboardReservation[]; summary?: PanelSummary }
 export const responseLabels: Record<ResponseChoice, string> = { pending: 'Sem resposta', yes: 'Vai participar', no: 'Não poderá ir', maybe: 'Talvez' }
+
+// Transição: enquanto o servidor não envia `summary` e `available`, os valores são
+// derivados aqui, no único lugar do front que faz essa conta. Remover quando o
+// pedido do painel no quadro dos agentes for entregue.
+export function panelSummary(data: Pick<Dashboard, 'invitations' | 'summary'>): PanelSummary {
+  if (data.summary) return data.summary
+  const count = (response: ResponseChoice) => data.invitations.filter(inv => inv.response === response).length
+  return {
+    invitations: { total: data.invitations.length, answered: data.invitations.length - count('pending'),
+      yes: count('yes'), no: count('no'), maybe: count('maybe'), pending: count('pending'), revoked: data.invitations.filter(inv => inv.revoked).length },
+    people_confirmed: data.invitations.reduce((total, inv) => total + inv.attending, 0),
+  }
+}
+export function availableOf(item: Pick<GuestItem, 'limit' | 'committed' | 'available'>): number | null {
+  if (item.available !== undefined) return item.available
+  return item.limit === null ? null : Math.max(0, item.limit - item.committed)
+}
 export async function invitations(eventId: string, action = 'list', payload: Record<string, unknown> = {}) {
   const { data, error } = await getClient().rpc('organizer_invitations', { p_event_id: eventId, p_action: action, p_payload: payload })
   if (error) throw error

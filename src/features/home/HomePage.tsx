@@ -1,34 +1,41 @@
+import { Link } from 'react-router-dom'
 import { readPublicConfig } from '../../lib/config'
+import { useAuth } from '../auth/context'
 
 const backend = readPublicConfig(import.meta.env)
 
+// Sequência real do uso: os números indicam a ordem.
 const steps = [
-  ['01', 'Prepare o encontro', 'Os detalhes do chá de bebê reunidos em um lugar.'],
-  ['02', 'Convide com carinho', 'Um convite individual para cada pessoa especial.'],
-  ['03', 'Organize os presentes', 'Uma lista compartilhada para ajudar nas escolhas.'],
+  ['01', 'Prepare o encontro', 'Data, local e instruções do chá de bebê em um lugar só.'],
+  ['02', 'Convide com carinho', 'Um link individual para cada pessoa ou família, enviado pelo WhatsApp.'],
+  ['03', 'Acompanhe os presentes', 'Fraldas por tamanho e mimos, com o que já foi escolhido e o que falta.'],
 ]
 
 export function HomePage() {
+  const { session } = useAuth()
   return <>
-    <section className="grid gap-12 py-16 md:grid-cols-[1.2fr_1fr] md:py-24">
-      <div>
-        <p className="mb-5 text-sm font-semibold uppercase tracking-widest text-orange-800">Um novo capítulo vem aí</p>
-        <h1>Mais carinho.<br />Menos complicação.</h1>
-        <p className="mt-6 max-w-lg text-lg leading-relaxed text-stone-600">Um lugar para reunir quem você ama e preparar a chegada de alguém muito especial.</p>
-        <a href="#como-funciona" className="button mt-8">Conheça o chadbb <span aria-hidden="true">↗</span></a>
+    <section className="page grid gap-12 py-16 md:grid-cols-[1.2fr_1fr] md:py-24">
+      <div className="flex flex-col items-start gap-6">
+        <p className="eyebrow">Chá de bebê</p>
+        <h1 className="invite-title">Mais carinho.<br />Menos complicação.</h1>
+        <p className="max-w-lg text-lg text-muted">Um lugar para reunir quem você ama e preparar a chegada de alguém muito especial.</p>
+        {session
+          ? <Link to="/eventos" className="button">Ir para seus eventos</Link>
+          : <Link to="/entrar" className="button">Começar a organizar</Link>}
       </div>
-      <aside className="flex flex-col justify-center rounded-[2rem] border border-orange-200 bg-orange-100/60 p-8 md:p-10">
-        <span aria-hidden="true" className="mb-8 text-5xl text-orange-800">✳</span>
-        <h2 className="text-2xl font-semibold">Cada chegada merece<br />um encontro especial.</h2>
-        <p className="mt-4 leading-relaxed text-stone-700">Prepare os detalhes do chá de bebê: escolha um nome, uma data e o lugar onde vocês vão celebrar.</p>
-        <p role="status" className="mt-8 border-t border-orange-200 pt-5 text-sm text-stone-700">{backend.status === 'ready' ? 'Crie seu evento e monte a lista de presentes pelo menu acima. Convites estão em preparação.' : backend.message}</p>
+      <aside className="flex flex-col justify-center gap-4 rounded-panel border border-line bg-brand-soft p-8 md:p-10">
+        <h2 className="font-display text-h2 font-medium">Cada chegada merece um encontro especial.</h2>
+        <p className="text-stone-700">Convidados confirmam presença e escolhem fraldas ou mimos pelo celular, sem criar conta.</p>
+        <p className="border-t border-line pt-4 text-body-sm text-stone-700">{backend.status === 'ready'
+          ? 'Para organizar, entre com seu e-mail: enviamos um link de acesso.'
+          : backend.message}</p>
       </aside>
     </section>
-    <section id="como-funciona" className="pb-20">
-      <h2 className="mb-8 text-2xl font-semibold">Do convite ao abraço.</h2>
-      <div className="grid gap-8 md:grid-cols-3">{steps.map(([number, title, description]) =>
-        <article key={number} className="border-t border-stone-300 pt-5"><span className="text-sm text-orange-800">{number}</span><h3 className="mt-4 text-lg font-semibold">{title}</h3><p className="mt-2 leading-relaxed text-stone-600">{description}</p></article>,
-      )}</div>
+    <section aria-labelledby="como-funciona" className="pb-20">
+      <h2 id="como-funciona" className="mb-8 text-h2 font-bold">Do convite ao abraço</h2>
+      <ol className="stagger grid gap-8 md:grid-cols-3">{steps.map(([number, title, description]) =>
+        <li key={number} className="border-t border-line pt-5"><span className="text-label font-bold text-brand" aria-hidden="true">{number}</span><h3 className="mt-3 text-h3 font-bold">{title}</h3><p className="mt-2 text-muted">{description}</p></li>,
+      )}</ol>
     </section>
   </>
 }
