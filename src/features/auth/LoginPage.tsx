@@ -122,7 +122,7 @@ export function LoginPage() {
           {error?.at === 'code' && <div id="login-code-error"><ErrorState message={error.text} /></div>}
         </form>}
       </>}
-      <p className="login-guest">É convidado? Não precisa entrar: use o link que a organização enviou pelo WhatsApp.</p>
+      <p className="login-guest"><strong>É convidado?</strong> Não precisa entrar: use o link que a organização enviou pelo WhatsApp.</p>
     </div>
     <aside className="login-aside" aria-labelledby="login-features">
       <h2 id="login-features" className="sr-only">O que o chadbb organiza</h2>
