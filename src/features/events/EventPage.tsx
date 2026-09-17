@@ -9,7 +9,7 @@ import { errorMessage } from '../../lib/errors'
 import { failedLast, live } from '../../lib/query'
 import { useLastError } from '../../lib/useLastError'
 import { useAuth } from '../auth/context'
-import { ErrorState, LoadingState, RefreshStatus, SuccessMessage } from '../../components/States'
+import { ErrorState, LoadingState, RefreshStatus, SlowRefresh, SuccessMessage } from '../../components/States'
 import { Button } from '../../components/ui'
 import { EventNotFound } from './EventLayout'
 
@@ -86,7 +86,7 @@ function EventEditor({ server, refreshing, refreshFailed, retry }: { server: Eve
     catch (cause) { setError(errorMessage(cause)) } finally { setBusy(false) }
   }
   return <div className="tab-panel max-w-3xl">
-    <div className="flex flex-wrap items-center gap-4"><h2 className="tab-title">Dados do evento</h2><span className="refresh-status mt-0" aria-hidden={!refreshing}>{refreshing ? 'Atualizando…' : ''}</span></div>
+    <div className="flex flex-wrap items-center gap-4"><h2 className="tab-title">Dados do evento</h2><SlowRefresh fetching={refreshing} className="mt-0" /></div>
     {refreshFailed && <RefreshStatus fetching={refreshing} failed onRetry={retry} />}
     {outdated && <div role="status" className="notice mt-6"><p>Este evento mudou em outra sessão. O que você digitou continua aqui.</p><Button variant="secondary" size="sm" className="mt-3" disabled={busy} onClick={() => void reload()}>Recarregar dados</Button></div>}
     {purged ? <p className="notice mt-6">Os dados pessoais deste evento foram excluídos conforme a política de retenção. Restam apenas título e datas.</p> :

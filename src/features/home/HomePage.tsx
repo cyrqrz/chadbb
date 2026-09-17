@@ -27,7 +27,7 @@ export function HomePage() {
         <h2 className="font-display text-h2 font-medium">Cada chegada merece um encontro especial.</h2>
         <p className="text-stone-700">Convidados confirmam presença e escolhem fraldas ou mimos pelo celular, sem criar conta.</p>
         <p className="border-t border-line pt-4 text-body-sm text-stone-700">{backend.status === 'ready'
-          ? 'Para organizar, entre com seu e-mail: enviamos um link de acesso.'
+          ? 'Para organizar, entre com seu e-mail: enviamos um código de acesso.'
           : backend.message}</p>
       </aside>
     </section>

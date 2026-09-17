@@ -10,8 +10,9 @@ com segredo `RETENTION_CRON_SECRET`. O cron chama `private.invoke_retention()`.
 `delete-event` exclui um evento `draft` ou `closed` do organizador autenticado.
 Chama a RPC `delete_event` com o JWT recebido e remove a pasta do evento nos
 buckets pela API de Storage. Pendências de limpeza são repetidas pela `retention`.
-O código comum de Storage fica em `_shared/storage.ts`. Ainda não foi publicada.
+O código comum de Storage fica em `_shared/storage.ts`.
 
-`guest` e `retention` estão publicadas no projeto exclusivo `chadbb-cha`. Consulte
+As três funções estão publicadas no projeto exclusivo `chadbb-cha`
+(`delete-event` desde 2026-09-17), só com a origem `https://chadbb.pages.dev`. Consulte
 [execução e smoke remoto](../../docs/EXECUCAO-MVP-FAMILIAR.md) e
 [preparação operacional](../../docs/OPERACAO-M6.md).

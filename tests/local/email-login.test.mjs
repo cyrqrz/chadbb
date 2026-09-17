@@ -39,8 +39,8 @@ test('login por e-mail local: PKCE real, sessão persistente e logout', { timeou
     phase = 'solicitação do e-mail pela interface'
     await page.goto('http://127.0.0.1:5173/entrar')
     await page.getByLabel('Seu e-mail').fill(email)
-    await page.getByRole('button', { name: 'Receber link de acesso' }).click()
-    await expect(page.getByRole('status')).toContainText('Confira sua caixa')
+    await page.getByRole('button', { name: 'Receber código de acesso' }).click()
+    await expect(page.getByRole('status')).toContainText('Confira a caixa de entrada')
     phase = 'entrega no Mailpit local'
     let message
     await expect.poll(async () => {

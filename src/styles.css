@@ -186,6 +186,9 @@
   /* Formulários */
   .field { display: flex; flex-direction: column; gap: 0.45rem; font-weight: 650; }
   .field input, .field textarea, .field select { width: 100%; min-width: 0; min-height: var(--control-height); border: 1.5px solid var(--color-line-strong); border-radius: var(--radius-field); background: var(--color-surface); padding: 0.7rem 0.9rem; font-weight: 400; color: var(--color-ink); transition: border-color var(--duration-fast), box-shadow var(--duration-fast); }
+  /* iPhone: com a aparência nativa, o Safari ignora width: 100% e o campo de data passa da margem. */
+  .field input:is([type="datetime-local"], [type="date"], [type="time"]) { -webkit-appearance: none; appearance: none; display: block; max-width: 100%; }
+  .field input::-webkit-date-and-time-value { min-height: 1.5em; text-align: left; }
   .field input:hover:not(:disabled), .field textarea:hover:not(:disabled), .field select:hover:not(:disabled) { border-color: var(--color-ink); }
   .field input:focus, .field textarea:focus, .field select:focus { border-color: var(--color-brand); box-shadow: var(--ring); outline: none; }
   .field input[aria-invalid="true"], .field textarea[aria-invalid="true"], .field select[aria-invalid="true"] { border-color: var(--color-danger); }
