@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, Navigate, Outlet } from 'react-router-dom'
 import { backend, supabase } from '../../lib/supabase'
 import { errorMessage } from '../../lib/errors'
-import { useAuth } from './context'
+import { LINK_FAILED, useAuth } from './context'
 import { ErrorState, LoadingState, SuccessMessage } from '../../components/States'
+import { Button } from '../../components/ui'
 
 export function RequireAuth() {
   const { session, loading } = useAuth()
@@ -15,37 +16,112 @@ export function AuthCallback() {
   const { session, loading, error } = useAuth()
   if (loading) return <section className="page"><LoadingState>Concluindo seu acesso…</LoadingState></section>
   if (session) return <Navigate to="/eventos" replace />
-  return <section className="page"><h1 className="page-title">Não foi possível entrar</h1><p role="alert" className="mt-6">{error ?? 'Solicite um novo link para acessar.'}</p><Link to="/entrar" className="button mt-6">Solicitar novo link</Link></section>
+  return <section className="page"><h1 className="page-title">Não foi possível entrar</h1><p role="alert" className="mt-6 max-w-2xl">{error ?? LINK_FAILED}</p><Link to="/entrar" className="button mt-6">Entrar com o código</Link></section>
 }
+
+
+const COOLDOWN = 60
+type Failure = { status?: number; code?: string; message?: string }
+// Quanto esperar: o Auth informa os segundos no limite de 60 s; no limite por hora, não.
+function sendFailure(cause: unknown): { text: string; wait: number } {
+  const failure = (cause ?? {}) as Failure
+  if (failure.status !== 429) return { text: errorMessage(cause), wait: 0 }
+  const seconds = Number(/after (\d+) seconds?/i.exec(failure.message ?? '')?.[1])
+  if (seconds > 0) return { text: `Muitos pedidos em sequência. Aguarde ${seconds} segundos para pedir outro código.`, wait: seconds }
+  return { text: 'O limite de pedidos de acesso foi atingido. Aguarde pelo menos 1 minuto; se continuar, tente de novo em até 1 hora. Se já recebeu um código, use “Já tenho um código”.', wait: COOLDOWN }
+}
+function codeFailure(cause: unknown) {
+  const failure = (cause ?? {}) as Failure
+  if (failure.status === 429) return 'Muitas tentativas de código. Aguarde alguns minutos antes de tentar de novo.'
+  if (failure.status === 403 || failure.code === 'otp_expired') return 'Código inválido ou expirado. Peça um novo.'
+  return errorMessage(cause)
+}
+
 export function LoginPage() {
   const { session, loading } = useAuth()
   const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
-  const [sent, setSent] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  // `codeFor`: o e-mail do passo do código (fica travado até “Usar outro e-mail”).
+  const [codeFor, setCodeFor] = useState<string | null>(null)
+  // Quantos envios deram certo para este e-mail (0 = digitou um código que já tinha).
+  const [sent, setSent] = useState(0)
+  const [code, setCode] = useState('')
+  const [checking, setChecking] = useState(false)
+  const [error, setError] = useState<{ at: 'email' | 'code'; text: string } | null>(null)
+  const [waitUntil, setWaitUntil] = useState(0)
+  const [now, setNow] = useState(() => Date.now())
+  const sending = useRef(false)
+  // Código só vale uma vez: um segundo toque não pode mandar outra verificação.
+  const verifying = useRef(false)
+  const emailField = useRef<HTMLInputElement>(null)
+  const codeField = useRef<HTMLInputElement>(null)
+  const left = Math.max(0, Math.ceil((waitUntil - now) / 1000))
+  useEffect(() => {
+    if (!waitUntil) return
+    const timer = window.setInterval(() => { const current = Date.now(); setNow(current); if (current >= waitUntil) { setWaitUntil(0); window.clearInterval(timer) } }, 1000)
+    return () => window.clearInterval(timer)
+  }, [waitUntil])
+  useEffect(() => { if (codeFor) codeField.current?.focus(); else emailField.current?.focus() }, [codeFor])
+  function wait(seconds: number) { const current = Date.now(); setNow(current); setWaitUntil(current + seconds * 1000) }
   async function submit(event: FormEvent) {
     event.preventDefault()
-    if (!supabase || busy) return
-    setBusy(true); setError(null); setSent(false)
+    if (!supabase || sending.current || left > 0) return
+    sending.current = true
+    const address = email.trim()
+    setBusy(true); setError(null)
     try {
-      const { error } = await supabase.auth.signInWithOtp({ email: email.trim(), options: { emailRedirectTo: `${window.location.origin}/auth/callback` } })
+      const { error } = await supabase.auth.signInWithOtp({ email: address, options: { emailRedirectTo: `${window.location.origin}/auth/callback` } })
       if (error) throw error
-      setSent(true)
-    } catch (cause) { setError(errorMessage(cause)) } finally { setBusy(false) }
+      setSent(count => codeFor === address ? count + 1 : 1); setCode(''); setCodeFor(address); wait(COOLDOWN)
+    } catch (cause) {
+      const failure = sendFailure(cause)
+      setError({ at: 'email', text: failure.text })
+      if (failure.wait) wait(failure.wait)
+    } finally { setBusy(false); sending.current = false }
+  }
+  function haveCode() {
+    const address = email.trim()
+    if (!address || !emailField.current?.checkValidity()) { setError({ at: 'email', text: 'Digite o e-mail para o qual o código foi enviado.' }); emailField.current?.focus(); return }
+    setError(null); setSent(0); setCodeFor(address)
+  }
+  function otherEmail() { setCodeFor(null); setSent(0); setCode(''); setError(null) }
+  async function verify(event: FormEvent) {
+    event.preventDefault()
+    if (!supabase || !codeFor || verifying.current) return
+    if (!/^\d{8}$/.test(code)) { setError({ at: 'code', text: 'Digite os 8 números do código.' }); codeField.current?.focus(); return }
+    verifying.current = true
+    setChecking(true); setError(null)
+    try {
+      const { error } = await supabase.auth.verifyOtp({ email: codeFor, token: code, type: 'email' })
+      if (error) throw error
+    } catch (cause) { setError({ at: 'code', text: codeFailure(cause) }); codeField.current?.focus() } finally { setChecking(false); verifying.current = false }
   }
   if (loading) return <section className="page"><LoadingState>Verificando seu acesso…</LoadingState></section>
   if (session) return <Navigate to="/eventos" replace />
+  const sendLabel = busy ? 'Enviando…' : left > 0 ? `Pedir outro código em ${left} s` : sent || codeFor ? 'Pedir outro código' : 'Receber código de acesso'
   return <section className="login-shell">
     <div className="login-form">
       <p className="eyebrow">Seu encontro começa aqui</p><h1 className="page-title">Entre para organizar</h1>
-      <p className="mt-3 text-stone-600">Sem senha: enviamos um link de acesso para o seu e-mail. Abra no mesmo navegador em que você o pediu.</p>
-      {backend.status !== 'ready' ? <div role="status" className="notice mt-8">O acesso ainda não está disponível neste ambiente. {backend.message}</div> :
+      <p className="mt-3 text-stone-600">Sem senha: enviamos para o seu e-mail um código de 8 dígitos e um link de acesso. O código funciona em qualquer navegador.</p>
+      {backend.status !== 'ready' ? <div role="status" className="notice mt-8">O acesso ainda não está disponível neste ambiente. {backend.message}</div> : <>
         <form onSubmit={submit} className="mt-8 flex flex-col gap-5">
-          <label className="field">Seu e-mail<input type="email" autoComplete="email" inputMode="email" placeholder="voce@exemplo.com" required maxLength={254} value={email} onChange={e => setEmail(e.target.value)} disabled={busy} /></label>
-          <button className="button w-full" disabled={busy}>{busy ? 'Enviando…' : sent ? 'Enviar outro link' : 'Receber link de acesso'}</button>
-          {sent && <SuccessMessage>Confira sua caixa de entrada e o spam. Se o endereço puder receber acesso, o link chegará em instantes.</SuccessMessage>}
-          {error && <ErrorState message={error} />}
+          <label className="field">Seu e-mail<input ref={emailField} type="email" autoComplete="email" inputMode="email" placeholder="voce@exemplo.com" required maxLength={254} value={email} readOnly={Boolean(codeFor)} aria-invalid={error?.at === 'email' || undefined} aria-describedby={codeFor ? 'login-email-locked' : error?.at === 'email' ? 'login-email-error' : undefined} onChange={e => setEmail(e.target.value)} /></label>
+          {codeFor && <p id="login-email-locked" className="hint -mt-3">O código vale para este e-mail. <button type="button" className="text-link inline-flex min-h-11 items-center" onClick={otherEmail}>Usar outro e-mail</button></p>}
+          <Button type="submit" className="w-full justify-center" busy={busy || left > 0}>{sendLabel}</Button>
+          {!codeFor && <Button variant="ghost" className="self-start" onClick={haveCode}>Já tenho um código</Button>}
+          {sent > 0 && codeFor && <div id="login-sent"><SuccessMessage>{sent > 1 ? 'Enviamos um novo código' : 'Enviamos um código'} e um link para {codeFor}. Confira a caixa de entrada e o spam; pode levar alguns minutos.</SuccessMessage></div>}
+          {error?.at === 'email' && <div id="login-email-error"><ErrorState message={error.text} /></div>}
+        </form>
+        {codeFor && <form noValidate onSubmit={verify} className="card mt-6 flex flex-col gap-4" aria-labelledby="login-code-title">
+          <h2 id="login-code-title" className="text-lg font-bold">Digite o código do e-mail</h2>
+          <label className="field">Código de 8 dígitos<input ref={codeField} inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{8}" required value={code}
+            aria-invalid={error?.at === 'code' || undefined} aria-describedby={[sent > 0 && 'login-sent', error?.at === 'code' && 'login-code-error', 'login-code-hint'].filter(Boolean).join(' ')}
+            onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 8))} /></label>
+          <p id="login-code-hint" className="hint">O código vale por 1 hora e só uma vez. Pedir outro invalida o anterior. O link do e-mail também funciona, se aberto neste mesmo navegador.</p>
+          <Button type="submit" className="w-full justify-center" busy={checking}>{checking ? 'Entrando…' : 'Entrar'}</Button>
+          {error?.at === 'code' && <div id="login-code-error"><ErrorState message={error.text} /></div>}
         </form>}
+      </>}
       <p className="login-guest">É convidado? Não precisa entrar: use o link que a organização enviou pelo WhatsApp.</p>
     </div>
     <aside className="login-aside" aria-labelledby="login-features">

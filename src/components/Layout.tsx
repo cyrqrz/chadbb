@@ -19,7 +19,7 @@ export function Layout() {
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-4">
         <Link to="/" aria-label="chadbb, início" className="brand inline-flex min-h-11 items-center gap-2.5 text-xl font-extrabold tracking-tight"><span className="brand-mark" aria-hidden="true">c</span>chadbb<span className="-ml-2.5 text-brand" aria-hidden="true">.</span></Link>
         <nav aria-label="Menu principal" className="flex flex-wrap items-center gap-1 text-sm">
-          {session ? <><Link className="nav-link" to="/eventos">Seus eventos</Link><button className="nav-link" disabled={busy} onClick={() => void signOut()}>{busy ? 'Saindo…' : 'Sair'}</button></> : <Link className="nav-link" to="/entrar">Organizar um evento</Link>}
+          {session ? <><Link className="nav-link" to="/eventos">Seus eventos</Link><button className="nav-link" disabled={busy} onClick={() => void signOut()}>{busy ? 'Saindo…' : 'Sair'}</button></> : <Link className="nav-link" to="/entrar">Entrar para organizar</Link>}
         </nav>
       </div>
     </header>

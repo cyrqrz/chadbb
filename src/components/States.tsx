@@ -1,3 +1,4 @@
+import { useDelayedFlag } from '../lib/useDelayedFlag'
 import type { ReactNode } from 'react'
 import { Button } from './ui/Button'
 
@@ -37,5 +38,11 @@ export function RefreshStatus({ fetching, failed, onRetry, label = 'Atualizando�
     {/* Texto fixo: a região de alerta é relida a cada mudança, e a tela tenta de novo sozinha. */}
     <Button variant="secondary" busy={fetching} onClick={onRetry}>Tentar novamente</Button>
   </div>
-  return <p className="refresh-status" aria-hidden={!fetching}>{fetching ? label : ''}</p>
+  return <SlowRefresh fetching={fetching} label={label} />
+}
+
+// Espaço sempre reservado: o aviso aparece só em reconsulta lenta e não empurra a tela.
+export function SlowRefresh({ fetching, label = 'Atualizando…', className = '' }: { fetching: boolean; label?: string; className?: string }) {
+  const slow = useDelayedFlag(fetching)
+  return <p className={`refresh-status ${className}`.trim()} aria-hidden={!slow}>{slow ? label : ''}</p>
 }

@@ -274,6 +274,8 @@ for (const status of ['published', 'closed'] as const) {
     await backend(page, () => ({ status: 200, json: full }), () => ({ status: 200, json: [{ ...event, status }] }))
     await page.goto(`/eventos/${eventId}`)
     await expect(page.getByLabel('Término')).toBeVisible()
+    // iPhone: com a aparência nativa, o Safari ignora width: 100% nos campos de data.
+    for (const label of ['Data e horário', 'Término']) expect(await page.getByLabel(label).evaluate(el => getComputedStyle(el).appearance)).toBe('none')
     await page.addStyleTag({ content: 'html { font-size: 200% !important; }' })
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
     expect(overflow).toBe(0)
@@ -891,5 +893,61 @@ test.describe('eventos: excluir evento', () => {
     await page.getByRole('button', { name: 'Excluir definitivamente' }).click()
     await expect(page.getByRole('heading', { name: 'Chá encerrado' })).toHaveCount(0)
     await expect(page.getByRole('status').filter({ hasText: 'Evento “Chá encerrado” excluído.' })).toHaveCount(0)
+  })
+})
+
+// Estabilidade: a reconsulta a cada 5 s não pode empurrar a tela ("tremida") nem
+// piscar "Atualizando…" quando a resposta é rápida.
+test.describe('reconsulta sem tremida', () => {
+  // Observa por um ciclo de reconsulta: posições verticais do alvo e se o aviso apareceu.
+  async function watch(page: Page, selector: string, ms = 6500) {
+    return page.evaluate(({ selector, ms }) => new Promise<{ tops: number[]; flashed: boolean }>(resolve => {
+      const tops = new Set<number>()
+      let flashed = false
+      const target = () => document.querySelector(selector)
+      const observer = new MutationObserver(() => { if (document.querySelector('main')?.textContent?.includes('Atualizando')) flashed = true })
+      observer.observe(document.body, { subtree: true, childList: true, characterData: true })
+      const timer = setInterval(() => { const box = target()?.getBoundingClientRect(); if (box) tops.add(Math.round(box.top + window.scrollY)) }, 25)
+      setTimeout(() => { clearInterval(timer); observer.disconnect(); resolve({ tops: [...tops], flashed }) }, ms)
+    }), { selector, ms })
+  }
+  const card = 'main :is(a, article).card'
+
+  test('“Seus eventos”: resposta rápida não mostra aviso nem mexe na lista', async ({ page }) => {
+    await backend(page, none)
+    await page.goto('/eventos')
+    await expect(page.locator(card).first()).toBeVisible()
+    const seen = await watch(page, card)
+    expect(seen.flashed).toBe(false)
+    expect(seen.tops).toHaveLength(1)
+  })
+
+  test('“Seus eventos”: resposta lenta mostra o aviso sem empurrar a lista', async ({ page }) => {
+    await backend(page, none)
+    await page.goto('/eventos')
+    await expect(page.locator(card).first()).toBeVisible()
+    await page.route('**/rest/v1/events**', async route => { await new Promise(resolve => setTimeout(resolve, 1500)); await route.fallback() })
+    const seen = await watch(page, card)
+    expect(seen.flashed).toBe(true)
+    expect(seen.tops).toHaveLength(1)
+  })
+
+  test('detalhes do evento no celular: reconsulta não mexe no formulário', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 740 })
+    await backend(page, none)
+    await page.goto(`/eventos/${eventId}`)
+    await expect(page.getByLabel('Nome do evento')).toBeVisible()
+    await page.route('**/rest/v1/events**', async route => { await new Promise(resolve => setTimeout(resolve, 1500)); await route.fallback() })
+    const seen = await watch(page, 'main form')
+    expect(seen.tops).toHaveLength(1)
+  })
+
+  test('painel: resposta rápida não pisca “Atualizando painel…”', async ({ page }) => {
+    await backend(page, () => ({ status: 200, json: full }))
+    await page.goto(`/eventos/${eventId}/convites`)
+    await expect(page.getByRole('heading', { name: 'Resumo' })).toBeVisible()
+    const seen = await watch(page, 'main h2')
+    expect(seen.flashed).toBe(false)
+    expect(seen.tops).toHaveLength(1)
   })
 })
