@@ -110,11 +110,12 @@ o ensaio familiar no celular continua pendente.
   - `tests/local/email-code.test.mjs` passou antes em vermelho e depois em verde;
   - `test:email:local` continua passando.
 
-  Pendente, com aprovação: G2, aplicar o modelo no `chadbb-cha` com
-  `scripts/auth/email-templates.mjs`. O script mostra a prévia por padrão e só
-  aplica com `--apply` e `CHADBB_AUTH_REF`. A prévia mostrou 4 campos: assunto e
-  conteúdo dos modelos `magic_link` e `confirmation`. O link não muda, então pode
-  ir antes do front. G3: tela do Claude (pedido acima).
+  G2 concluído em 2026-09-17: o titular aplicou o modelo no `chadbb-cha` com
+  `scripts/auth/email-templates.mjs --apply`. Uma nova prévia, só leitura,
+  confirmou 4 campos iguais ao repositório (sha256 `f7a2d46df7f0`, código de 8
+  dígitos, validade de 1 h). O e-mail real já traz o código e o link. Pendente:
+  G3, a tela do Claude (pedido acima); até lá, entrar pelo link no mesmo
+  navegador em que foi pedido.
 - [x] **2026-09-17 · Exclusão de evento (`delete_event` + Edge `delete-event`).**
   G1–G6 concluídos (detalhes em "Concluídas"). Falta só o teste pelo botão na
   produção, depois do merge da PR #11, com um evento de rascunho criado só para
