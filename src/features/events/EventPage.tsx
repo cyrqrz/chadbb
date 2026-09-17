@@ -9,7 +9,7 @@ import { errorMessage } from '../../lib/errors'
 import { failedLast, live } from '../../lib/query'
 import { useLastError } from '../../lib/useLastError'
 import { useAuth } from '../auth/context'
-import { ErrorState, LoadingState, RefreshStatus, SuccessMessage } from '../../components/States'
+import { ErrorState, LoadingState, RefreshStatus, SlowRefresh, SuccessMessage } from '../../components/States'
 import { BackLink, Button } from '../../components/ui'
 
 export function EventPage() {
@@ -86,7 +86,8 @@ function EventEditor({ server, refreshing, refreshFailed, retry }: { server: Eve
   }
   return <section className="page max-w-3xl">
     <BackLink to="/eventos">Seus eventos</BackLink>
-    <div className="mt-7 flex flex-wrap items-center gap-4"><h1 className="page-title">Detalhes do evento</h1><span className="badge">{statusLabels[record.status]}</span><span className="refresh-status mt-0" aria-hidden={!refreshing}>{refreshing ? 'Atualizando…' : ''}</span></div>
+    <div className="mt-7 flex flex-wrap items-center gap-4"><h1 className="page-title">Detalhes do evento</h1><span className="badge">{statusLabels[record.status]}</span></div>
+    <SlowRefresh fetching={refreshing} />
     {refreshFailed && <RefreshStatus fetching={refreshing} failed onRetry={retry} />}
     {outdated && <div role="status" className="notice mt-6"><p>Este evento mudou em outra sessão. O que você digitou continua aqui.</p><Button variant="secondary" size="sm" className="mt-3" disabled={busy} onClick={() => void reload()}>Recarregar dados</Button></div>}
     <nav aria-label="Áreas do evento" className="stagger mt-6 flex flex-wrap gap-3"><Link to={`/eventos/${record.id}/convites`} className="secondary">Convites e confirmações →</Link><Link to={`/eventos/${record.id}/presentes`} className="secondary">Lista de presentes →</Link></nav>

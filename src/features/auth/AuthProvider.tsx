@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/query'
-import { AuthContext } from './context'
+import { AuthContext, LINK_FAILED } from './context'
 
 let initialization: Promise<{ session: Session | null; error: string | null }> | undefined
 function initializeAuth() {
@@ -17,9 +17,9 @@ function initializeAuth() {
   if (isCallback) window.history.replaceState(null, '', '/auth/callback')
   if (!client) return Promise.resolve({ session: null, error: null })
   initialization = (async () => {
-    if (failed) return { session: null, error: 'O link de acesso expirou ou é inválido. Solicite outro link.' }
+    if (failed) return { session: null, error: 'O link de acesso expirou ou já foi usado. Entre com o código de 8 dígitos do mesmo e-mail ou peça um novo.' }
     const { data, error } = code ? await client.auth.exchangeCodeForSession(code, flowId ? { flowId } : undefined) : await client.auth.getSession()
-    if (error || (isCallback && !data.session)) return { session: null, error: 'Não foi possível acessar. Reabra o link no mesmo navegador em que o solicitou ou peça outro.' }
+    if (error || (isCallback && !data.session)) return { session: null, error: LINK_FAILED }
     return { session: data.session, error: null }
   })().catch(() => ({ session: null, error: 'Não foi possível recuperar sua sessão. Entre novamente.' }))
   return initialization
@@ -42,7 +42,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }).data.subscription
     const current = revision
     void initializeAuth().then((result) => {
-      if (active && revision === current) { userId = result.session?.user.id ?? null; setState({ ...result, loading: false }) }
+      if (!active) return
+      if (revision === current) { userId = result.session?.user.id ?? null; setState({ ...result, loading: false }) }
+      // Outro evento de sessão chegou antes (ex.: SIGNED_OUT de uma sessão antiga):
+      // a sessão dele vale, mas o motivo da falha do link não pode se perder.
+      else if (result.error) setState(current => current.session ? current : { ...current, loading: false, error: result.error })
     })
     return () => { active = false; subscription?.unsubscribe() }
   }, [])
