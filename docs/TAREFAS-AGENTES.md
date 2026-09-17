@@ -48,6 +48,30 @@ o ensaio familiar no celular continua pendente.
   responde `ORIGIN_DENIED` de propósito, porque só `https://chadbb.pages.dev` é
   liberado. Use o backend simulado nos e2e. Contrato completo em
   `CONTRATOS-TRANSACIONAIS.md`, seção "Exclusão de evento".
+- [ ] **2026-09-17 · Codex → Claude · Entrar com código do e-mail (urgente).**
+  O titular não conseguiu entrar: pediu o link num navegador e o abriu em outro
+  (o Safari do iPhone). O PKCE só funciona no navegador do pedido. Nos logs do
+  Auth, o `/verify` deu 303 e nenhum `/token` foi chamado. O e-mail passa a
+  trazer um **código de 8 dígitos**, além do link (modelo
+  `supabase/templates/acesso.html`, já validado localmente).
+  - Em `/entrar`, depois do envio, mostrar o campo "Código de 8 dígitos"
+    (`inputmode="numeric"`, `autocomplete="one-time-code"`) e o botão
+    "Entrar". O e-mail já digitado fica preservado.
+  - Chamar `supabase.auth.verifyOtp({ email, token, type: 'email' })`. No
+    sucesso, ir para `/eventos`.
+  - Erros: código errado ou expirado (`otp_expired` ou 403) → "Código inválido
+    ou expirado. Peça um novo."; limite de tentativas (429) → pedir para esperar.
+    O código vale 1 h e só uma vez; um pedido novo invalida o anterior.
+  - Textos: o envio passa a dizer "Enviamos um código e um link para seu
+    e-mail". O link continua valendo no mesmo navegador.
+  - Bug em `/auth/callback`: quando a troca do código falha e ao mesmo tempo
+    chega outro evento de sessão (por exemplo, `SIGNED_OUT` de uma sessão
+    antiga), `AuthProvider` descarta o erro, e a tela mostra só "Solicite um
+    novo link". Mostrar a mensagem específica: abrir no mesmo navegador ou usar
+    o código.
+  - Testes: `tests/local/email-code.test.mjs` já cobre o back (código em outro
+    cliente, código errado e reúso). Se o texto do botão mudar, ajustar
+    `tests/local/email-login.test.mjs`. Limite local: 2 e-mails por hora.
 - [x] **T-F1 · Visual e estados das telas (M1).** _(2026-09-16: componentes comuns
   em `src/components/States.tsx`; mergeado no PR #7.)_ Em `GuestPage`, `GiftListPage`,
   `InvitationsPage` e `EventPage`: estados de vazio, carregando, sucesso e erro com
@@ -80,6 +104,17 @@ o ensaio familiar no celular continua pendente.
 
 ## Codex — back e tarefas difíceis (`chadbb-codex`, `codex/back`)
 
+- [ ] **2026-09-17 · Login por código no e-mail.** G1 local concluído:
+  - modelo `supabase/templates/acesso.html` e `config.toml` com código de 8
+    dígitos, igual à produção;
+  - `tests/local/email-code.test.mjs` passou antes em vermelho e depois em verde;
+  - `test:email:local` continua passando.
+
+  Pendente, com aprovação: G2, aplicar o modelo no `chadbb-cha` com
+  `scripts/auth/email-templates.mjs`. O script mostra a prévia por padrão e só
+  aplica com `--apply` e `CHADBB_AUTH_REF`. A prévia mostrou 4 campos: assunto e
+  conteúdo dos modelos `magic_link` e `confirmation`. O link não muda, então pode
+  ir antes do front. G3: tela do Claude (pedido acima).
 - [x] **2026-09-17 · Exclusão de evento (`delete_event` + Edge `delete-event`).**
   G1–G6 concluídos (detalhes em "Concluídas"). Falta só o teste pelo botão na
   produção, depois do merge da PR #11, com um evento de rascunho criado só para
