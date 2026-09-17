@@ -77,6 +77,8 @@ irmão depende.
 ## Usuário
 
 - [ ] Criar a conta Resend no e-mail do organizador e repassar a chave (T-B1).
+  _(2026-09-16: chave criada no PC do trabalho; guardar em
+  `~/.config/chadbb/resend-api-key`, modo 600, e avisar o Codex.)_
 - [ ] Juntar o conteúdo real: local, instruções e imagem autorizada.
 - [ ] Ensaio com o irmão e um convidado, no celular e no navegador do WhatsApp
   (meta: 2–4 de outubro).

@@ -1,21 +1,22 @@
-# Retomada do Claude (front) — 2026-09-16, fim da sessão
+# Retomada do Claude (front) — atualizada em 2026-09-16, à noite
 
-Retomado em outra máquina no mesmo dia. O commit “WIP” foi completado pelo
-commit final do G3 + G3.1, aprovado pelo usuário; os passos da G3.1 abaixo
-ficam como histórico.
+G3 e G3.1 foram concluídos e aprovados na máquina de casa (commit `806ca84`,
+já no GitHub). A sessão seguinte volta ao PC do trabalho, onde o ambiente já
+está configurado.
 
-## Como retomar
+## Como retomar (PC do trabalho)
 
 1. `cd ~/projetos/chadbb-claude && git checkout claude/front && git pull`
-2. `npm ci` (Node 22).
-3. Ler `AGENTS.md`, `docs/TAREFAS-AGENTES.md`, `docs/design/PLANO-VISUAL.md`
-   e este arquivo. A memória do Claude é local da outra máquina; tudo o que
-   importa está aqui e no quadro.
-4. Hook `.claude/hooks/check-on-stop.sh` roda `npm run check` ao fim de cada
-   resposta; agente `.claude/agents/qa-ux.md` revisa cada mudança (se não
-   carregar, usar o agente geral pedindo para seguir esse arquivo).
+   (traz o `806ca84`; o clone de lá ainda está no WIP `986680d`).
+2. `npm ci` (Node 22): nenhuma dependência nova, mas é barato.
+3. Ler `AGENTS.md`, `docs/TAREFAS-AGENTES.md`, `docs/design/PLANO-VISUAL.md`,
+   `docs/design/CARDS.md` e este arquivo.
+4. Conferir o PR (abaixo). Se já foi mergeado: `git pull origin main`.
 5. `test:browser:local` precisa da stack do Codex **e** de
-   `npm run functions:serve` rodando (em terminal aberto) em `~/projetos/chadbb-codex`.
+   `npm run functions:serve` aberto em `~/projetos/chadbb-codex`. Se o banco
+   local estiver antigo (erro `relation "private.retention_audit" does not exist`),
+   ele tem menos migrations que o repositório: pedir aprovação e rodar
+   `npm run db:reset` no clone do Codex.
 
 ## Onde paramos
 
@@ -23,57 +24,57 @@ ficam como histórico.
 |---|---|
 | G0, G1 | mergeados (PR #7) |
 | G2, G2.1 | mergeados (PR #8); fontes Manrope + Fraunces aprovadas |
-| G3 (convite, página inicial, prévia WhatsApp) | **aprovado** pelo usuário em 2026-09-16; no PR junto com a G3.1 |
-| G3.1 (sistema de cards, `docs/design/CARDS.md`) | **aprovado** em 2026-09-16 (check 44/44, e2e 164/164, browser 8/8, QA com ressalvas em `CARDS.md` §4). Revisão: https://claude.ai/artifact/5T2XkXsw1iyJvkWY5seSWN. PR aberto; próximo: G4 |
+| G3 (convite, página inicial, prévia WhatsApp) | **aprovado** em 2026-09-16 |
+| G3.1 (sistema de cards, `docs/design/CARDS.md`) | **aprovado** em 2026-09-16: check 44/44, e2e 164/164, browser 8/8, QA com ressalvas em `CARDS.md` §4. Revisão: https://claude.ai/artifact/5T2XkXsw1iyJvkWY5seSWN |
+| **PR G3 + G3.1** | **conferir se foi aberto.** Na máquina de casa não havia `gh`; o usuário recebeu o link de comparação `main...claude/front` com título e descrição. Se não existir, abrir com `gh pr create` (título “G3 (convite) e G3.1 (sistema de cards)”; sugerir *Squash and merge*, porque o WIP `986680d` ficou no histórico) |
+| G4 (shell do evento, painel, lista) | **próximo**, janela 26–30/09 |
 
-### G3.1 — feito até agora
+## Próximos passos
 
-- Tokens de card em `src/styles.css` (`--card-*`, `--control-radius`,
-  `--action-gap`, `--divider-color`) e classes `.card-stack`, `.card-header`,
-  `.card-badges`, `.card-title`, `.card-description`, `.card-reservation`,
-  `.card-actions` (divisor), `.card-disclosure`, `.availability`, `.stepper`.
-- `Progress` com semântica de `progressbar` quando recebe `label`.
-- Novo `Availability` (texto “N de M disponíveis” antes da barra).
-- `QuantityField` virou stepper único (− | valor | +), rótulo “Quantidade” +
-  contexto só para leitor de tela.
-- Card de fralda do convite (`GuestGift` em `GuestPage.tsx`) reescrito:
-  cabeçalho com selos (Tamanho, Completo, Reservado/Compra informada), “Sua
-  reserva N pacotes” sem caixa rosa, CTA único (“Escolher presente” /
-  “Atualizar quantidade”), ações abaixo do divisor, “Trocar tamanho” como
-  disclosure (`aria-expanded`, foco no select “Novo tamanho”, “Confirmar troca”).
-- Testes: grupo “G3.1 · card de fralda” em `tests/e2e/guest.spec.ts`; textos
-  atualizados em `tests/e2e/guest.spec.ts` e `tests/browser/family.integration.mjs`
-  (“Sua reserva 2 pacotes”, “4 de 6 disponíveis”, “Atualizar quantidade”,
-  “Trocar tamanho”).
+1. **PR:** confirmar que está aberto; merge é do usuário. Depois do merge, o
+   Cloudflare Pages publica o visual novo.
+2. **G4** (`PLANO-VISUAL.md` §3): cabeçalho do evento, resumo, fraldas como
+   progresso, mimos, lista com menos caixas. Levar junto:
+   - ressalvas da G3.1 (`CARDS.md` §4): prop `error` no `QuantityField`,
+     título antes dos selos no DOM, número repetido no painel, estado
+     “Adicionando…” e foco depois de incluir;
+   - componentes React para os cards, `ActionMenu` e `ConfirmDialog` (Radix);
+   - audit A11–A14 e A16–A19;
+   - axe nas telas do organizador (T-F3).
+   Fluxo: plano com gates → testes antes (TDD) → código → QA (`qa-ux`) →
+   capturas + página de revisão → aprovação → commit/PR.
+3. Depois: G5 (estados globais, offline, QA) em 01/10; congelamento em 05/10;
+   ensaio em 02–04/10.
 
-### G3.1 — próximos passos
+## SMTP (T-B1, do Codex) — situação conhecida
 
-1. **Corrigir o axe** (`aria-progressbar-name`): em
-   `src/components/ui/Progress.tsx`, incluir `'aria-label': label` no objeto
-   da `progressbar`. Na última rodada falhavam 4 testes × 2 projetos por isso
-   (“reserva, compra informada…”, “evento encerrado…”, “320 px…”, “card sem reserva”).
-2. Rodar `npx playwright test tests/e2e/guest.spec.ts` e depois a suíte toda.
-3. Aplicar o mesmo padrão aos outros cards (sem mudar a estrutura das telas, que é G4):
-   - `GuestCard` (`InvitationsPage.tsx`): `card-stack`/`card-header`/`card-actions`
-     (as regras `.guest-card .card-actions` já estão no CSS);
-   - `Diapers` do painel: `Progress` com `label` e selo “✓ Completo”
-     (atualizar `tests/e2e/panel.spec.ts`: hoje espera “Tamanho completo”,
-     “15 disponíveis”, “11 disponíveis”);
-   - `ItemCard` e `ProductCard` (`GiftListPage.tsx`): anatomia e `QuantityField`
-     (máx. 10 000);
-   - cards de resumo e de evento: mesma base.
-4. Escrever `docs/design/CARDS.md` (versão adaptada, como foi feito com a
-   G2.1) e atualizar `foundation.md` (tokens de card, `Availability`, stepper).
-5. Rodar `npm run check`, e2e, `test:browser:local`; QA de UX; capturas e
-   páginas de revisão; pedir aprovação do usuário.
-6. Com aprovação: reorganizar os commits WIP (ou fazer um commit final
-   descrevendo G3 + G3.1) e abrir o PR.
+- O usuário já criou uma chave de API no Resend **no PC do trabalho**.
+- Na máquina de casa não existe `~/.config/chadbb/resend-api-key`, o arquivo
+  que `docs/PLANO-SMTP-T-B1.md` espera. No PC do trabalho, conferir se o
+  arquivo existe (só `ls -l`, nunca exibir o conteúdo) e se a chave já foi
+  configurada no Auth do `chadbb-cha`. Essa checagem é do Codex e, por ser
+  remota, precisa de aprovação.
+- Sem domínio próprio, o remetente é `onboarding@resend.dev` e só entrega ao
+  e-mail da conta Resend (o organizador).
+- Sem SMTP, ninguém entra no site; por isso o usuário ainda não consegue ver
+  as telas novas em `chadbb.pages.dev`. Localmente: `npm run dev` + Inbucket
+  (`http://127.0.0.1:54324`) para o link de login.
+
+## Máquina de casa (para quando voltar a ela)
+
+- Os 3 clones em `~/projetos`: `chadbb` (main), `chadbb-codex` (codex/back),
+  `chadbb-claude` (claude/front).
+- Docker Desktop com integração WSL ligada; stack local com as 20 migrations.
+- Bibliotecas do Chromium instaladas (`libnss3`, `libnspr4`, `libasound2t64`).
+- `.env.local` só com as variáveis públicas do Supabase local.
+- Falta instalar e autenticar o `gh` (`sudo apt install gh` + `gh auth login`).
 
 ## Pendências gerais
 
-- Pedidos ao Codex no quadro (resumo do painel, `available`, `id` das reservas,
-  `diapers` no resumo, deadlock intermitente).
-- A branch `codex/back` também está em WIP para retomada; não mergear.
-- Audit: A11–A14, A16–A19 abertos para G4/G5.
-- Depois do G3/G3.1: G4 (painel e lista), G5 (estados globais, offline, QA),
-  congelamento em 05/10.
+- Pedidos ao Codex no quadro: resumo do painel, `available`, `id` das
+  reservas, `diapers` no resumo, deadlock intermitente.
+- A branch `codex/back` está em WIP de retomada; não mergear sem revisão.
+- Testes que falharam uma vez com a máquina carregada e passaram isolados:
+  “G2.1 · só uma ação domina”, “tentar de novo pelo teclado mantém o foco” e
+  “falha de atualização nos detalhes não apaga…”. Observar; se repetir, tratar
+  como teste instável.
