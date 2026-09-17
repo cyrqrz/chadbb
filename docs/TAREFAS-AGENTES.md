@@ -109,19 +109,24 @@ o ensaio familiar no celular continua pendente.
     onde os campos de data hoje cortam (pedido separado).
   - **Testes:** ampliar os e2e do convite e rodar `npm run check` antes do PR.
 
-  **Ressalvas do Codex sobre o mapa (privacidade e CSP).** O endereço é dado
-  privado do convite, mostrado só a quem tem o link.
-  1. Incorporar um mapa de terceiro (iframe do Google Maps, Leaflet/OSM) envia
-     o endereço e o IP do convidado a esse serviço em toda visita. Isso muda a
-     política de privacidade do piloto e precisa de decisão do titular.
-  2. Exige afrouxar a CSP de `public/_headers`: `frame-src` para o iframe ou
-     `img-src`/`connect-src` para os blocos do mapa. Hoje é `default-src 'self'`.
-  3. Alternativa sem vazamento: manter o endereço em texto com o botão "Abrir no
-     mapa" (já existe) e, se quiser imagem, carregar o mapa **só depois de um
-     clique** do convidado ("Ver o mapa aqui"), avisando que abre um serviço
-     externo. É a opção que o Codex recomenda.
-  Escolhida a opção, registre aqui o pedido de CSP; a alteração de
-  `public/_headers` é do front, mas o Codex revisa a regra.
+  **Mapa: decisão do titular em 2026-09-17 — carregar só depois do clique.**
+  O endereço é dado privado do convite, então nada sai para terceiros sem ação
+  do convidado.
+  - Estado inicial: endereço em texto, o botão "Abrir no mapa" que já existe e
+    um botão novo, "Ver o mapa aqui", com aviso curto de que isso abre um
+    serviço externo (ex.: "carrega o OpenStreetMap com este endereço").
+  - Só no clique, inserir o iframe. Preferir **OpenStreetMap**
+    (`https://www.openstreetmap.org/export/embed.html?...`), com
+    `loading="lazy"`, `referrerpolicy="no-referrer"`, `title` descritivo e
+    altura fixa para não deslocar a página. Sem cookies nem scripts de terceiro.
+  - Nada de carregar o mapa automaticamente, nem prefetch, nem `<link rel>`
+    para o serviço antes do clique.
+  - CSP em `public/_headers`, revisada pelo Codex: acrescentar
+    `frame-src https://www.openstreetmap.org;` mantendo o resto igual,
+    inclusive `frame-ancestors 'none'`. Se a escolha mudar para o Google,
+    a regra passa a ser `frame-src https://www.google.com https://maps.google.com`.
+    Alterar só essa diretiva; qualquer outra mudança na CSP volta ao Codex.
+  - Registrar na tela que o endereço é do convite e não deve ser repassado.
 - [ ] **2026-09-17 · Codex → Claude · Erro de envio do link aparece como "conexão".**
   Se o Auth não consegue enviar o e-mail, `/auth/v1/otp` responde **500**
   `unexpected_failure` ("Error sending confirmation email"). Hoje isso acontece
