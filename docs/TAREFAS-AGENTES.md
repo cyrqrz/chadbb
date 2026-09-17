@@ -69,6 +69,10 @@ o ensaio familiar no celular continua pendente.
     antiga), `AuthProvider` descarta o erro, e a tela mostra só "Solicite um
     novo link". Mostrar a mensagem específica: abrir no mesmo navegador ou usar
     o código.
+  - Pedido de link/código: desabilitar o botão durante o envio e, após o envio,
+    mostrar contagem regressiva de 60 s antes de permitir outro pedido (o Auth
+    recusa com 429 antes disso). Em 17/09 houve ~15 pedidos em 12 s.
+    Mensagem de 429 deve dizer quanto esperar, sem prometer liberação imediata.
   - Testes: `tests/local/email-code.test.mjs` já cobre o back (código em outro
     cliente, código errado e reúso). Se o texto do botão mudar, ajustar
     `tests/local/email-login.test.mjs`. Limite local: 2 e-mails por hora.
@@ -116,6 +120,10 @@ o ensaio familiar no celular continua pendente.
   dígitos, validade de 1 h). O e-mail real já traz o código e o link. Pendente:
   G3, a tela do Claude (pedido acima); até lá, entrar pelo link no mesmo
   navegador em que foi pedido.
+  Em 2026-09-17 o limite de e-mails do Auth subiu de 2 para 10 por hora no
+  projeto (`rate_limit_email_sent`), aplicado pelo titular e conferido por
+  leitura; o valor 2 bloqueou o login após dois pedidos. Mantido o
+  intervalo de 60 s por e-mail (`smtp_max_frequency`).
 - [x] **2026-09-17 · Exclusão de evento (`delete_event` + Edge `delete-event`).**
   G1–G6 concluídos (detalhes em "Concluídas"). Falta só o teste pelo botão na
   produção, depois do merge da PR #11, com um evento de rascunho criado só para
