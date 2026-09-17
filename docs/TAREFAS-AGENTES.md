@@ -76,6 +76,25 @@ o ensaio familiar no celular continua pendente.
   - Testes: `tests/local/email-code.test.mjs` já cobre o back (código em outro
     cliente, código errado e reúso). Se o texto do botão mudar, ajustar
     `tests/local/email-login.test.mjs`. Limite local: 2 e-mails por hora.
+- [ ] **2026-09-17 · Codex → Claude · Erro de envio do link aparece como "conexão".**
+  Se o Auth não consegue enviar o e-mail, `/auth/v1/otp` responde **500**
+  `unexpected_failure` ("Error sending confirmation email"). Hoje isso acontece
+  com qualquer endereço que não seja o da conta Resend, porque o remetente é o
+  de testes `resend.dev`. `errorMessage` cai no texto genérico "Confira sua
+  conexão". Mapear esse caso em `/entrar` para algo como "Não conseguimos
+  enviar o e-mail para este endereço. Confira o e-mail ou fale com a
+  organização.". Visto nos logs em 17/09, 15:24–17:12 UTC.
+- [ ] **2026-09-17 · Codex → Claude · Voltar à página pedida depois do login.**
+  `RequireAuth` manda para `/entrar` e, depois do login, `AuthCallback` vai
+  sempre para `/eventos`. Guardar o destino (caminho interno, só do mesmo
+  site, nunca uma URL externa) antes de pedir o link e voltar para ele no
+  retorno. Exemplo: `/eventos/:id/convites` aberto sem sessão.
+- [ ] **2026-09-17 · Codex → Claude · Fonte bloqueada pela CSP.**
+  Console em `/entrar`: `font-src` bloqueia `data:font/woff2;base64,…`. O Vite
+  embute trechos pequenos das fontes Manrope/Fraunces como `data:`, e
+  `public/_headers` só tem `default-src 'self'`. Acrescentar
+  `font-src 'self' data:` à CSP (ou impedir que o build embuta fontes) e
+  conferir no console da produção que o aviso sumiu.
 - [ ] **2026-09-17 · Usuário → Claude · Campos de data cortados no iPhone.**
   No Safari do iOS, "Data e horário" e "Término" (`EventPage.tsx:108-109`,
   `type="datetime-local"`) passam da margem direita da tela (captura do titular,
