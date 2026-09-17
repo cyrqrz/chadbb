@@ -734,3 +734,162 @@ test.describe('G3.1 · cards do organizador', () => {
     await expectAccessible(page)
   })
 })
+
+// Exclusão de um evento (Edge `delete-event`, contrato em CONTRATOS-TRANSACIONAIS.md):
+// só rascunho e encerrado; confirmação no próprio card; nada é apagado sem ela.
+test.describe('eventos: excluir evento', () => {
+  const closed: EventRecord = { ...event, id: '10000000-0000-4000-8000-000000000002', status: 'closed', title: 'Chá encerrado', version: 7 }
+  function list(initial: EventRecord[]) {
+    let rows = initial
+    const calls: Record<string, unknown>[] = []
+    return {
+      calls,
+      events: (() => ({ status: 200, json: rows, headers: { 'content-range': rows.length ? `0-${rows.length - 1}/${rows.length}` : '*/0' } })) as Reply,
+      remove: (reply?: ReturnType<Reply>): Reply => ({ body }) => {
+        calls.push(body)
+        if (reply) return reply
+        rows = rows.filter(row => row.id !== body.event_id)
+        return { status: 200, json: { event_id: body.event_id, items_removed: 1, invitations_removed: 0, reservations_removed: 0, storage_cleanup: 'done' } }
+      },
+    }
+  }
+
+  test('só rascunho e encerrado têm o botão, fora do link do card', async ({ page }) => {
+    const draft: EventRecord = { ...event, id: '10000000-0000-4000-8000-000000000003', status: 'draft', title: 'Chá rascunho' }
+    const mock = list([event, closed, draft])
+    await backend(page, none, mock.events)
+    await page.goto('/eventos')
+    const published = page.getByRole('link', { name: /Chá de teste/ })
+    await expect(published).toBeVisible()
+    await expect(published.getByRole('button')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Excluir evento Chá de teste' })).toHaveCount(0)
+    for (const title of ['Chá encerrado', 'Chá rascunho']) {
+      const card = page.getByRole('article').filter({ has: page.getByRole('heading', { name: title }) })
+      await expect(card.getByRole('button', { name: `Excluir evento ${title}` })).toBeVisible()
+      await expect(card.getByRole('link', { name: new RegExp(title) })).toHaveCount(1)
+      await expect(card.locator('a button, a a')).toHaveCount(0)
+    }
+    await expectAccessible(page)
+  })
+
+  test('cancelar a confirmação não apaga e devolve o foco ao botão', async ({ page }) => {
+    const mock = list([closed])
+    await backend(page, none, mock.events, { '/functions/v1/delete-event': mock.remove() })
+    await page.goto('/eventos')
+    const trigger = page.getByRole('button', { name: 'Excluir evento Chá encerrado' })
+    await trigger.click()
+    const question = page.getByText('Excluir “Chá encerrado”?', { exact: false })
+    await expect(question).toBeVisible()
+    await expect(question).toContainText('não dá para desfazer')
+    await expect(question).toBeFocused()
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    await page.getByRole('button', { name: 'Cancelar' }).click()
+    await expect(question).toHaveCount(0)
+    await expect(trigger).toBeFocused()
+    expect(mock.calls).toEqual([])
+  })
+
+  test('confirmar apaga com a versão, some da lista e avisa', async ({ page }) => {
+    const mock = list([closed])
+    await backend(page, none, mock.events, { '/functions/v1/delete-event': mock.remove() })
+    await page.goto('/eventos')
+    await page.getByRole('button', { name: 'Excluir evento Chá encerrado' }).click()
+    await page.getByRole('button', { name: 'Excluir definitivamente' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'Evento “Chá encerrado” excluído.' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Chá encerrado' })).toHaveCount(0)
+    expect(mock.calls).toEqual([{ event_id: closed.id, version: 7 }])
+    await expectAccessible(page)
+  })
+
+  test('recusa do servidor mantém o card e explica', async ({ page }) => {
+    const mock = list([closed])
+    await backend(page, none, mock.events, { '/functions/v1/delete-event': mock.remove({ status: 409, json: { error: 'EVENT_NOT_DELETABLE' } }) })
+    await page.goto('/eventos')
+    await page.getByRole('button', { name: 'Excluir evento Chá encerrado' }).click()
+    await page.getByRole('button', { name: 'Excluir definitivamente' }).click()
+    await expect(page.getByRole('alert')).toContainText('Só é possível excluir eventos em rascunho ou encerrados')
+    await expect(page.getByRole('heading', { name: 'Chá encerrado' })).toBeVisible()
+  })
+
+  test('o card tem só o título como nome e o foco vai para o aviso depois de cada exclusão', async ({ page }) => {
+    const other: EventRecord = { ...closed, id: '10000000-0000-4000-8000-000000000004', title: 'Chá antigo', version: 2 }
+    const mock = list([closed, other])
+    await backend(page, none, mock.events, { '/functions/v1/delete-event': mock.remove() })
+    await page.goto('/eventos')
+    await expect(page.getByRole('article', { name: 'Chá encerrado', exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Excluir evento Chá encerrado' }).click()
+    await page.getByRole('button', { name: 'Excluir definitivamente' }).click()
+    const notice = page.getByRole('status').filter({ hasText: 'excluído.' })
+    await expect(notice).toHaveText('Evento “Chá encerrado” excluído.')
+    await expect(page.getByRole('heading', { name: 'Chá encerrado' })).toHaveCount(0)
+    await expect(notice).toBeFocused()
+    // Segunda exclusão: o aviso troca de texto (não acumula) e recebe o foco de novo.
+    await page.getByRole('button', { name: 'Excluir evento Chá antigo' }).click()
+    await page.getByRole('button', { name: 'Excluir definitivamente' }).dblclick()
+    await expect(notice).toHaveText('Evento “Chá antigo” excluído.')
+    await expect(page.getByRole('status').filter({ hasText: 'excluído.' })).toHaveCount(1)
+    await expect(notice).toBeFocused()
+    expect(mock.calls).toHaveLength(2)
+  })
+
+  test('excluir o único evento da última página volta para a página anterior', async ({ page }) => {
+    const rows = Array.from({ length: 13 }, (_, n): EventRecord => ({ ...closed, id: `10000000-0000-4000-8000-0000000001${String(n).padStart(2, '0')}`, title: `Chá fictício ${n + 1}` }))
+    let current = rows
+    const calls: unknown[] = []
+    await backend(page, none, ({ url }) => {
+      const offset = Number(url.searchParams.get('offset') ?? 0)
+      if (offset >= current.length) return { status: 416, json: { code: 'PGRST103', message: 'Requested range not satisfiable' } }
+      const slice = current.slice(offset, offset + 12)
+      return { status: 200, json: slice, headers: { 'content-range': `${offset}-${offset + slice.length - 1}/${current.length}` } }
+    }, { '/functions/v1/delete-event': ({ body }) => { calls.push(body); current = current.filter(row => row.id !== body.event_id); return { status: 200, json: { event_id: body.event_id, storage_cleanup: 'done' } } } })
+    await page.goto('/eventos')
+    await page.getByRole('button', { name: 'Próxima' }).click()
+    await page.getByRole('button', { name: 'Excluir evento Chá fictício 13' }).click()
+    await page.getByRole('button', { name: 'Excluir definitivamente' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'Evento “Chá fictício 13” excluído.' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Chá fictício 1', exact: true })).toBeVisible()
+    await expect(page.getByText('Não foi possível carregar seus eventos.')).toHaveCount(0)
+    expect(calls).toHaveLength(1)
+  })
+
+  test('em 320 px com texto a 200% a confirmação cabe e os alvos têm 44 px', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 640 })
+    const mock = list([closed])
+    await backend(page, none, mock.events)
+    await page.goto('/eventos')
+    await page.addStyleTag({ content: 'html { font-size: 200% !important; }' })
+    await page.getByRole('button', { name: 'Excluir evento Chá encerrado' }).click()
+    for (const name of ['Excluir evento Chá encerrado', 'Excluir definitivamente', 'Cancelar']) {
+      const box = await page.getByRole('button', { name }).boundingBox()
+      expect(box!.height, name).toBeGreaterThanOrEqual(44)
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    await expectAccessible(page)
+  })
+  test('limpeza pendente dos arquivos ainda conta como excluído e o pedido leva o login', async ({ page }) => {
+    const mock = list([closed])
+    let auth = ''
+    await backend(page, none, mock.events, { '/functions/v1/delete-event': request => {
+      const reply = mock.remove()(request)
+      return { ...reply, json: { ...(reply.json as object), storage_cleanup: 'pending' } }
+    } })
+    page.on('request', request => { if (request.url().includes('/functions/v1/delete-event') && request.method() === 'POST') auth = request.headers().authorization ?? '' })
+    await page.goto('/eventos')
+    await page.getByRole('button', { name: 'Excluir evento Chá encerrado' }).click()
+    await page.getByRole('button', { name: 'Excluir definitivamente' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'Evento “Chá encerrado” excluído.' })).toBeVisible()
+    expect(auth).toMatch(/^Bearer \S+$/)
+  })
+
+  test('evento já excluído em outra aba some da lista, sem aviso de sucesso', async ({ page }) => {
+    const mock = list([closed])
+    let gone = false
+    await backend(page, none, (request => gone ? { status: 200, json: [], headers: { 'content-range': '*/0' } } : mock.events(request)) as Reply,
+      { '/functions/v1/delete-event': () => { gone = true; return { status: 404, json: { error: 'EVENT_NOT_FOUND' } } } })
+    await page.goto('/eventos')
+    await page.getByRole('button', { name: 'Excluir evento Chá encerrado' }).click()
+    await page.getByRole('button', { name: 'Excluir definitivamente' }).click()
+    await expect(page.getByRole('heading', { name: 'Chá encerrado' })).toHaveCount(0)
+    await expect(page.getByRole('status').filter({ hasText: 'Evento “Chá encerrado” excluído.' })).toHaveCount(0)
+  })
+})

@@ -17,12 +17,13 @@ function snapshot(items: GuestItem[]): Snapshot {
 const diaper: GuestItem = { id: '70000000-0000-4000-8000-000000000007', title: 'Fraldas tamanho P', description: 'Pacote fictício.',
   category: 'fralda', diaper_size: 'P', limit: 6, committed: 0, own: null }
 
-async function backend(page: Page, options: { items?: GuestItem[]; failReads?: () => boolean; event?: Partial<Snapshot['event']> } = {}) {
+async function backend(page: Page, options: { items?: GuestItem[]; failReads?: () => boolean; event?: Partial<Snapshot['event']>; refuseExchange?: boolean } = {}) {
   let current = snapshot(options.items ?? [diaper])
   current = { ...current, event: { ...current.event, ...options.event } }
   await page.route('https://e2e.supabase.co/functions/v1/guest', async route => {
     const body = route.request().postDataJSON()
     const reply = (status: number, json: unknown) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(json) })
+    if (body.action === 'exchange' && options.refuseExchange) return reply(401, { error: 'GUEST_SESSION_INVALID' })
     if (body.action === 'exchange') return reply(200, { session_token: 'fake-guest-session', snapshot: current })
     if (body.action === 'read') return options.failReads?.() ? reply(503, { error: 'TEMPORARILY_UNAVAILABLE' }) : reply(200, { snapshot: current })
     if (body.action === 'rsvp') {
@@ -87,12 +88,83 @@ test('lista vazia e falha de atualização têm estado próprio', async ({ page 
   await expect(alert).toHaveCount(0)
 })
 
-test('link inválido explica como recuperar o acesso', async ({ page }) => {
-  await backend(page)
-  await page.goto('/convite#invalido')
-  await expect(page.getByRole('heading', { name: 'Vamos recuperar seu acesso' })).toBeVisible()
-  await expect(page.getByRole('alert')).toContainText('Reabra o convite original')
-  await expectAccessible(page)
+// Cada motivo tem a sua mensagem: recarregar a página não é "acesso revogado".
+test.describe('convite que não abre', () => {
+  const reopenHint = 'Toque de novo no link que você recebeu'
+  test('recarregar a página pede para abrir o link de novo, sem falar em acesso revogado', async ({ page }) => {
+    await backend(page)
+    await page.goto(`/convite#${token}`)
+    await expect(page.getByText('Convidado fictício', { exact: false }).first()).toBeVisible()
+    await page.reload()
+    await expect(page.getByRole('heading', { level: 1, name: 'Abra o convite pelo link recebido' })).toBeVisible()
+    await expect(page.getByText(reopenHint)).toBeVisible()
+    await expect(page.getByText('expirou ou foi revogado')).toHaveCount(0)
+    await expect(page.getByRole('alert')).toHaveCount(0)
+    await expectAccessible(page)
+  })
+  test('endereço sem código mostra a mesma orientação', async ({ page }) => {
+    await backend(page)
+    await page.goto('/convite')
+    await expect(page.getByRole('heading', { level: 1, name: 'Abra o convite pelo link recebido' })).toBeVisible()
+    await expect(page.getByText(reopenHint)).toBeVisible()
+  })
+  test('link incompleto explica como recuperar o acesso', async ({ page }) => {
+    await backend(page)
+    await page.goto('/convite#invalido')
+    await expect(page.getByRole('heading', { name: 'Vamos recuperar seu acesso' })).toBeVisible()
+    await expect(page.getByRole('alert')).toContainText('Este link de convite está incompleto')
+    await expect(page.getByText('expirou ou foi revogado')).toHaveCount(0)
+    await expectAccessible(page)
+  })
+  test('código recusado pelo servidor avisa que o acesso expirou ou foi revogado', async ({ page }) => {
+    await backend(page, { refuseExchange: true })
+    await page.goto(`/convite#${token}`)
+    await expect(page.getByRole('heading', { name: 'Vamos recuperar seu acesso' })).toBeVisible()
+    await expect(page.getByRole('alert')).toContainText('Este acesso expirou ou foi revogado')
+  })
+  test('usar "Pular para o conteúdo" e recarregar não chama o link de incompleto', async ({ page }) => {
+    await backend(page)
+    await page.goto(`/convite#${token}`)
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+    await page.keyboard.press('Tab')
+    await page.keyboard.press('Enter')
+    await expect.poll(() => new URL(page.url()).hash).toBe('#conteudo')
+    await page.reload()
+    await expect(page.getByRole('heading', { level: 1, name: 'Abra o convite pelo link recebido' })).toBeVisible()
+    await expect(page.getByText('incompleto')).toHaveCount(0)
+  })
+  test('trocar o fragmento na mesma aba mostra o motivo certo a cada vez', async ({ page }) => {
+    await backend(page)
+    await page.goto(`/convite#${token}`)
+    await expect(page.getByText('Convidado fictício', { exact: false }).first()).toBeVisible()
+    await page.evaluate(() => { location.hash = '#invalido' })
+    await expect(page.getByRole('alert')).toContainText('Este link de convite está incompleto')
+    await page.evaluate(t => { location.hash = `#${t}` }, token)
+    await expect(page.getByText('Convidado fictício', { exact: false }).first()).toBeVisible()
+    await expect(page.getByRole('alert')).toHaveCount(0)
+    expect(new URL(page.url()).hash).toBe('')
+  })
+  test('sessão que expira durante o uso continua dizendo que o acesso expirou', async ({ page }) => {
+    await page.route('https://e2e.supabase.co/functions/v1/guest', async route => {
+      const body = route.request().postDataJSON()
+      const status = body.action === 'exchange' ? 200 : 401
+      const json = body.action === 'exchange' ? { session_token: 'fake-guest-session', snapshot: snapshot([diaper]) } : { error: 'GUEST_SESSION_INVALID' }
+      await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(json) })
+    })
+    await page.goto(`/convite#${token}`)
+    await expect(page.getByRole('heading', { level: 1, name: 'Reabra seu convite' })).toBeVisible({ timeout: 15000 })
+    await expect(page.getByRole('alert')).toContainText('Este acesso expirou ou foi revogado')
+  })
+  for (const [label, hash] of [['sem código', ''], ['incompleto', '#invalido']] as const) {
+    test(`convite ${label} cabe em 320 px com texto a 200% e passa no axe`, async ({ page }) => {
+      await page.setViewportSize({ width: 320, height: 640 })
+      await backend(page)
+      await page.goto(`/convite${hash}`)
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+      await page.addStyleTag({ content: 'html { font-size: 200% !important; }' })
+      await expectAccessible(page)
+    })
+  }
 })
 
 test('aviso de falha não muda enquanto a tela tenta de novo sozinha', async ({ page }) => {

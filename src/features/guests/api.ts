@@ -57,6 +57,7 @@ export async function guestCall(token: string, action: string, payload: Record<s
 export function guestMessage(error: unknown) {
   const messages: Record<string, string> = {
     GUEST_SESSION_INVALID: 'Este acesso expirou ou foi revogado. Reabra o convite original ou procure a organização.',
+    INVITE_LINK_INCOMPLETE: 'Este link de convite está incompleto. Abra de novo o link inteiro que você recebeu ou peça um novo à organização.',
     INSUFFICIENT_QUANTITY: 'Essa quantidade não está mais disponível. Consulte o saldo atualizado e escolha novamente.',
     RESERVATION_VERSION_CONFLICT: 'Sua escolha mudou em outra sessão. Revise os dados atualizados antes de salvar.',
     RESPONSE_VERSION_CONFLICT: 'Sua resposta mudou em outra sessão. Revise os dados antes de confirmar.',

@@ -1,3 +1,4 @@
+import { readPublicConfig } from '../../lib/config'
 import { supabase } from '../../lib/supabase'
 import { fromLocalDate } from './model'
 import type { EventDraft, EventRecord } from './model'
@@ -37,6 +38,21 @@ export async function transitionEvent(event: EventRecord, status: 'published' | 
   const { data, error } = await getClient().rpc('transition_event', { p_event_id: event.id, p_version: event.version, p_status: status }).single()
   if (error) throw error
   return data as EventRecord
+}
+// Edge `delete-event`: o servidor confere dono, estado (só rascunho e encerrado) e
+// versão, e remove os arquivos. `storage_cleanup: 'pending'` também é sucesso.
+export async function deleteEvent(event: EventRecord) {
+  const config = readPublicConfig(import.meta.env)
+  if (config.status !== 'ready') throw new Error('BACKEND_UNAVAILABLE')
+  const { data: { session } } = await getClient().auth.getSession()
+  if (!session) throw Object.assign(new Error('AUTH_REQUIRED'), { status: 401 })
+  const response = await fetch(`${config.config.url}/functions/v1/delete-event`, {
+    method: 'POST', cache: 'no-store',
+    headers: { 'Content-Type': 'application/json', apikey: config.config.key, Authorization: `Bearer ${session.access_token}` },
+    body: JSON.stringify({ event_id: event.id, version: event.version }),
+  })
+  const data = await response.json().catch(() => null)
+  if (!response.ok) throw Object.assign(new Error(data?.error ?? 'TEMPORARILY_UNAVAILABLE'), { status: response.status })
 }
 export function coverUrl(path: string) { return getClient().storage.from('event-public').getPublicUrl(path).data.publicUrl }
 export async function uploadCover(event: EventRecord, file: File) {

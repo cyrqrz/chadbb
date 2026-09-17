@@ -15,6 +15,8 @@ export function errorMessage(error: unknown): string {
     EVENT_ENDS_BEFORE_START: 'O término deve ser depois do início.',
     EVENT_RETENTION_DUE: 'Este evento terminou há mais de 30 dias e está na fila de exclusão de dados pessoais. Não é possível alterá-lo.',
     EVENT_PURGED: 'Os dados pessoais deste evento já foram excluídos pela política de retenção. Não é possível alterá-lo.',
+    EVENT_NOT_DELETABLE: 'Só é possível excluir eventos em rascunho ou encerrados. Encerre o evento antes de excluí-lo.',
+    EVENT_VERSION_CONFLICT: 'Este evento mudou em outra aba. A lista foi atualizada: confira e tente de novo.',
     INVALID_TRANSITION: 'Essa mudança de estado não está disponível.',
     INVALID_QUANTITY: 'Informe uma quantidade inteira entre 1 e 10.000.',
     PRODUCT_UNAVAILABLE: 'Este produto não está mais disponível no catálogo.',

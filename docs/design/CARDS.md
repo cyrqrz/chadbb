@@ -69,6 +69,9 @@ um divisor antes das ações; não de caixas coloridas dentro do card.
 | Título antes dos selos no DOM | Quem navega por títulos não ouve o status (“Completo”, “Compra informada”), que vem antes. Opção: título primeiro no DOM e selos com `order: -1` | G4 |
 | Número repetido no painel | “6 de 6 pacotes comprometidos” é lido no número e na barra | G4 (painel novo) |
 | “Adicionando…” e foco após incluir | O `aria-label` fixo esconde o estado ocupado; depois de incluir, o formulário some e o foco se perde (o status é anunciado) | G4 |
+| Campo de quantidade durante o envio | Com `busy`, o campo fica `readOnly` + `aria-disabled` e mantém o foco, mas não muda de aparência (o tracejado de `:disabled` indica “somente leitura” e piscaria a cada envio). Definir um estado visual de “enviando” | G4 |
+| “Enviando…” no CTA do convite | “Escolher presente” / “Atualizar quantidade” não mudam durante o envio; a presença já mostra “Aguarde…” | G4 |
+| Foco em outros controles do convite | “Já comprei”, “Cancelar reserva”, “Novo tamanho”, o fieldset da presença e “Quantas pessoas vão?” usam `disabled={busy}` e soltam o foco em qualquer envio da página (anterior à G3.1) | G4/G5 |
 
 ## 5. Critérios de aceite
 
