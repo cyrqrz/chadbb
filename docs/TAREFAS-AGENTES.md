@@ -134,10 +134,10 @@ o ensaio familiar no celular continua pendente.
   leitura; o valor 2 bloqueou o login após dois pedidos. Mantido o
   intervalo de 60 s por e-mail (`smtp_max_frequency`).
 - [x] **2026-09-17 · Exclusão de evento (`delete_event` + Edge `delete-event`).**
-  G1–G6 concluídos (detalhes em "Concluídas"). Falta só o teste pelo botão na
-  produção, depois do merge da PR #11, com um evento de rascunho criado só para
-  isso; em seguida o Codex confere, só com leitura, o registro em
-  `private.event_deletions`. **Não liberar o preview**
+  G1–G6 concluídos (detalhes em "Concluídas"). Testado pelo botão na produção
+  em 2026-09-17: dois eventos excluídos (um encerrado e um rascunho). Os registros
+  em `private.event_deletions`, conferidos só com leitura, trazem as contagens e
+  a limpeza do Storage concluída, sem falhas. **Não liberar o preview**
   (`claude-front.chadbb.pages.dev`) em `GUEST_ALLOWED_ORIGINS`: ele usa o banco
   de produção e viraria uma segunda porta para os convites reais.
   Códigos: `AUTH_REQUIRED`, `EVENT_NOT_FOUND`, `EVENT_VERSION_CONFLICT`,
@@ -224,7 +224,7 @@ mantém o cálculo antigo só como transição, isolado em `src/features/guests/
 | Agente | Tarefa | Branch | Situação |
 |---|---|---|---|
 | Claude | PR #11 (convite e “Excluir evento”) mergeada em 17/09, depois do G5/G6. Próximos: pedidos urgentes de 17/09 (código no login, botão de envio, campos de data no iPhone); depois T-F7 · G4 (26–30/09) — ver `docs/design/RETOMADA-CLAUDE.md` | `claude/front` | pedidos de 17/09 |
-| Codex | Exclusão de evento publicada; aguarda o teste pelo botão (PR #11). T-B5 pausada (plano em PLANO-DESEMPENHO-T-B5.md, remoto não autorizado) | `codex/back` | livre para a próxima tarefa |
+| Codex | T-B5: runner revalidado localmente em 17/09; G2 remoto aguardando aprovação. Exclusão de evento concluída e testada em produção (plano em PLANO-DESEMPENHO-T-B5.md, remoto não autorizado) | `codex/back` | livre para a próxima tarefa |
 
 ## Concluídas
 

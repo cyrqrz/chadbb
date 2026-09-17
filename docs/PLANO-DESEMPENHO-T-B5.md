@@ -79,6 +79,24 @@ Resultado local não comprova latência da produção; nenhuma meta remota foi
 declarada cumprida. G1 valida também a confiabilidade do instrumento, mesmo
 quando ele corretamente reprova uma medição.
 
+### Revalidação em 2026-09-17, depois do G3 e da PR #11
+
+- Primeiro ensaio: **reprovado na sincronização, sem nenhuma amostra**. O
+  runner procurava textos antigos da tela do convite ("pacotes disponíveis",
+  "Vou levar", "Você confirmou…"), que o G3.1 trocou. Nessa execução, a carga
+  não teve erros, mas o p95 local foi de **4846 ms** na leitura e **4822 ms**
+  na escrita. A limpeza zerou tudo. O resultado fica registrado.
+- Correção somente no runner: "N de 6 disponíveis", "Escolher presente" /
+  "Atualizar quantidade" e a reserva própria em "Sua reserva".
+- Novo ensaio: **225 leituras, p95 1205 ms; 25 escritas, p95 1205 ms**; zero
+  erros; sincronização **4838 / 5155 / 5053 ms**; duas leituras canceladas
+  esperadas; 363 POSTs guest; limpeza zerada. Critérios locais aprovados.
+- `performance-gates` 13/13 e isolamento (`event-performance.integration`) 3/3.
+- A variação local (711 → 4846 → 1205 ms) mostra a sensibilidade do ambiente
+  Docker/WSL. Não é evidência sobre a produção.
+- Cotas da produção: no máximo 420 POSTs, contra 1200/min por IP e 2400/min no
+  total. Os convidados reais continuam com pelo menos 1980/min no total.
+
 ## G2 — Aprovação e medição remota
 
 Apresentar evidências e dry-run ao titular antes da execução. Comando proposto:
