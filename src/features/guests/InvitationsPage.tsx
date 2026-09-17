@@ -10,7 +10,7 @@ import { errorMessage } from '../../lib/errors'
 import { failedLast, live } from '../../lib/query'
 import { useLastError } from '../../lib/useLastError'
 import { EmptyState, ErrorState, LoadingState, RefreshStatus, SuccessMessage } from '../../components/States'
-import { BackLink, Button, StatusBadge } from '../../components/ui'
+import { BackLink, Button, Progress, StatusBadge } from '../../components/ui'
 import type { StatusTone } from '../../components/ui'
 
 export function InvitationsPage() {
@@ -101,12 +101,14 @@ const responseIcons: Partial<Record<Invitation['response'], string>> = { no: '�
 function GuestCard({ invitation: inv, canEdit, canRevoke, onEdit, onRotate, onRevoke }: {
   invitation: Invitation; canEdit: boolean; canRevoke: boolean; onEdit: () => void; onRotate: () => void; onRevoke: () => void
 }) {
-  return <li className="card guest-card">
-    <div className="flex flex-wrap gap-2">
-      <StatusBadge tone="neutral">{inv.kind === 'family' ? `Família · até ${inv.capacity} pessoas` : 'Individual'}</StatusBadge>
-      {inv.revoked && <StatusBadge tone="danger">Acesso revogado</StatusBadge>}
-    </div>
-    <h3 className="text-h3 font-bold break-words">{inv.name}</h3>
+  return <li className="card card-stack guest-card">
+    <header className="card-header">
+      <div className="card-badges">
+        <StatusBadge tone="neutral">{inv.kind === 'family' ? `Família · até ${inv.capacity} pessoas` : 'Individual'}</StatusBadge>
+        {inv.revoked && <StatusBadge tone="danger">Acesso revogado</StatusBadge>}
+      </div>
+      <h3 className="card-title">{inv.name}</h3>
+    </header>
     <p><StatusBadge tone={responseTones[inv.response]} icon={responseIcons[inv.response]}>{responseLabels[inv.response]}{inv.response === 'yes' ? ` · ${inv.attending} pessoa(s)` : ''}</StatusBadge></p>
     {inv.revoked && <p className="hint">O link antigo não funciona mais; as respostas e escolhas foram preservadas.</p>}
     <div className="card-actions">
@@ -118,7 +120,7 @@ function GuestCard({ invitation: inv, canEdit, canRevoke, onEdit, onRotate, onRe
 }
 
 function Figure({ value, of, children }: { value: number; of?: number | null; children: ReactNode }) {
-  return <><p className="stat">{value}{of != null && <span className="text-lg font-normal text-stone-600"> de {of}</span>}</p><p className="mt-1">{children}</p></>
+  return <div><p className="stat">{value}{of != null && <span className="text-lg font-normal text-muted"> de {of}</span>}</p><p className="mt-1">{children}</p></div>
 }
 
 function Summary({ summary }: { summary: PanelSummary }) {
@@ -127,14 +129,14 @@ function Summary({ summary }: { summary: PanelSummary }) {
   return <section className="mt-4" aria-labelledby="summary-title">
     <h2 id="summary-title" className="text-2xl font-semibold">Resumo</h2>
     <div className="stagger mt-5 grid gap-4 md:grid-cols-2">
-      <article className="card" aria-labelledby="people-title"><h3 id="people-title" className="eyebrow">Pessoas</h3>
+      <article className="card card-stack" aria-labelledby="people-title"><h3 id="people-title" className="eyebrow">Pessoas</h3>
         <Figure value={summary.people_confirmed}>pessoas confirmadas</Figure>
-        <p className="hint mt-3">Pessoas informadas nos convites com a resposta “{responseLabels.yes}”.</p>
+        <p className="hint">Pessoas informadas nos convites com a resposta “{responseLabels.yes}”.</p>
       </article>
-      <article className="card" aria-labelledby="answers-title"><h3 id="answers-title" className="eyebrow">Convites</h3>
+      <article className="card card-stack" aria-labelledby="answers-title"><h3 id="answers-title" className="eyebrow">Convites</h3>
         <Figure value={inv.answered} of={inv.total}>convites respondidos</Figure>
-        <dl className="mt-4 grid gap-1 text-sm sm:grid-cols-2 sm:gap-x-6">{rows.map(([label, value]) => <div key={label} className="flex justify-between gap-3 border-b border-stone-200 py-1"><dt>{label}</dt><dd className="font-semibold">{value}</dd></div>)}</dl>
-        {inv.revoked > 0 && <p className="hint mt-3">{inv.revoked} {inv.revoked === 1 ? 'convite está' : 'convites estão'} com acesso revogado.</p>}
+        <dl className="grid gap-1 text-sm sm:grid-cols-2 sm:gap-x-6">{rows.map(([label, value]) => <div key={label} className="flex justify-between gap-3 border-b border-stone-200 py-1"><dt>{label}</dt><dd className="font-semibold">{value}</dd></div>)}</dl>
+        {inv.revoked > 0 && <p className="hint">{inv.revoked} {inv.revoked === 1 ? 'convite está' : 'convites estão'} com acesso revogado.</p>}
       </article>
     </div>
   </section>
@@ -144,15 +146,19 @@ type PanelItem = Dashboard['items'][number]
 
 function Diapers({ items, eventId }: { items: PanelItem[]; eventId: string }) {
   return <section className="mt-10" aria-labelledby="diaper-totals"><h2 id="diaper-totals" className="text-2xl font-semibold">Fraldas por tamanho</h2>
-    <p className="mt-2 text-stone-600">Pacotes comprometidos: os que os convidados vão levar e os que já informaram ter comprado.</p>
+    <p className="mt-2 text-muted">Pacotes comprometidos: os que os convidados vão levar e os que já informaram ter comprado.</p>
     {!items.length ? <div className="mt-5"><EmptyState title="Nenhum tamanho de fralda na lista.">Prepare a lista do chá para acompanhar os pacotes por tamanho.</EmptyState></div> :
       <ul className="stagger mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{items.map(item => {
         const available = availableOf(item)
-        const filled = item.limit ? Math.min(100, Math.round(item.committed / item.limit * 100)) : 0
-        return <li className="card" key={item.id}><h3 className="eyebrow">Tamanho {item.diaper_size}</h3>
+        const limit = item.limit ?? 0
+        return <li className="card card-stack" key={item.id}>
+          <header className="card-header">
+            {available === 0 && <div className="card-badges"><StatusBadge tone="success">Completo</StatusBadge></div>}
+            <h3 className="card-title">Tamanho {item.diaper_size}</h3>
+          </header>
           <Figure value={item.committed} of={item.limit}>pacotes comprometidos</Figure>
-          <div className="meter mt-3" aria-hidden="true"><span style={{ width: `${filled}%` }} /></div>
-          <p className="mt-3 font-semibold">{available === 0 ? 'Tamanho completo' : `${available} ${available === 1 ? 'disponível' : 'disponíveis'}`}</p>
+          <Progress value={item.committed} max={limit} label={`${item.committed} de ${limit} pacotes comprometidos`} />
+          {available !== 0 && <p className="availability-text">{available} {available === 1 ? 'disponível' : 'disponíveis'}</p>}
         </li>
       })}</ul>}
     <Link className="text-link mt-4 inline-block min-h-11 py-2" to={`/eventos/${eventId}/presentes`}>Organizar fraldas e mimos</Link>
@@ -164,26 +170,33 @@ function Treats({ items }: { items: PanelItem[] }) {
   const others = items.filter(item => item.committed === 0)
   const units = (n: number) => `${n} ${n === 1 ? 'unidade' : 'unidades'}`
   return <section className="mt-10" aria-labelledby="treat-totals"><h2 id="treat-totals" className="text-2xl font-semibold">Mimos</h2>
-    <p className="mt-2 text-stone-600">Mimos não têm limite: cada convidado informa quantas unidades vai levar.</p>
+    <p className="mt-2 text-muted">Mimos não têm limite: cada convidado informa quantas unidades vai levar.</p>
     {!items.length ? <div className="mt-5"><EmptyState title="Nenhum mimo na lista.">Os mimos são opcionais. Inclua-os pela lista de presentes, se quiser.</EmptyState></div> : <>
       {!chosen.length ? <div className="mt-5"><EmptyState title="Nenhum mimo escolhido ainda." /></div> :
-        <ul className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{chosen.map(item => <li className="card flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1" key={item.id}><span className="font-semibold">{item.title}</span><span>{units(item.committed)}</span></li>)}</ul>}
-      {others.length > 0 && <details className="mt-4"><summary className="min-h-11 cursor-pointer py-2 font-semibold">Mimos ainda não escolhidos ({others.length})</summary><ul className="mt-2 list-disc space-y-1 pl-6 text-stone-600">{others.map(item => <li key={item.id}>{item.title}</li>)}</ul></details>}
+        <ul className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{chosen.map(item => <li className="card card-stack" key={item.id}><h3 className="card-title">{item.title}</h3><p className="availability-text">{units(item.committed)}</p></li>)}</ul>}
+      {others.length > 0 && <details className="mt-4"><summary className="min-h-11 cursor-pointer py-2 font-semibold">Mimos ainda não escolhidos ({others.length})</summary><ul className="mt-2 list-disc space-y-1 pl-6 text-muted">{others.map(item => <li key={item.id}>{item.title}</li>)}</ul></details>}
     </>}
   </section>
 }
 
 const statusLabels: Record<string, string> = { reserved: 'Vai levar', purchase_declared: 'Compra informada' }
+const statusTones: Record<string, StatusTone> = { reserved: 'brand', purchase_declared: 'success' }
 
 function Choices({ reservations }: { reservations: DashboardReservation[] }) {
   const groups = [['fralda', 'Fraldas'], ['mimo', 'Mimos']] as const
   return <section className="mt-10" aria-labelledby="promises"><h2 id="promises" className="text-2xl font-semibold">Escolhas dos convidados</h2>
-    <p className="mt-2 text-stone-600">“Compra informada” é só uma declaração do convidado: o site não recebe pagamento nem confere a compra.</p>
+    <p className="mt-2 text-muted">“Compra informada” é só uma declaração do convidado: o site não recebe pagamento nem confere a compra.</p>
     {!reservations.length ? <div className="mt-5"><EmptyState title="Nenhuma escolha ainda.">As escolhas dos convidados aparecerão aqui.</EmptyState></div> : groups.map(([category, label]) => {
       const list = reservations.filter(r => r.category === category)
       return <div key={category} className="mt-6"><h3 className="text-xl font-semibold">{label}</h3>
-        {!list.length ? <p className="mt-2 text-stone-600">Nenhuma escolha de {label.toLowerCase()} ainda.</p> :
-          <ul className="mt-3 grid gap-3 md:grid-cols-2">{list.map((r, index) => <li className="card" key={r.id ?? index}><p className="font-semibold break-words">{r.title} · {r.quantity} {r.category === 'fralda' ? 'pacote(s)' : 'unidade(s)'}</p><p className="mt-2 break-words">{r.name}</p><span className="badge mt-3">{statusLabels[r.status] ?? r.status}</span></li>)}</ul>}
+        {!list.length ? <p className="mt-2 text-muted">Nenhuma escolha de {label.toLowerCase()} ainda.</p> :
+          <ul className="mt-3 grid gap-3 md:grid-cols-2">{list.map((r, index) => <li className="card card-stack" key={r.id ?? index}>
+            <header className="card-header">
+              <div className="card-badges"><StatusBadge tone={statusTones[r.status] ?? 'neutral'}>{statusLabels[r.status] ?? r.status}</StatusBadge></div>
+              <h4 className="card-title">{r.title} · {r.quantity} {r.category === 'fralda' ? (r.quantity === 1 ? 'pacote' : 'pacotes') : (r.quantity === 1 ? 'unidade' : 'unidades')}</h4>
+            </header>
+            <p className="break-words">{r.name}</p>
+          </li>)}</ul>}
       </div>
     })}
   </section>

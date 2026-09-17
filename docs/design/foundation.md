@@ -1,4 +1,4 @@
-# Foundation do chadbb (G2 + G2.1)
+# Foundation do chadbb (G2, G2.1 e G3.1)
 
 Base visual única do front. Os valores vivem em `src/styles.css` (`@theme` e
 `:root`); os componentes, em `src/components/ui/`. A página de amostras fica em
@@ -132,11 +132,13 @@ opacidade), ocupado (`aria-disabled`, mantém o foco), erro e selecionado
 | `Button` | `<button>` com rótulo | `primary` (uma por contexto), `secondary`, `ghost`, `danger`, `link` (só dentro de frase); `md` 48 px, `sm` 44 px | `--radius-control`, `--control-height-*`, `--space-control-x` | quebra linha; em `.card-actions` ocupa a largura quando o card é estreito | `busy` = `aria-disabled` e ignora cliques sem soltar o foco (A8); `disabled` só quando a ação não existe; destrutivas pedem confirmação |
 | `Button variant="icon"` | `<button>` quadrado com ícone decorativo | 44 px | `--radius-control` | — | `aria-label` obrigatório no tipo; ícone com `aria-hidden` |
 | `BackLink` | `<a>` com seta | — | `--radius-control`, `--touch-min` | — | alvo de 44 px; seta fora do nome acessível (A4) |
-| Card (`.card`, `.guest-card`) | superfície com borda sutil | `.guest-card` é contêiner de consulta | `--radius-surface`, `--space-card`, `--color-border-subtle` | abaixo de 22 rem as ações empilham; acima ficam em linha, perigo à direita | título do card como `h3`; ações com nome completo (o contexto vai em `.sr-only`) |
+| Card (`.card` + `.card-stack`) | `card-header` (selos, título, descrição), conteúdo, área interativa, `card-actions` abaixo do divisor; detalhes em `CARDS.md` | `.guest-card` é contêiner de consulta; `.product-listed` para item já incluído | `--card-radius`, `--card-padding`, `--card-gap`, `--card-border`, `--card-surface`, `--action-gap`, `--divider-color` | abaixo de 22 rem as ações do card de convidado empilham; acima ficam em linha, perigo à direita | título do card como `h3` (ou `h4` sob um grupo); ações com nome completo (o contexto vai em `.sr-only`); sem caixa colorida dentro |
 | `StatusBadge` | selo pill com ícone + texto | `brand`, `neutral`, `success`, `warning`, `danger` | `--radius-pill` | quebra linha | ícone decorativo; a cor nunca é a única pista |
 | `Field` (input, select, textarea) | rótulo, controle, dica, erro | — | `--radius-field`, `--control-height-md`, `--color-border` | largura total | `htmlFor`, `aria-describedby` (dica e erro) e `aria-invalid`; somente leitura com contorno tracejado |
 | `Tabs` | `nav` rotulada com botões | — | `--radius-control` | quebra linha | `aria-pressed`; troca de conteúdo sem mover o foco |
-| `Progress` | trilho + barra | completa fica verde | `--radius-pill` | largura do contêiner | só visual; o número fica escrito ao lado |
+| `Progress` | trilho + barra | completa fica verde | `--radius-pill` | largura do contêiner | sem `label`, decorativa (o número está escrito ao lado); com `label`, `progressbar` com `aria-label`, `aria-valuenow/max` e `aria-valuetext` |
+| `Availability` | texto “N de M disponíveis” + `Progress` | — | `.availability` | largura do contêiner | texto antes da barra; a barra recebe o nome “N de M {unidade} reservados” |
+| `QuantityField` | rótulo + stepper `− \| valor \| +` | `label` (padrão “Quantidade”), `context` só para leitor de tela, `min`/`max` | `--control-radius`, `--control-height-md`, `--color-border` | não passa da largura do card | grupo rotulado; `−`/`+` com nome (“Diminuir pacotes”); nos limites, `aria-disabled` mantém o foco; campo vazio volta ao mínimo |
 | `Section` | `section` + título + descrição | `level` 2 ou 3 | `--text-h2` | — | `aria-labelledby` |
 | `Skeleton` | bloco | largura e altura | `--radius-control` | — | decorativo; o anúncio fica com o `LoadingState` |
 | `Pagination` | `nav` + anterior/próxima + “Página X de Y” | recebe `pageSize` | botões `secondary` | quebra linha | `nav` rotulada; botões indisponíveis nas pontas |
@@ -151,8 +153,8 @@ Consultas (`src/lib/query.ts`, `src/lib/useLastError.ts`): `failedLast` e
 `useLastError` mantêm a tela de erro (e o foco no botão) durante a nova tentativa,
 e evitam que uma falha de atualização apague uma tela que já tinha dados.
 
-Ficam para as fases seguintes: `QuantityField` (G3, com o convite novo),
-`ActionMenu` e `ConfirmDialog` no lugar de `window.confirm` (G4).
+Ficam para as fases seguintes: `ActionMenu` e `ConfirmDialog` no lugar de
+`window.confirm`, e componentes React para os cards (G4).
 
 ## Automação de acessibilidade
 

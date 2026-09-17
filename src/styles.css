@@ -281,7 +281,7 @@
   .card-disclosure { display: flex; width: 100%; flex-direction: column; gap: 12px; padding-block: 4px 12px; }
   .availability { display: flex; flex-direction: column; gap: 6px; }
   .availability-text { font-weight: 650; font-variant-numeric: tabular-nums; }
-  .stepper { display: inline-flex; max-width: 100%; align-items: stretch; overflow: hidden; border: 1.5px solid var(--color-border); border-radius: var(--control-radius); background: var(--color-surface); }
+  .stepper { display: inline-flex; align-self: flex-start; max-width: 100%; align-items: stretch; overflow: hidden; border: 1.5px solid var(--color-border); border-radius: var(--control-radius); background: var(--color-surface); }
   .stepper:focus-within { border-color: var(--color-brand); box-shadow: var(--ring); }
   .stepper .btn-icon { min-height: var(--control-height-md); width: var(--control-height-md); border: 0; border-radius: 0; font-size: 1.25rem; }
   .field .stepper input { width: 4.5rem; min-height: var(--control-height-md); border: 0; border-inline: 1px solid var(--divider-color); border-radius: 0; box-shadow: none; text-align: center; font-variant-numeric: tabular-nums; }
@@ -289,7 +289,7 @@
   .stepper .btn-icon:focus-visible { outline-offset: -3px; }
 
   /* Card de convidado (G2.1): ações empilham quando o card é estreito. */
-  .guest-card { container: guest-card / inline-size; display: flex; flex-direction: column; gap: 0.5rem; }
+  .guest-card { container: guest-card / inline-size; }
   .guest-card .card-actions { align-items: stretch; gap: 0.5rem; }
   .guest-card .card-actions > * { width: 100%; justify-content: center; margin-inline-start: 0; padding-inline: var(--space-control-x); }
   @container guest-card (min-width: 22rem) {

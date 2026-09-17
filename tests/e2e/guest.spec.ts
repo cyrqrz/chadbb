@@ -344,6 +344,8 @@ test.describe('G3.1 · card de fralda (referência do sistema de cards)', () => 
     await expect(stepper.getByRole('spinbutton')).toHaveValue('2')
     expect(await stepper.getByRole('button', { name: 'Aumentar pacotes' }).evaluate(el => getComputedStyle(el).borderTopWidth)).toBe('0px')
     expect(parseFloat(await stepper.evaluate(el => getComputedStyle(el).borderTopLeftRadius))).toBeLessThanOrEqual(12)
+    // O contorno envolve só − | valor | +: não estica até a borda do card.
+    expect(await stepper.evaluate(el => el.getBoundingClientRect().width - [...el.children].reduce((sum, child) => sum + child.getBoundingClientRect().width, 0))).toBeLessThanOrEqual(4)
   })
 
   test('um CTA principal e ações secundárias abaixo de um divisor', async ({ page }) => {

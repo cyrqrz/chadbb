@@ -1,8 +1,8 @@
 # Retomada do Claude (front) — 2026-09-16, fim da sessão
 
-Estado salvo às pressas para continuar em outra máquina. **Os commits
-“WIP” desta data não passaram por aprovação de diff nem estão com todos os
-testes verdes**; não abrir PR antes de terminar os passos abaixo.
+Retomado em outra máquina no mesmo dia. O commit “WIP” foi completado pelo
+commit final do G3 + G3.1, aprovado pelo usuário; os passos da G3.1 abaixo
+ficam como histórico.
 
 ## Como retomar
 
@@ -23,8 +23,8 @@ testes verdes**; não abrir PR antes de terminar os passos abaixo.
 |---|---|
 | G0, G1 | mergeados (PR #7) |
 | G2, G2.1 | mergeados (PR #8); fontes Manrope + Fraunces aprovadas |
-| G3 (convite, página inicial, prévia WhatsApp) | **pronto e testado** (check ok, e2e 112/112, browser 8/8, QA aprovado com ressalvas); **aguardando aprovação do usuário** para commit/PR. Páginas: visual https://claude.ai/artifact/8uLLVMPz2fR3KGYm7hSWEZ · diff https://claude.ai/artifact/Gzn5aPFpNYe9k3KqRFdRv3 |
-| G3.1 (sistema de cards, `docs/design/cards-original.md`) | **em andamento, incompleto** |
+| G3 (convite, página inicial, prévia WhatsApp) | **aprovado** pelo usuário em 2026-09-16; no PR junto com a G3.1 |
+| G3.1 (sistema de cards, `docs/design/CARDS.md`) | **aprovado** em 2026-09-16 (check 44/44, e2e 164/164, browser 8/8, QA com ressalvas em `CARDS.md` §4). Revisão: https://claude.ai/artifact/5T2XkXsw1iyJvkWY5seSWN. PR aberto; próximo: G4 |
 
 ### G3.1 — feito até agora
 

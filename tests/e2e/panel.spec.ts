@@ -68,7 +68,7 @@ test('painel separa convites, pessoas, fraldas por tamanho e mimos', async ({ pa
   const sizes = page.getByRole('region', { name: 'Fraldas por tamanho' }).getByRole('listitem')
   await expect(sizes).toHaveCount(4)
   await expect(sizes.filter({ hasText: 'Tamanho P' })).toContainText('6 de 6')
-  await expect(sizes.filter({ hasText: 'Tamanho P' })).toContainText('Tamanho completo')
+  await expect(sizes.filter({ hasText: 'Tamanho P' })).toContainText('Completo')
   await expect(sizes.filter({ hasText: 'Tamanho M' })).toContainText('15 disponíveis')
   await expect(sizes.filter({ hasText: 'Tamanho XG' })).toContainText('5 disponíveis')
 
@@ -79,9 +79,9 @@ test('painel separa convites, pessoas, fraldas por tamanho e mimos', async ({ pa
 
   const choices = page.getByRole('region', { name: 'Escolhas dos convidados' })
   await expect(choices).toContainText('só uma declaração do convidado')
-  await expect(choices.getByRole('heading', { name: 'Fraldas' })).toBeVisible()
-  await expect(choices.getByRole('heading', { name: 'Mimos' })).toBeVisible()
-  await expect(choices.getByText('Compra informada', { exact: true })).toBeVisible()
+  await expect(choices.getByRole('heading', { name: 'Fraldas', exact: true })).toBeVisible()
+  await expect(choices.getByRole('heading', { name: 'Mimos', exact: true })).toBeVisible()
+  await expect(choices.locator('.badge', { hasText: 'Compra informada' })).toBeVisible()
   await expectAccessible(page)
   await page.screenshot({ path: `test-results/panel-${test.info().project.name}.png`, fullPage: true })
 })
@@ -96,7 +96,7 @@ test('painel usa o resumo e o saldo enviados pelo servidor', async ({ page }) =>
   await expect(page.getByRole('article', { name: 'Convites' })).toContainText('3 de 5convites respondidos')
   const sizes = page.getByRole('region', { name: 'Fraldas por tamanho' }).getByRole('listitem')
   await expect(sizes.filter({ hasText: 'Tamanho M' })).toContainText('11 disponíveis')
-  await expect(sizes.filter({ hasText: 'Tamanho G' })).toContainText('Tamanho completo')
+  await expect(sizes.filter({ hasText: 'Tamanho G' })).toContainText('Completo')
 })
 
 test('painel vazio orienta o próximo passo', async ({ page }) => {
@@ -420,5 +420,317 @@ test.describe('G2.1 · card de convidado', () => {
     const box = (await item.boundingBox())!
     const edit = (await item.getByRole('button', { name: /^Editar convite/ }).boundingBox())!
     expect(edit.width).toBeGreaterThan(box.width * 0.75)
+  })
+})
+
+// G3.1: os cards do organizador seguem a anatomia do card de fralda do convite.
+test.describe('G3.1 · cards do organizador', () => {
+  const itemCards = (page: Page) => page.locator('article.card, li.card, a.card')
+  async function sameAnatomy(page: Page) {
+    await expect(itemCards(page).first()).toBeVisible()
+    await expect(page.locator(':is(article, li, a).card:not(.card-stack)')).toHaveCount(0)
+    // Sem caixa colorida dentro do card.
+    await expect(page.locator('.card :is(.notice, .state-warning)')).toHaveCount(0)
+  }
+
+  test('painel: fralda por tamanho com barra acessível e selo de completo', async ({ page }) => {
+    await backend(page, () => ({ status: 200, json: full }))
+    await page.goto(`/eventos/${eventId}/convites`)
+    const sizes = page.getByRole('region', { name: 'Fraldas por tamanho' }).getByRole('listitem')
+    const p = sizes.filter({ has: page.getByRole('heading', { name: 'Tamanho P' }) })
+    await expect(p.getByRole('progressbar', { name: '6 de 6 pacotes comprometidos' })).toBeVisible()
+    await expect(p.locator('.badge-success')).toHaveText('✓Completo')
+    await expect(p).not.toContainText('disponíve')
+    const m = sizes.filter({ has: page.getByRole('heading', { name: 'Tamanho M' }) })
+    await expect(m.getByRole('progressbar', { name: '4 de 19 pacotes comprometidos' })).toBeVisible()
+    await expect(m).toContainText('15 disponíveis')
+    await expect(m.locator('.badge-success')).toHaveCount(0)
+    await sameAnatomy(page)
+    await expectAccessible(page)
+  })
+
+  test('painel: escolha dos convidados usa selo com ícone', async ({ page }) => {
+    await backend(page, () => ({ status: 200, json: full }))
+    await page.goto(`/eventos/${eventId}/convites`)
+    const choices = page.getByRole('region', { name: 'Escolhas dos convidados' })
+    await expect(choices.getByRole('heading', { name: 'Fraldas tamanho P · 6 pacotes' })).toBeVisible()
+    await expect(choices.locator('.badge-success')).toHaveText('✓Compra informada')
+  })
+
+  const g = product(1, 'G')
+  const listedG = { id: '90000000-0000-4000-8000-000000000009', event_id: eventId, product_id: g.id, quantity_requested: 12, category: 'fralda', diaper_size: 'G', version: 1, product: g }
+  const bottle = { id: '80000000-0000-4000-8000-000000000005', title: 'Mamadeira fictícia', description: '', platform: 'manual', category: 'mimo', diaper_size: null, active: false }
+  const listedBottle = { id: '90000000-0000-4000-8000-000000000008', event_id: eventId, product_id: bottle.id, quantity_requested: null, category: 'mimo', diaper_size: null, version: 1, product: bottle }
+  async function giftList(page: Page) {
+    await backend(page, () => ({ status: 200, json: full }), undefined, {
+      '/rest/v1/event_items': ({ url }) => {
+        const rows = url.searchParams.get('category') === 'eq.mimo' ? [listedBottle] : [listedG]
+        return { status: 200, json: rows, headers: { 'content-range': `0-0/1` } }
+      },
+      '/rest/v1/products': () => ({ status: 200, json: [g, product(2, 'M')], headers: { 'content-range': '0-1/2' } }),
+    })
+    await page.goto(`/eventos/${eventId}/presentes`)
+  }
+
+  test('lista: fralda usa o stepper e só libera a ação quando a quantidade muda', async ({ page }) => {
+    await giftList(page)
+    const card = page.getByRole('region', { name: 'Fraldas na lista' }).getByRole('article')
+    await expect(card.getByRole('heading', { name: 'Fraldas tamanho G' })).toHaveClass(/card-title/)
+    const field = card.getByRole('spinbutton', { name: 'Quantidade de Fraldas tamanho G' })
+    await expect(field).toHaveValue('12')
+    await expect(field).toHaveAttribute('max', '10000')
+    const stepper = card.getByRole('group', { name: 'Quantidade de Fraldas tamanho G' })
+    // O contorno envolve só − | valor | +: não estica até a borda do card.
+    expect(await stepper.evaluate(el => el.getBoundingClientRect().width - [...el.children].reduce((sum, child) => sum + child.getBoundingClientRect().width, 0))).toBeLessThanOrEqual(4)
+    const save = card.getByRole('button', { name: 'Atualizar quantidade' })
+    await expect(save).toBeDisabled()
+    await field.press('Enter')
+    await expect(card.getByRole('alert')).toHaveCount(0)
+    await card.getByRole('button', { name: 'Aumentar pacotes' }).click()
+    await expect(field).toHaveValue('13')
+    await expect(save).toBeEnabled()
+    await sameAnatomy(page)
+    await expectAccessible(page)
+  })
+
+  test('lista: mimo sem caixa interna e produto fora do catálogo como selo', async ({ page }) => {
+    await giftList(page)
+    await page.getByRole('button', { name: 'Mimos', exact: true }).click()
+    const card = page.getByRole('region', { name: 'Mimos na lista' }).getByRole('article')
+    await expect(card).toContainText('Sem limite de quantidade')
+    await expect(card.locator('.badge-warning')).toHaveText('!Fora do catálogo')
+    await sameAnatomy(page)
+    await expectAccessible(page)
+  })
+
+  test('catálogo: pacotes pelo stepper e nenhum botão preenchido nos cards', async ({ page }) => {
+    await giftList(page)
+    const catalog = page.getByRole('region', { name: 'Incluir itens avulsos' })
+    const m = catalog.getByRole('article').filter({ hasText: 'Fraldas tamanho M' })
+    await expect(m.getByRole('spinbutton', { name: 'Pacotes de Fraldas tamanho M' })).toHaveValue('1')
+    await m.getByRole('button', { name: 'Aumentar pacotes' }).click()
+    await expect(m.getByRole('spinbutton', { name: 'Pacotes de Fraldas tamanho M' })).toHaveValue('2')
+    await expect(m.getByRole('button', { name: 'Adicionar Fraldas tamanho M à lista' })).toHaveClass(/secondary/)
+    await expect(catalog.getByRole('article').filter({ hasText: 'Fraldas tamanho G' }).locator('.badge-success')).toHaveText('✓Já na lista')
+    await sameAnatomy(page)
+  })
+
+  // Lista com rotas de escrita simuladas; `calls` guarda o corpo de cada RPC.
+  async function giftListWith(page: Page, { status = 'published', write }: { status?: string; write?: Reply } = {}) {
+    const calls: Record<string, unknown>[] = []
+    const rpc: Reply = request => { calls.push(request.body); return write ? write(request) : { status: 500, json: { message: 'unexpected' } } }
+    await backend(page, () => ({ status: 200, json: full }), () => ({ status: 200, json: [{ ...event, status }] }), {
+      '/rest/v1/event_items': ({ url }) => {
+        const rows = url.searchParams.get('category') === 'eq.mimo' ? [listedBottle] : [listedG]
+        return { status: 200, json: rows, headers: { 'content-range': '0-0/1' } }
+      },
+      '/rest/v1/products': () => ({ status: 200, json: [g, product(2, 'M')], headers: { 'content-range': '0-1/2' } }),
+      '/rest/v1/rpc/set_event_item_quantity': rpc,
+      '/rest/v1/rpc/add_event_item': rpc,
+    })
+    await page.goto(`/eventos/${eventId}/presentes`)
+    return calls
+  }
+  const listCard = (page: Page) => page.getByRole('region', { name: 'Fraldas na lista' }).getByRole('article')
+  const catalogCard = (page: Page) => page.getByRole('region', { name: 'Incluir itens avulsos' }).getByRole('article').filter({ hasText: 'Fraldas tamanho M' })
+
+  test('stepper: nome acessível do grupo e dos botões nos dois cards', async ({ page }) => {
+    await giftListWith(page)
+    await expect(listCard(page).getByRole('group', { name: 'Quantidade de Fraldas tamanho G' })).toBeVisible()
+    await expect(catalogCard(page).getByRole('group', { name: 'Pacotes de Fraldas tamanho M' })).toBeVisible()
+    for (const card of [listCard(page), catalogCard(page)]) {
+      for (const name of ['Diminuir pacotes', 'Aumentar pacotes']) {
+        const button = card.getByRole('button', { name, exact: true })
+        await expect(button).toBeVisible()
+        const box = (await button.boundingBox())!
+        expect(Math.min(box.width, box.height)).toBeGreaterThanOrEqual(44)
+      }
+    }
+  })
+
+  test('stepper: nos limites o botão fica indisponível sem soltar o foco', async ({ page }) => {
+    await giftListWith(page)
+    const card = catalogCard(page)
+    const field = card.getByRole('spinbutton', { name: 'Pacotes de Fraldas tamanho M' })
+    const minus = card.getByRole('button', { name: 'Diminuir pacotes' })
+    const plus = card.getByRole('button', { name: 'Aumentar pacotes' })
+    await expect(field).toHaveValue('1')
+    await expect(minus).toHaveAttribute('aria-disabled', 'true')
+    await minus.focus()
+    await page.keyboard.press('Enter')
+    await expect(field).toHaveValue('1')
+    await expect(minus).toBeFocused()
+
+    await field.fill('10000')
+    await expect(plus).toHaveAttribute('aria-disabled', 'true')
+    await expect(minus).not.toHaveAttribute('aria-disabled', 'true')
+    await plus.focus()
+    await page.keyboard.press('Space')
+    await expect(field).toHaveValue('10000')
+    await expect(plus).toBeFocused()
+    // Acima do máximo, o − traz de volta para o limite.
+    await field.fill('10001')
+    await minus.click()
+    await expect(field).toHaveValue('10000')
+  })
+
+  for (const [value, rule] of [['', 'vazio'], ['0', 'zero'], ['10001', 'acima do máximo']] as const) {
+    test(`quantidade inválida (${rule}) não é enviada na lista nem no catálogo`, async ({ page }) => {
+      const calls = await giftListWith(page, { write: () => ({ status: 200, json: {} }) })
+      for (const [card, field, action] of [
+        [listCard(page), 'Quantidade de Fraldas tamanho G', 'Atualizar quantidade'],
+        [catalogCard(page), 'Pacotes de Fraldas tamanho M', 'Adicionar Fraldas tamanho M à lista'],
+      ] as const) {
+        const input = card.getByRole('spinbutton', { name: field })
+        await input.fill(value)
+        await card.getByRole('button', { name: action }).click()
+        // O navegador segura o envio e leva o foco ao campo com a mensagem de validação.
+        await expect(input).toBeFocused()
+        expect(await input.evaluate((el: HTMLInputElement) => el.validity.valid)).toBe(false)
+        await expect(card.getByRole('status')).toHaveCount(0)
+      }
+      expect(calls).toEqual([])
+    })
+  }
+
+  test('lista: salvar mostra o resultado dentro do card e não deixa o foco cair no vazio', async ({ page }) => {
+    const calls = await giftListWith(page, { write: ({ body }) => ({ status: 200, json: { ...listedG, quantity_requested: body.p_quantity, version: 2, product: undefined } }) })
+    const card = listCard(page)
+    await card.getByRole('spinbutton', { name: 'Quantidade de Fraldas tamanho G' }).fill('14')
+    const save = card.getByRole('button', { name: 'Atualizar quantidade' })
+    await save.focus()
+    await page.keyboard.press('Enter')
+    await expect(card.getByRole('status')).toHaveText('Quantidade atualizada.')
+    expect(calls).toEqual([{ p_event_id: eventId, p_item_id: listedG.id, p_version: 1, p_quantity: 14 }])
+    await expect(card.getByRole('spinbutton')).toHaveValue('14')
+    await expect(save).toBeDisabled()
+    await expect(save).toBeFocused()
+    await expectAccessible(page)
+  })
+
+  test('lista: erro ao salvar fica no card, com saída pelo "Recarregar quantidade"', async ({ page }) => {
+    await giftListWith(page, { write: () => ({ status: 503, json: { message: 'unavailable' } }) })
+    const card = listCard(page)
+    const field = card.getByRole('spinbutton', { name: 'Quantidade de Fraldas tamanho G' })
+    await field.fill('14')
+    await card.getByRole('button', { name: 'Atualizar quantidade' }).click()
+    await expect(card.getByRole('alert')).toBeVisible()
+    await expect(card.getByRole('alert')).not.toContainText(/unavailable|503/)
+    await expect(field).toHaveValue('14')
+    await expectAccessible(page)
+    page.once('dialog', dialog => void dialog.accept())
+    await card.getByRole('button', { name: 'Recarregar quantidade' }).click()
+    await expect(field).toHaveValue('12')
+    await expect(card.getByRole('status')).toHaveText('Quantidade recarregada.')
+    await expect(card.getByRole('alert')).toHaveCount(0)
+  })
+
+  test('catálogo: sucesso e erro aparecem dentro do card do produto', async ({ page }) => {
+    let fail = true
+    const calls = await giftListWith(page, { write: () => fail ? { status: 500, json: { message: 'boom' } } : { status: 200, json: { id: 'x' } } })
+    const card = catalogCard(page)
+    await card.getByRole('button', { name: 'Aumentar pacotes' }).click()
+    const add = card.getByRole('button', { name: 'Adicionar Fraldas tamanho M à lista' })
+    await add.focus()
+    await page.keyboard.press('Enter')
+    await expect(card.getByRole('alert')).toBeVisible()
+    await expect(card.getByRole('alert')).not.toContainText('boom')
+    await expect(add).toBeFocused()
+    fail = false
+    await card.getByRole('button', { name: 'Adicionar Fraldas tamanho M à lista' }).click()
+    await expect(card.getByRole('status')).toHaveText('Incluído na lista.')
+    await expect(card.getByRole('alert')).toHaveCount(0)
+    expect(calls.at(-1)).toEqual({ p_event_id: eventId, p_product_id: product(2, 'M').id, p_quantity: 2 })
+  })
+
+  test('evento encerrado: stepper desabilitado, sem ação de salvar nem catálogo', async ({ page }) => {
+    await giftListWith(page, { status: 'closed' })
+    await expect(page.getByText('Evento encerrado. A lista está disponível apenas para consulta.')).toBeVisible()
+    const card = listCard(page)
+    await expect(card.getByRole('spinbutton', { name: 'Quantidade de Fraldas tamanho G' })).toBeDisabled()
+    await expect(card.getByRole('spinbutton')).toHaveValue('12')
+    await expect(card.getByRole('button', { name: 'Diminuir pacotes' })).toBeDisabled()
+    await expect(card.getByRole('button', { name: 'Aumentar pacotes' })).toBeDisabled()
+    await expect(card.getByRole('button', { name: 'Atualizar quantidade' })).toHaveCount(0)
+    await expect(page.getByRole('region', { name: 'Incluir itens avulsos' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /Lista pronta|Preparar|Completar/ })).toHaveCount(0)
+    await expectAccessible(page)
+  })
+
+  // Títulos sem saltos (h2 → h4) em nenhuma das telas do organizador.
+  async function headingLevels(page: Page) {
+    return page.locator('h1, h2, h3, h4, h5, h6').evaluateAll(list => list.map(h => Number(h.tagName[1])))
+  }
+  function expectNoSkips(levels: number[]) {
+    expect(levels[0]).toBe(1)
+    levels.forEach((level, i) => { if (i) expect(level - levels[i - 1], `nível ${levels[i - 1]} → ${level}`).toBeLessThanOrEqual(1) })
+  }
+
+  test('painel: títulos em ordem e selos lidos sem o ícone', async ({ page }) => {
+    await backend(page, () => ({ status: 200, json: full }))
+    await page.goto(`/eventos/${eventId}/convites`)
+    await expect(page.getByRole('heading', { name: 'Fraldas tamanho P · 6 pacotes' })).toBeVisible()
+    expectNoSkips(await headingLevels(page))
+    const p = page.getByRole('region', { name: 'Fraldas por tamanho' }).getByRole('listitem').filter({ has: page.getByRole('heading', { name: 'Tamanho P' }) })
+    const snapshot = await p.ariaSnapshot()
+    expect(snapshot).toContain('Completo')
+    expect(snapshot).not.toMatch(/[✓•!×]/)
+    const choice = await page.getByRole('region', { name: 'Escolhas dos convidados' }).ariaSnapshot()
+    expect(choice).toContain('Vai levar')
+    expect(choice).not.toMatch(/[✓•!×]/)
+    // Mimo escolhido no painel é título de nível 3 sob "Mimos".
+    await expect(page.getByRole('region', { name: 'Mimos' }).getByRole('heading', { level: 3, name: 'Mamadeira fictícia' })).toBeVisible()
+  })
+
+  test('lista: títulos em ordem', async ({ page }) => {
+    await giftListWith(page)
+    await expect(catalogCard(page)).toBeVisible()
+    expectNoSkips(await headingLevels(page))
+  })
+
+  for (const [where, path] of [['painel', 'convites'], ['lista', 'presentes']] as const) {
+    test(`${where}: 320 px com texto a 200% sem rolagem lateral nem controle cortado`, async ({ page }) => {
+      await page.setViewportSize({ width: 320, height: 740 })
+      if (where === 'lista') await giftListWith(page); else { await backend(page, () => ({ status: 200, json: full })); await page.goto(`/eventos/${eventId}/${path}`) }
+      await expect(page.locator('.card-title').first()).toBeVisible()
+      await page.addStyleTag({ content: 'html { font-size: 200% !important; }' })
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBe(0)
+      // Nenhum botão, campo ou selo passa da borda do próprio card (overflow escondido também conta).
+      const clipped = await page.locator('.card').evaluateAll(cards => cards.flatMap(card => {
+        const outer = card.getBoundingClientRect()
+        return [...card.querySelectorAll('button, input, .badge, .card-title')].filter(el => {
+          const box = el.getBoundingClientRect()
+          return box.width > 0 && (box.left < outer.left - 0.5 || box.right > outer.right + 0.5)
+        }).map(el => el.getAttribute('aria-label') ?? el.textContent)
+      }))
+      expect(clipped).toEqual([])
+    })
+  }
+
+  test('eventos: o card inteiro é um link sem controles dentro, com foco visível', async ({ page }) => {
+    await backend(page, () => ({ status: 200, json: full }), () => ({ status: 200, json: [event], headers: { 'content-range': '0-0/1' } }))
+    await page.goto('/eventos')
+    const card = page.getByRole('link', { name: /Chá de teste/ })
+    await expect(card).toHaveAttribute('href', `/eventos/${eventId}`)
+    await expect(card.locator('a, button, input, select, textarea, [tabindex]')).toHaveCount(0)
+    const name = await card.evaluate(el => el.textContent ?? '')
+    expect(name).toContain('Publicado')
+    expect(await card.ariaSnapshot()).not.toMatch(/[✓•]/)
+    await card.focus()
+    await page.keyboard.press('Shift+Tab'); await page.keyboard.press('Tab')
+    await expect(card).toBeFocused()
+    expect(await card.evaluate(el => getComputedStyle(el).outlineStyle)).not.toBe('none')
+    await page.keyboard.press('Enter')
+    await expect(page).toHaveURL(new RegExp(`/eventos/${eventId}$`))
+  })
+
+  test('eventos: card de evento com a mesma anatomia', async ({ page }) => {
+    await backend(page, () => ({ status: 200, json: full }), () => ({ status: 200, json: [event], headers: { 'content-range': '0-0/1' } }))
+    await page.goto('/eventos')
+    const card = page.getByRole('link', { name: /Chá de teste/ })
+    await expect(card).toHaveClass(/card-stack/)
+    await expect(card.getByRole('heading', { name: 'Chá de teste' })).toHaveClass(/card-title/)
+    await sameAnatomy(page)
+    await expectAccessible(page)
   })
 })

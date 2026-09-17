@@ -47,7 +47,8 @@ irmão depende.
   Gates G0–G5 até o ensaio; congelamento a partir de 05/10. Absorve T-F3, T-F4
   e T-F5 nos gates indicados no plano. G0 e G1 mergeados (PR #7, 2026-09-16);
   G2 e G2.1 (foundation, forma e hierarquia de ações; fontes Manrope + Fraunces
-  aprovadas) mergeados (PR #8). G3 (convite, página inicial e prévia) em revisão.
+  aprovadas) mergeados (PR #8). G3 (convite, página inicial e prévia) e G3.1 (sistema de cards,
+  `docs/design/CARDS.md`) aprovados em 2026-09-16; PR aberto para a `main`.
 - [ ] **T-F6 · Testes.** Ampliar os testes e2e para o que mudar; `npm run check`
   antes de cada PR.
 
