@@ -60,7 +60,8 @@ function goTo(ref: RefObject<HTMLElement | null>) {
   ref.current?.focus({ preventScroll: true })
 }
 
-function GuestEvent({ access }: { access: { token: string; snapshot: Snapshot } }) {
+// `preview`: o organizador vê o convite com dados de exemplo; nada é consultado nem enviado.
+export function GuestEvent({ access, preview = false }: { access: { token: string; snapshot: Snapshot }; preview?: boolean }) {
   const cache = useQueryClient()
   const [key] = useState(() => ['guest-view', crypto.randomUUID()])
   const [tab, setTab] = useState<'fralda' | 'mimo'>('fralda')
@@ -74,12 +75,13 @@ function GuestEvent({ access }: { access: { token: string; snapshot: Snapshot } 
   const presence = useRef<HTMLElement>(null)
   const gifts = useRef<HTMLElement>(null)
   const query = useQuery({ queryKey: key, queryFn: async ({ signal }) => (await guestCall(access.token, 'read', {}, signal)).snapshot,
-    initialData: access.snapshot, ...live, enabled: q => !expired && !(q.state.error instanceof GuestError && q.state.error.status === 401), retry: false })
+    initialData: access.snapshot, ...live, enabled: q => !preview && !expired && !(q.state.error instanceof GuestError && q.state.error.status === 401), retry: false })
   useEffect(() => () => { cache.removeQueries({ queryKey: key }) }, [cache, key])
   async function mutate(action: string, payload: Record<string, unknown>, success?: string) {
     if (busy || expired) return false
     const signature = JSON.stringify({ action, payload })
     setFeedbackAt(action === 'rsvp' ? 'presenca' : String(payload.from_item_id ?? payload.item_id ?? 'presentes'))
+    if (preview) { setError(null); setNotice({ ok: false, text: 'Na prévia, nada é enviado. O convidado verá a confirmação aqui.' }); return false }
     // Pedido de resultado desconhecido precisa ser resolvido antes de outro pedido.
     if (pending && pending.signature !== signature) {
       setNotice({ ok: false, text: 'Há uma confirmação pendente. Use “Verificar tentativa anterior” antes de fazer outra escolha.' }); return false
@@ -102,7 +104,7 @@ function GuestEvent({ access }: { access: { token: string; snapshot: Snapshot } 
     } finally { setBusy(false) }
   }
   if (expired || query.error instanceof GuestError && query.error.status === 401) return <section className="page"><p className="eyebrow">Seu convite</p><h1 className="page-title">Reabra seu convite</h1><div className="mt-6"><ErrorState message={guestMessage(new GuestError('GUEST_SESSION_INVALID', 401))} /></div></section>
-  const data = query.data
+  const data = preview ? access.snapshot : query.data
   const { event, invitation } = data
   const closed = event.status === 'closed'
   const answered = invitation.response !== 'pending'

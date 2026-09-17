@@ -8,7 +8,8 @@ import { errorMessage } from '../../lib/errors'
 import { failedLast, live } from '../../lib/query'
 import { useLastError } from '../../lib/useLastError'
 import { EmptyState, ErrorState, LoadingState, RefreshStatus, SuccessMessage } from '../../components/States'
-import { BackLink, Button, Pagination, QuantityField, StatusBadge } from '../../components/ui'
+import { Button, Pagination, QuantityField, StatusBadge } from '../../components/ui'
+import { EventNotFound } from '../events/EventLayout'
 import { addItem, giftKeys, listedProducts, listItems, listProducts, PAGE_SIZE, prepareList, setQuantity } from './api'
 import { parseQuantity, platformLabels, categoryLabels } from './model'
 import type { Category, DiaperSize, EventItem, Product } from './model'
@@ -18,12 +19,12 @@ export function GiftListPage() {
   const { session } = useAuth()
   const event = useQuery({ queryKey: [...eventKeys.detail(id), session?.user.id], queryFn: () => getEvent(id), retry: false, ...live })
   const loadError = useLastError(event.error)
-  if (event.isPending && !(failedLast(event) && loadError)) return <section className="page"><LoadingState>Carregando evento…</LoadingState></section>
-  if (event.data === undefined) return <section className="page"><h1 className="page-title">Lista de presentes</h1><div className="mt-6"><ErrorState title="Não foi possível abrir a lista." message={errorMessage(loadError)} busy={event.isFetching} onRetry={() => void event.refetch()} /></div></section>
-  if (!event.data) return <section className="page"><h1 className="page-title">Evento não encontrado</h1><p className="mt-4">Confira o endereço e se está na conta correta.</p><div className="mt-6"><BackLink to="/eventos">Seus eventos</BackLink></div></section>
-  return <GiftList key={id} eventId={id} title={event.data.title || 'Evento sem título'} closed={event.data.status === 'closed'} />
+  if (event.isPending && !(failedLast(event) && loadError)) return <LoadingState>Carregando evento…</LoadingState>
+  if (event.data === undefined) return <div className="tab-panel"><h2 className="tab-title">Lista de presentes</h2><div className="mt-6"><ErrorState title="Não foi possível abrir a lista." message={errorMessage(loadError)} busy={event.isFetching} onRetry={() => void event.refetch()} /></div></div>
+  if (!event.data) return <EventNotFound />
+  return <GiftList key={id} eventId={id} closed={event.data.status === 'closed'} />
 }
-function GiftList({ eventId, title, closed }: { eventId: string; title: string; closed: boolean }) {
+function GiftList({ eventId, closed }: { eventId: string; closed: boolean }) {
   const { session } = useAuth()
   const [category, setCategory] = useState<Category>('fralda')
   const [page, setPage] = useState(0)
@@ -41,9 +42,8 @@ function GiftList({ eventId, title, closed }: { eventId: string; title: string; 
   const empty = listed.data?.length === 0
   // Sem dado anterior, a nova tentativa volta a consulta para "pending" e zera isError;
   // comparar as datas mantém o aviso na tela durante a tentativa.
-  return <section className="page">
-    <BackLink to={`/eventos/${eventId}`}>Detalhes do evento</BackLink>
-    <p className="eyebrow mt-7 break-words">{title}</p><h1 className="page-title">Lista de presentes</h1>
+  return <div className="tab-panel">
+    <h2 className="tab-title">Lista de presentes</h2>
     <p className="mt-4 max-w-2xl text-stone-600">Fraldas por tamanho e mimos de livre escolha. Os convidados veem esta lista pelo link do convite.</p>
     {!closed && <section aria-labelledby="quick-start" className={empty ? 'quick-start mt-8' : 'card mt-8'}>
       {empty && <p className="eyebrow">Recomendado</p>}
@@ -70,7 +70,7 @@ function GiftList({ eventId, title, closed }: { eventId: string; title: string; 
       </>}
     </section>
     {!closed && <Catalog key={category} eventId={eventId} category={category} listed={listed.data} listedFailed={listed.errorUpdatedAt > listed.dataUpdatedAt} listedFetching={listed.isFetching} retryListed={() => void listed.refetch()} />}
-  </section>
+  </div>
 }
 function ItemCard({ item, closed }: { item: EventItem; closed: boolean }) {
   const [baseline, setBaseline] = useState(item)

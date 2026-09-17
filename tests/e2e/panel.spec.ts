@@ -125,7 +125,7 @@ test('falha ao abrir o painel mostra erro e permite tentar de novo', async ({ pa
 test('detalhes e lista de presentes mostram o mesmo estado de erro', async ({ page }) => {
   let failing = true
   await backend(page, () => ({ status: 200, json: full }), () => failing ? { status: 500, json: { message: 'unavailable' } } : { status: 200, json: [event] })
-  for (const [path, title] of [[`/eventos/${eventId}`, 'Não foi possível abrir o evento.'], [`/eventos/${eventId}/presentes`, 'Não foi possível abrir a lista.']]) {
+  for (const [path, title] of [[`/eventos/${eventId}/dados`, 'Não foi possível abrir o evento.'], [`/eventos/${eventId}/presentes`, 'Não foi possível abrir a lista.']]) {
     await page.goto(path)
     await expect(page.getByRole('alert')).toContainText(title)
     await expectAccessible(page)
@@ -167,7 +167,7 @@ test('lista vazia recomenda a lista pronta do chá', async ({ page }) => {
 test('evento encerrado fica só para leitura, sem envio de imagem', async ({ page }) => {
   const closed = { ...event, status: 'closed' }
   await backend(page, () => ({ status: 200, json: full }), () => ({ status: 200, json: [closed] }))
-  await page.goto(`/eventos/${eventId}`)
+  await page.goto(`/eventos/${eventId}/dados`)
   await expect(page.getByText('Este evento foi encerrado.')).toBeVisible()
   await expect(page.getByLabel('Nome do evento')).toBeDisabled()
   await expect(page.getByLabel('Imagem de capa (opcional)')).toHaveCount(0)
@@ -209,7 +209,8 @@ function actions(replies: Record<string, ReturnType<Reply>>): Reply {
 async function openEdit(page: Page) {
   await page.goto(`/eventos/${eventId}/convites`)
   await page.getByRole('button', { name: 'Editar convite de Convidado fictício 1' }).click()
-  return { create: page.getByRole('region', { name: 'Convide alguém especial' }), edit: page.getByRole('region', { name: 'Editar convite' }) }
+  return { create: page.getByRole('region', { name: 'Convide alguém especial' }), edit: page.getByRole('region', { name: 'Editar convite' }),
+    list: page.getByRole('region', { name: 'Convidados' }).locator('.guests-feedback') }
 }
 async function confirmAnd(page: Page, invitation: string, action: string) {
   page.once('dialog', dialog => void dialog.accept())
@@ -226,21 +227,30 @@ test('reemitir link com edição aberta mostra o aviso junto do link novo', asyn
   await expect(edit).toBeVisible()
 })
 
-test('revogar com edição aberta avisa no formulário de convite', async ({ page }) => {
+test('revogar com edição aberta avisa acima da lista, sem abrir o formulário de convite', async ({ page }) => {
   await backend(page, actions({ revoke: { status: 200, json: { id: full.invitations[2].id } } }))
-  const { create, edit } = await openEdit(page)
+  const { create, edit, list } = await openEdit(page)
   await confirmAnd(page, 'Convidado fictício 3', 'Revogar acesso')
-  await expect(create.getByRole('status')).toContainText('Convite revogado.')
+  await expect(list.getByRole('status')).toContainText('Convite revogado.')
+  await expect(create).toHaveCount(0)
   await expect(edit.getByRole('status')).toHaveCount(0)
   await expect(edit).toBeVisible()
 })
 
-test('erro ao revogar com edição aberta aparece no formulário de convite', async ({ page }) => {
+test('erro ao revogar com edição aberta aparece acima da lista', async ({ page }) => {
   await backend(page, actions({ revoke: { status: 400, json: { message: 'INVITATION_NOT_FOUND' } } }))
-  const { create, edit } = await openEdit(page)
+  const { edit, list } = await openEdit(page)
   await confirmAnd(page, 'Convidado fictício 3', 'Revogar acesso')
-  await expect(create.getByRole('alert')).toHaveText('Convite não encontrado ou sem permissão.')
+  await expect(list.getByRole('alert')).toHaveText('Convite não encontrado ou sem permissão.')
   await expect(edit.getByRole('alert')).toHaveCount(0)
+})
+
+test('salvar a edição fecha o formulário e avisa acima da lista', async ({ page }) => {
+  await backend(page, actions({ update: { status: 200, json: { id: full.invitations[0].id } } }))
+  const { edit, list } = await openEdit(page)
+  await edit.getByRole('button', { name: 'Salvar convite' }).click()
+  await expect(list.getByRole('status')).toHaveText('Convite atualizado.')
+  await expect(edit).toHaveCount(0)
 })
 
 test('erro ao salvar fica na edição, não muda de lugar ao copiar e some ao cancelar', async ({ page, context }) => {
@@ -272,7 +282,7 @@ for (const status of ['published', 'closed'] as const) {
   test(`detalhes do evento (${status}) cabem em 320 px com texto a 200%`, async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 740 })
     await backend(page, () => ({ status: 200, json: full }), () => ({ status: 200, json: [{ ...event, status }] }))
-    await page.goto(`/eventos/${eventId}`)
+    await page.goto(`/eventos/${eventId}/dados`)
     await expect(page.getByLabel('Término')).toBeVisible()
     await page.addStyleTag({ content: 'html { font-size: 200% !important; }' })
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
@@ -295,10 +305,11 @@ test('tentar de novo pelo teclado mantém o foco no botão', async ({ page }) =>
   await expect(retry).toBeFocused()
 })
 
-test('links de voltar têm área de toque de 44 px', async ({ page }) => {
+test('links de voltar e abas têm área de toque de 44 px', async ({ page }) => {
   await backend(page, () => ({ status: 200, json: full }))
-  await page.goto(`/eventos/${eventId}/convites`)
-  const back = page.getByRole('link', { name: 'Detalhes do evento' })
+  await page.goto(`/eventos/${eventId}`)
+  for (const tab of await page.getByRole('navigation', { name: 'Áreas do evento' }).getByRole('link').all()) expect((await tab.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+  const back = page.getByRole('main').getByRole('link', { name: 'Seus eventos' })
   await expect(back).toBeVisible()
   expect((await back.boundingBox())!.height).toBeGreaterThanOrEqual(44)
 })
@@ -306,7 +317,7 @@ test('links de voltar têm área de toque de 44 px', async ({ page }) => {
 test('falha de atualização nos detalhes não apaga o que está sendo digitado', async ({ page }) => {
   let failing = false
   await backend(page, () => ({ status: 200, json: full }), () => failing ? { status: 500, json: { message: 'unavailable' } } : { status: 200, json: [event] })
-  await page.goto(`/eventos/${eventId}`)
+  await page.goto(`/eventos/${eventId}/dados`)
   await page.getByLabel('Endereço privado').fill('Rascunho fictício em andamento')
   failing = true
   await expect(page.getByRole('alert')).toContainText('Os dados abaixo são da última consulta.', { timeout: 20_000 })
@@ -328,10 +339,10 @@ test('falha de atualização na lista de presentes mantém a tela', async ({ pag
 test('voltar a uma tela que falhou mostra carregando, não o erro antigo', async ({ page }) => {
   let delay = 0
   await backend(page, () => ({ status: 200, json: full }), () => ({ status: 500, json: { message: 'unavailable' } }))
-  await page.goto(`/eventos/${eventId}`)
-  await expect(page.getByRole('heading', { name: 'Detalhes do evento' })).toBeVisible({ timeout: 15_000 })
+  await page.goto(`/eventos/${eventId}/dados`)
+  await expect(page.getByRole('heading', { name: 'Dados do evento' })).toBeVisible({ timeout: 15_000 })
   await expect(page.getByRole('alert')).toContainText('Não foi possível abrir o evento.')
-  await page.getByRole('link', { name: 'Seus eventos' }).click()
+  await page.getByRole('main').getByRole('link', { name: 'Seus eventos' }).click()
   await expect(page.getByRole('heading', { name: 'Seus eventos' })).toBeVisible()
   delay = 1500
   await page.route('**/rest/v1/events**', async route => { if (delay) await new Promise(resolve => setTimeout(resolve, delay)); await route.fallback() })
@@ -891,5 +902,216 @@ test.describe('eventos: excluir evento', () => {
     await page.getByRole('button', { name: 'Excluir definitivamente' }).click()
     await expect(page.getByRole('heading', { name: 'Chá encerrado' })).toHaveCount(0)
     await expect(page.getByRole('status').filter({ hasText: 'Evento “Chá encerrado” excluído.' })).toHaveCount(0)
+  })
+})
+
+// G4 (docs/design/G4-PAINEL.md): o painel é a tela inicial do evento, com
+// cabeçalho e abas comuns, e o organizador vê o convite como o convidado.
+test.describe('G4 · painel do evento', () => {
+  const tabs = (page: Page) => page.getByRole('navigation', { name: 'Áreas do evento' })
+
+  test('o card em “Seus eventos” abre o painel, com o título do evento e as abas', async ({ page }) => {
+    await backend(page, () => ({ status: 200, json: full }))
+    await page.goto('/eventos')
+    await page.getByRole('link', { name: /Chá de teste/ }).click()
+    await expect(page).toHaveURL(new RegExp(`/eventos/${eventId}$`))
+    await expect(page.getByRole('heading', { level: 1, name: 'Chá de teste' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Resumo' })).toBeVisible()
+    await expect(tabs(page).getByRole('link', { name: 'Painel' })).toHaveAttribute('aria-current', 'page')
+    await expect(tabs(page).getByRole('link', { name: 'Presentes' })).not.toHaveAttribute('aria-current', 'page')
+    await expect(page.getByRole('link', { name: 'Ver como o convidado vê' })).toHaveAttribute('href', `/eventos/${eventId}/previa`)
+    await expect(page.getByRole('link', { name: 'Seus eventos' }).first()).toBeVisible()
+    await expectAccessible(page)
+    await page.screenshot({ path: `test-results/g4-painel-${test.info().project.name}.png`, fullPage: true })
+  })
+
+  test('o endereço antigo de convites leva ao painel', async ({ page }) => {
+    await backend(page, () => ({ status: 200, json: full }))
+    await page.goto(`/eventos/${eventId}/convites`)
+    await expect(page).toHaveURL(new RegExp(`/eventos/${eventId}$`))
+    await expect(page.getByRole('heading', { name: 'Resumo' })).toBeVisible()
+  })
+
+  test('as abas levam a presentes e aos dados do evento, com o mesmo cabeçalho', async ({ page }) => {
+    await backend(page, () => ({ status: 200, json: full }), undefined, { '/rest/v1/event_items': none, '/rest/v1/products': none })
+    await page.goto(`/eventos/${eventId}`)
+    await tabs(page).getByRole('link', { name: 'Dados do evento' }).click()
+    await expect(page).toHaveURL(new RegExp(`/eventos/${eventId}/dados$`))
+    await expect(page.getByRole('heading', { level: 1, name: 'Chá de teste' })).toBeVisible()
+    await expect(page.getByLabel('Nome do evento')).toHaveValue('Chá de teste')
+    await expect(tabs(page).getByRole('link', { name: 'Dados do evento' })).toHaveAttribute('aria-current', 'page')
+    await expectAccessible(page)
+    await page.screenshot({ path: `test-results/g4-dados-${test.info().project.name}.png`, fullPage: true })
+    await tabs(page).getByRole('link', { name: 'Presentes' }).click()
+    await expect(page).toHaveURL(new RegExp(`/eventos/${eventId}/presentes$`))
+    await expect(page.getByRole('heading', { name: 'Lista de presentes' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1)
+    await expectAccessible(page)
+  })
+
+  test('o cabeçalho mostra quantos dias faltam, pelo horário de Brasília', async ({ page }) => {
+    // Mesmo horário, nove dias depois: nove dias de calendário em Brasília.
+    const soon = new Date(Date.now() + 9 * 86_400_000).toISOString()
+    await backend(page, () => ({ status: 200, json: full }), () => ({ status: 200, json: [{ ...event, starts_at: soon }] }))
+    await page.goto(`/eventos/${eventId}`)
+    await expect(page.getByText('Faltam 9 dias')).toBeVisible()
+  })
+
+  test('o painel começa pelo resumo e segue com convidados, fraldas, mimos e escolhas', async ({ page }) => {
+    await backend(page, () => ({ status: 200, json: full }))
+    await page.goto(`/eventos/${eventId}`)
+    await expect(page.getByRole('heading', { name: 'Resumo' })).toBeVisible()
+    const order = await page.locator('main h2').allTextContents()
+    const wanted = ['Resumo', 'Convidados', 'Fraldas por tamanho', 'Mimos', 'Escolhas dos convidados']
+    expect(order.filter(text => wanted.includes(text))).toEqual(wanted)
+  })
+
+  test('“Convidar alguém” abre o formulário e leva o foco ao nome', async ({ page }) => {
+    await backend(page, () => ({ status: 200, json: full }))
+    await page.goto(`/eventos/${eventId}`)
+    const open = page.getByRole('button', { name: 'Convidar alguém' })
+    await expect(open).toBeEnabled()
+    await expect(page.getByLabel('Nome da pessoa ou família')).toHaveCount(0)
+    await expect(open).toHaveAttribute('aria-expanded', 'false')
+    await open.click()
+    await expect(open).toHaveAttribute('aria-expanded', 'true')
+    await expect(page.getByLabel('Nome da pessoa ou família')).toBeFocused()
+    await expectAccessible(page)
+  })
+
+  test('fraldas aparecem numa só lista de progresso, sem um card por tamanho', async ({ page }) => {
+    await backend(page, () => ({ status: 200, json: full }))
+    await page.goto(`/eventos/${eventId}`)
+    const region = page.getByRole('region', { name: 'Fraldas por tamanho' })
+    await expect(region.getByRole('listitem')).toHaveCount(4)
+    await expect(region.locator('li.card')).toHaveCount(0)
+  })
+
+  test('cabe em 320 px com texto a 200%', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 740 })
+    await backend(page, () => ({ status: 200, json: full }))
+    await page.goto(`/eventos/${eventId}`)
+    await expect(page.getByRole('heading', { name: 'Resumo' })).toBeVisible()
+    await page.addStyleTag({ content: 'html { font-size: 200% !important; }' })
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBe(0)
+  })
+
+  test('a prévia mostra o convite com dados de exemplo e não envia nada', async ({ page }) => {
+    const guestCalls: string[] = []
+    page.on('request', request => { if (request.url().includes('/functions/v1/guest')) guestCalls.push(request.url()) })
+    await backend(page, () => ({ status: 200, json: full }), () => ({ status: 200, json: [{ ...event, private_address: 'Rua fictícia, 10' }] }))
+    await page.goto(`/eventos/${eventId}`)
+    await page.getByRole('link', { name: 'Ver como o convidado vê' }).click()
+    await expect(page).toHaveURL(new RegExp(`/eventos/${eventId}/previa$`))
+    await expect(page.getByText('Prévia do convite')).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Chá de teste' })).toBeVisible()
+    await expect(page.getByText('Convidado de exemplo, este convite é para você')).toBeVisible()
+    await expect(page.getByText('Rua fictícia, 10').first()).toBeVisible()
+    const gift = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Fraldas tamanho M' }) })
+    await gift.getByRole('button', { name: 'Escolher presente' }).click()
+    await expect(page.getByText('Na prévia, nada é enviado.')).toBeVisible()
+    await page.getByRole('radio', { name: 'Vai participar' }).check()
+    await page.getByRole('button', { name: 'Confirmar presença' }).click()
+    await expect(page.getByRole('region', { name: 'Podemos contar com você?' }).getByText('Na prévia, nada é enviado.')).toBeVisible()
+    expect(guestCalls).toEqual([])
+    await expect(page.getByRole('link', { name: 'Voltar ao painel' })).toHaveAttribute('href', `/eventos/${eventId}`)
+    await expectAccessible(page)
+    await page.screenshot({ path: `test-results/g4-previa-${test.info().project.name}.png`, fullPage: true })
+  })
+
+  test('evento inexistente: as três abas dizem “Evento não encontrado”, sem abas nem prévia', async ({ page }) => {
+    await backend(page, () => ({ status: 400, json: { message: 'EVENT_NOT_FOUND' } }), () => ({ status: 200, json: [] }))
+    for (const path of ['', '/presentes', '/dados']) {
+      await page.goto(`/eventos/${eventId}${path}`)
+      await expect(page.getByRole('heading', { level: 2, name: 'Evento não encontrado' })).toBeVisible()
+      await expect(page.getByRole('heading', { level: 1, name: 'Seu evento' })).toBeVisible()
+      await expect(page.getByRole('link', { name: 'Ver como o convidado vê' })).toHaveCount(0)
+      await expect(tabs(page)).toHaveCount(0)
+      await expect(page.getByRole('main').getByRole('link', { name: 'Seus eventos' })).toBeVisible()
+    }
+    await expectAccessible(page)
+  })
+
+  test('trocar de aba pelo teclado mantém o foco na aba escolhida', async ({ page }) => {
+    await backend(page, () => ({ status: 200, json: full }), undefined, { '/rest/v1/event_items': none, '/rest/v1/products': none })
+    await page.goto(`/eventos/${eventId}`)
+    await expect(page.getByRole('heading', { name: 'Resumo' })).toBeVisible()
+    const data = tabs(page).getByRole('link', { name: 'Dados do evento' })
+    await data.focus()
+    await page.keyboard.press('Enter')
+    await expect(page.getByLabel('Nome do evento')).toBeVisible()
+    await expect(data).toBeFocused()
+    await expect(data).toHaveAttribute('aria-current', 'page')
+  })
+
+  test('“Fechar” devolve o foco a “Convidar alguém”', async ({ page }) => {
+    await backend(page, () => ({ status: 200, json: full }))
+    await page.goto(`/eventos/${eventId}`)
+    const open = page.getByRole('button', { name: 'Convidar alguém' })
+    await open.click()
+    await page.getByRole('region', { name: 'Convide alguém especial' }).getByRole('button', { name: 'Fechar' }).click()
+    await expect(page.getByRole('region', { name: 'Convide alguém especial' })).toHaveCount(0)
+    await expect(open).toHaveAttribute('aria-expanded', 'false')
+    await expect(open).toBeFocused()
+  })
+
+  test('fechar o formulário só pede confirmação se o link não foi copiado', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+    await backend(page, actions({ create: { status: 200, json: { id: 'novo', token: 'token-ficticio' } } }))
+    await page.goto(`/eventos/${eventId}`)
+    await page.getByRole('button', { name: 'Convidar alguém' }).click()
+    const form = page.getByRole('region', { name: 'Convide alguém especial' })
+    await form.getByLabel('Nome da pessoa ou família').fill('Convidado fictício 9')
+    await form.getByRole('button', { name: 'Criar convite' }).click()
+    await expect(form.getByLabel('Link para compartilhar')).toHaveValue(/token-ficticio/)
+    const dialogs: string[] = []
+    page.on('dialog', dialog => { dialogs.push(dialog.message()); void dialog.dismiss() })
+    await form.getByRole('button', { name: 'Fechar' }).click()
+    expect(dialogs).toHaveLength(1)
+    await expect(form).toBeVisible()
+    await form.getByRole('button', { name: 'Copiar convite' }).click()
+    await expect(form.getByRole('status')).toHaveText('Link copiado.')
+    await form.getByRole('button', { name: 'Fechar' }).click()
+    await expect(form).toHaveCount(0)
+    expect(dialogs).toHaveLength(1)
+  })
+
+  test('evento encerrado não oferece “Convidar alguém” nem manda publicar', async ({ page }) => {
+    await backend(page, () => ({ status: 200, json: full }), () => ({ status: 200, json: [{ ...event, status: 'closed' }] }))
+    await page.goto(`/eventos/${eventId}`)
+    await expect(page.getByRole('heading', { name: 'Convidados', exact: true })).toBeVisible()
+    await expect(page.getByText('Este evento foi encerrado. Não é possível criar novos convites.')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Convidar alguém' })).toHaveCount(0)
+    await expect(page.getByText(/Publique o evento/)).toHaveCount(0)
+  })
+
+  for (const [label, path] of [['presentes', '/presentes'], ['prévia', '/previa']] as const) {
+    test(`${label} cabe em 320 px com texto a 200%`, async ({ page }) => {
+      await page.setViewportSize({ width: 320, height: 740 })
+      await backend(page, () => ({ status: 200, json: full }), undefined, { '/rest/v1/event_items': none, '/rest/v1/products': none })
+      await page.goto(`/eventos/${eventId}${path}`)
+      await expect(page.getByRole('heading', { level: 1 })).toContainText('Chá de teste')
+      await expect(page.getByRole('heading', { level: 2 }).first()).toBeVisible()
+      await page.addStyleTag({ content: 'html { font-size: 200% !important; }' })
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBe(0)
+    })
+  }
+
+  test('com o formulário aberto e texto a 200%, o painel cabe em 320 px', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 740 })
+    await backend(page, () => ({ status: 200, json: full }))
+    await page.goto(`/eventos/${eventId}`)
+    await page.getByRole('button', { name: 'Convidar alguém' }).click()
+    await page.addStyleTag({ content: 'html { font-size: 200% !important; }' })
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBe(0)
+    for (const button of [page.getByRole('button', { name: 'Convidar alguém' }), page.getByRole('button', { name: 'Fechar' }), page.getByRole('link', { name: 'Ver como o convidado vê' })])
+      expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+  })
+
+  test('prévia sem data pede para preencher os dados do evento', async ({ page }) => {
+    await backend(page, () => ({ status: 200, json: full }), () => ({ status: 200, json: [{ ...event, starts_at: null, status: 'draft' }] }))
+    await page.goto(`/eventos/${eventId}/previa`)
+    await expect(page.getByText('Defina a data do evento em “Dados do evento” para ver a prévia.')).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Dados do evento' })).toHaveAttribute('href', `/eventos/${eventId}/dados`)
   })
 })

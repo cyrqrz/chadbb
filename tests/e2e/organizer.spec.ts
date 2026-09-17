@@ -88,7 +88,8 @@ async function createInBrowser(page: Page) {
   await page.getByRole('button', { name: 'Criar evento' }).click()
   await page.getByLabel('Nome do evento').fill('Chá de bebê da Lia')
   await page.getByRole('button', { name: 'Criar rascunho' }).click()
-  await expect(page.getByRole('heading', { name: 'Detalhes do evento' })).toBeVisible()
+  await expect(page).toHaveURL(new RegExp(`/eventos/${eventId}/dados$`))
+  await expect(page.getByRole('heading', { name: 'Dados do evento' })).toBeVisible()
 }
 
 test('cria, edita, publica e encerra evento; layout cabe no celular', async ({ page }) => {
