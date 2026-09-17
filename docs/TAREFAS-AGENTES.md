@@ -224,7 +224,7 @@ mantém o cálculo antigo só como transição, isolado em `src/features/guests/
 | Agente | Tarefa | Branch | Situação |
 |---|---|---|---|
 | Claude | PR #11 (convite e “Excluir evento”) mergeada em 17/09, depois do G5/G6. Próximos: pedidos urgentes de 17/09 (código no login, botão de envio, campos de data no iPhone); depois T-F7 · G4 (26–30/09) — ver `docs/design/RETOMADA-CLAUDE.md` | `claude/front` | pedidos de 17/09 |
-| Codex | T-B5: runner revalidado localmente em 17/09; G2 remoto aguardando aprovação. Exclusão de evento concluída e testada em produção (plano em PLANO-DESEMPENHO-T-B5.md, remoto não autorizado) | `codex/back` | livre para a próxima tarefa |
+| Codex | T-B5: G2 remoto reprovado em 17/09 (p95 ~4,2 s, zero erros, sync ok); proposta G3 (1 chamada por POST) aguardando aprovação. Exclusão de evento concluída e testada em produção (plano em PLANO-DESEMPENHO-T-B5.md, remoto não autorizado) | `codex/back` | livre para a próxima tarefa |
 
 ## Concluídas
 

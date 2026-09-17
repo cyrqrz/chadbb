@@ -110,5 +110,35 @@ Somente o projeto `chadbb-cha`, TLS com CA validada e frontend publicado
 O teste pode reprovar a meta: registrar todos os resultados e investigar a
 causa, sem repetir até obter aprovação nem aumentar limites para passar.
 
-**Ainda não executado nem aprovado remotamente.** A autorização anterior foi
-para a T-B4. Este gate é específico de carga e sincronização T-B5.
+### Execução remota em 2026-09-17 (aprovada pelo titular): **reprovada**
+
+- 225 leituras, **p95 4258 ms** (máx. 4347); 25 escritas, **p95 4044 ms**
+  (máx. 4276); **zero erros**. Sincronização **6008 / 4984 / 5482 ms**, dentro
+  de 7 s. 362 POSTs guest. Limpeza restrita zerada nas oito contagens.
+- Meta de 2 s **não cumprida**. O resultado não foi repetido.
+
+### Diagnóstico, só com leitura
+
+- Logs da Edge `guest` (379 POSTs): execução p50 **3160 ms**, p95 **4062 ms**,
+  mínimo **211 ms**. As primeiras requisições de cada onda levam cerca de 1,9 s,
+  e as seguintes, de 3,2 a 4,0 s. O tempo é gasto dentro da função, não na rede
+  até o cliente.
+- `pg_stat_statements`: `check_guest_rate` executa em média **2,9 ms** (3495
+  chamadas) e `guest_action`, **5,1 ms** (1158). O SQL não é o gargalo.
+- Plano **free**, `max_connections` 60, PostgREST com cerca de 11 conexões.
+  Cada POST faz **4 idas sequenciais** da Edge ao PostgREST (3 cotas e a ação).
+  Com 50 pedidos simultâneos, são cerca de 200 chamadas por onda, enfileiradas
+  entre a Edge e o PostgREST (e/ou limites de CPU da Edge no plano free).
+- O modelo de carga (50 pedidos no mesmo instante, a cada 5 s) é mais severo
+  que 50 convites consultando a cada 5 s de forma espalhada. Isso fica
+  registrado, mas **o critério não foi alterado** para passar.
+
+### Próximo passo proposto (G3, com aprovação)
+
+1. Local, com teste antes: reduzir as 4 chamadas por POST a 1. As cotas passam a
+   ser conferidas dentro de uma única RPC de servidor, sem mudar as regras nem
+   os limites. Comparar com a medição local de referência.
+2. Publicar a mudança (migration e Edge `guest`) com gates próprios e repetir o
+   ensaio remoto **uma vez**.
+3. Se continuar reprovando: avaliar compute maior (plano pago) ou conexão direta
+   da Edge ao Postgres pelo pooler, com decisão do titular.
