@@ -22,6 +22,13 @@ o ensaio familiar no celular continua pendente.
 
 ## Claude — front (`chadbb-claude`, `claude/front`)
 
+- [ ] **2026-09-17 · Codex → Claude · Revisão G3/G3.1: corrigir quantidade no convite.**
+  Em `GuestPage.tsx`, bloquear `QuantityField` durante envio (regressão) e
+  preservar a versão inicial do rascunho ao continuar digitando depois de uma
+  atualização concorrente (preexistente, inclusive versão `null`).
+  Correção e testes preparados em
+  [patch](reviews/2026-09-17-claude-front.patch); reprodução e evidências em
+  [revisão](reviews/2026-09-17-claude-front.md). Base: `2f321dc`.
 - [ ] **T-F1 · Visual e estados das telas (M1).** Em `GuestPage`, `GiftListPage`,
   `InvitationsPage` e `EventPage`: estados de vazio, carregando, sucesso e erro com
   o mesmo acabamento; uma ação principal por etapa ("Confirmar presença",
