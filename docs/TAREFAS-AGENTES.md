@@ -216,6 +216,27 @@ mantém o cálculo antigo só como transição, isolado em `src/features/guests/
   referências de mercado). Não bloqueia o chá de 01/11; o front só muda depois
   que o Auth estiver pronto.
 
+- [x] 2026-09-17 · Claude → Codex · **Reservar as portas do Supabase local no
+  WSL — aplicado pelo usuário.** `npm run db:start` falhou uma vez com
+  `failed to bind host port 0.0.0.0:54322/tcp: address already in use`, sem
+  nenhum processo ouvindo a porta e sem container de pé. Causa: o
+  `net.ipv4.ip_local_port_range` do WSL é `32768 60999`, então 54321/54322 podem
+  ser entregues como porta efêmera de saída — o pull das imagens abriu muitas
+  conexões e uma delas pegou a 54322 no instante do `bind`. A segunda tentativa
+  subiu os 12 containers e aplicou as 21 migrations. O usuário já fixou
+  `net.ipv4.ip_local_reserved_ports = 54320-54330` nesta máquina, ativo e
+  persistido em `/etc/sysctl.d/99-supabase.conf`. Conferido em 2026-09-17:
+  reserva ativa no kernel, 12 containers de pé e 21 migrations aplicadas.
+
+- [ ] 2026-09-17 · Claude → Codex · **Documentar a reserva de portas no
+  `README.md`.** Junto dos comandos `db:*`: 54321 e 54322 caem na faixa efêmera
+  do WSL (`net.ipv4.ip_local_port_range` = `32768 60999`), então
+  `npm run db:start` pode falhar com `address already in use` sem nenhum
+  processo ouvindo a porta. A saída é reservar a faixa
+  (`net.ipv4.ip_local_reserved_ports = 54320-54330`, em
+  `/etc/sysctl.d/99-supabase.conf`). Atinge qualquer máquina nova do projeto;
+  o diagnóstico completo está no item acima. `README.md` é área do Codex.
+
 ## Pedidos do back para o front
 
 - [ ] 2026-09-16 · Codex → Claude · Usuário relata que “Conheça o chadbb”
