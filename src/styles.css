@@ -173,7 +173,11 @@
   .badge-success { background: var(--color-success-soft); color: var(--color-success-text); }
   .badge-warning { background: var(--color-warning-soft); color: var(--color-warning); }
   .badge-danger { background: var(--color-danger-soft); color: var(--color-danger); }
-  .stagger > * { animation: rise var(--duration-slow) var(--ease-emphasized) both; }
+  /* `backwards`, não `both`: o estado final de `rise` é o padrão (opacidade 1,
+     sem transform), e mantê-lo preenchido fazia a animação ganhar do cascade e
+     travar o `transform` para sempre — o hover dos cartões não saía do lugar.
+     `backwards` preserva o estado inicial durante o atraso do stagger. */
+  .stagger > * { animation: rise var(--duration-slow) var(--ease-emphasized) backwards; }
   .stagger > :nth-child(2) { animation-delay: 40ms; } .stagger > :nth-child(3) { animation-delay: 80ms; }
   .stagger > :nth-child(4) { animation-delay: 120ms; } .stagger > :nth-child(5) { animation-delay: 160ms; }
   .stagger > :nth-child(n + 6) { animation-delay: 200ms; }
@@ -257,7 +261,10 @@
   /* Login */
   .login-shell { display: grid; margin-block: 2rem 4rem; overflow: hidden; border: 1px solid var(--color-border-subtle); border-radius: var(--radius-panel); background: var(--color-surface); box-shadow: var(--shadow-md); animation: rise var(--duration-slow) var(--ease-emphasized) both; }
   .login-form { display: flex; flex-direction: column; justify-content: center; min-width: 0; padding: clamp(1.25rem, 5vw, 3.5rem); }
-  .login-guest { margin-top: 2rem; border-top: 1px solid var(--color-line); padding-top: 1.25rem; font-size: var(--text-body-sm); color: var(--color-muted); }
+  /* Saída de quem não deve entrar: some no cinza pequeno, então ganha
+     superfície e faixa de destaque em vez de ficar sob um fio. */
+  .login-guest { margin-top: 2rem; border: 1px solid color-mix(in srgb, var(--color-brand) 20%, var(--color-line)); border-inline-start: 4px solid var(--color-brand); border-radius: var(--radius-field); background: var(--color-brand-soft); padding: 1rem 1.125rem; color: var(--color-ink); }
+  .login-guest strong { color: var(--color-brand-hover); font-weight: 700; }
   .login-aside { display: flex; align-items: center; min-width: 0; background: radial-gradient(90% 70% at 100% 0%, var(--color-brand-soft) 0%, transparent 70%), var(--color-blush); padding: clamp(1rem, 5vw, 3.5rem); }
   .login-features { display: grid; gap: 0.75rem; width: 100%; margin: 0; padding: 0; list-style: none; }
   .login-feature { display: flex; gap: 1rem; align-items: flex-start; border-radius: var(--radius-surface); background: var(--color-surface); padding: 1rem 1.2rem; box-shadow: var(--shadow-sm); transition: transform var(--duration-normal) var(--ease-standard), box-shadow var(--duration-normal); }
@@ -291,6 +298,21 @@
   .preview-bar { display: flex; flex-direction: column; align-items: flex-start; gap: 0.75rem; padding-bottom: 0; }
 
   /* Sistema de cards (G3.1): cabeçalho, conteúdo, área interativa e ações. */
+  /* Passos da página inicial: cartões com peso próprio. A elevação no hover
+     usa a transição que `.card` já declara, e o guarda de movimento reduzido
+     no fim do arquivo zera a duração. */
+  /* `.card` eleva em 240 ms; aqui o pedido é 120–200 ms, então a duração é
+     reescrita só neste cartão, sem mexer no sistema de cards. */
+  .step-card { display: flex; flex-direction: column; align-items: flex-start; gap: 0.75rem; padding: clamp(1.25rem, 3vw, 1.75rem); transition: border-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard); }
+  .step-number { display: inline-grid; place-items: center; width: 2.5rem; height: 2.5rem; border-radius: var(--radius-pill); background: var(--color-brand-soft); color: var(--color-brand-hover); font-size: var(--text-body-sm); font-weight: 800; font-variant-numeric: lining-nums; transition: background var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard); }
+  /* Só onde há mouse: no toque, o :hover gruda depois do toque e o passo
+     ficaria elevado como se estivesse selecionado. */
+  @media (hover: hover) {
+    .step-card:hover { border-color: var(--color-brand); box-shadow: var(--shadow-md); transform: translateY(-3px); }
+    .step-card:hover .step-number { background: var(--color-brand); color: var(--color-surface); }
+  }
+  .step-title { font-size: var(--text-h3); line-height: var(--text-h3--line-height); font-weight: 700; }
+
   .card-stack { display: flex; flex-direction: column; gap: var(--card-gap); }
   .card-header { display: flex; flex-direction: column; gap: 8px; }
   .card-badges { display: flex; flex-wrap: wrap; gap: 6px; }

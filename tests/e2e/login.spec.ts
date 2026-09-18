@@ -240,6 +240,31 @@ test('a página inicial fala do código, não só do link', async ({ page }) => 
   await expect(page.getByText('Para organizar, entre com seu e-mail')).toContainText('código')
 })
 
+// Pedido do titular em 2026-09-17: o aviso de quem é convidado estava apagado
+// (cinza pequeno sob um fio). É a saída de quem não deve entrar: ganha
+// superfície própria, texto em tom de leitura e a pergunta em destaque.
+test('o aviso de quem é convidado tem destaque, não cinza apagado', async ({ page }) => {
+  await auth(page)
+  await page.goto('/entrar')
+  const note = page.getByText('Não precisa entrar', { exact: false })
+  await expect(note).toBeVisible()
+  const style = await note.evaluate(el => {
+    const s = getComputedStyle(el)
+    const muted = getComputedStyle(document.documentElement).getPropertyValue('--color-muted').trim()
+    const ink = getComputedStyle(document.documentElement).getPropertyValue('--color-ink').trim()
+    const paint = (value: string) => { const probe = document.createElement('span'); probe.style.color = value; document.body.append(probe); const out = getComputedStyle(probe).color; probe.remove(); return out }
+    return { color: s.color, background: s.backgroundColor, accent: s.borderLeftWidth, muted: paint(muted), ink: paint(ink) }
+  })
+  // Sai do cinza de texto secundário e passa a ter fundo e faixa de destaque.
+  expect(style.color).not.toBe(style.muted)
+  expect(style.color).toBe(style.ink)
+  expect(style.background).not.toBe('rgba(0, 0, 0, 0)')
+  expect(parseFloat(style.accent)).toBeGreaterThanOrEqual(3)
+  // A pergunta guia a leitura.
+  await expect(note.locator('strong')).toHaveText('É convidado?')
+  await accessible(page)
+})
+
 test('dois toques em “Entrar” mandam uma verificação só', async ({ page }) => {
   let release!: () => void
   const hold = new Promise<void>(resolve => { release = resolve })

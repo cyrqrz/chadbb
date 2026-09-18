@@ -71,22 +71,26 @@ export function GuestEvent({ access, preview = false }: { access: { token: strin
   // Onde mostrar o retorno: na presença, na seção de presentes ou no cartão do item.
   const [feedbackAt, setFeedbackAt] = useState<string>('presenca')
   const [expired, setExpired] = useState(false)
-  const [pending, setPending] = useState<{ action: string; payload: Record<string, unknown>; signature: string; success?: string } | null>(null)
+  const [pending, setPending] = useState<{ action: string; payload: Record<string, unknown>; signature: string; success?: string; where: string } | null>(null)
   const presence = useRef<HTMLElement>(null)
   const gifts = useRef<HTMLElement>(null)
   const query = useQuery({ queryKey: key, queryFn: async ({ signal }) => (await guestCall(access.token, 'read', {}, signal)).snapshot,
     initialData: access.snapshot, ...live, enabled: q => !preview && !expired && !(q.state.error instanceof GuestError && q.state.error.status === 401), retry: false })
   useEffect(() => () => { cache.removeQueries({ queryKey: key }) }, [cache, key])
-  async function mutate(action: string, payload: Record<string, unknown>, success?: string) {
+  // `where` permite responder onde a pessoa clicou: o cancelamento pedido no
+  // aviso da presença não pode aparecer lá embaixo, no cartão do presente
+  // (que pode estar até em outra aba).
+  async function mutate(action: string, payload: Record<string, unknown>, success?: string, where?: string) {
     if (busy || expired) return false
     const signature = JSON.stringify({ action, payload })
-    setFeedbackAt(action === 'rsvp' ? 'presenca' : String(payload.from_item_id ?? payload.item_id ?? 'presentes'))
+    const area = where ?? (action === 'rsvp' ? 'presenca' : String(payload.from_item_id ?? payload.item_id ?? 'presentes'))
+    setFeedbackAt(area)
     if (preview) { setError(null); setNotice({ ok: false, text: 'Na prévia, nada é enviado. O convidado verá a confirmação aqui.' }); return false }
     // Pedido de resultado desconhecido precisa ser resolvido antes de outro pedido.
     if (pending && pending.signature !== signature) {
       setNotice({ ok: false, text: 'Há uma confirmação pendente. Use “Verificar tentativa anterior” antes de fazer outra escolha.' }); return false
     }
-    const request = pending ?? { action, payload: { ...payload, request_id: crypto.randomUUID() }, signature, success }
+    const request = pending ?? { action, payload: { ...payload, request_id: crypto.randomUUID() }, signature, success, where: area }
     setPending(request)
     setBusy(true); setError(null); setNotice(null)
     try {
@@ -111,7 +115,7 @@ export function GuestEvent({ access, preview = false }: { access: { token: strin
   const feedback = (area: string) => feedbackAt === area && <>
     {notice && (notice.ok ? <SuccessMessage>{notice.text}</SuccessMessage> : <p role="status" className="state state-warning">{notice.text}</p>)}
     {error !== null && <ErrorState message={guestMessage(error)} />}
-    {pending && !busy && <Button variant="secondary" onClick={() => { const request = pending; void mutate(request.action, Object.fromEntries(Object.entries(request.payload).filter(([name]) => name !== 'request_id'))) }}>Verificar tentativa anterior</Button>}
+    {pending && !busy && <Button variant="secondary" onClick={() => { const request = pending; void mutate(request.action, Object.fromEntries(Object.entries(request.payload).filter(([name]) => name !== 'request_id')), request.success, request.where) }}>Verificar tentativa anterior</Button>}
   </>
   const place = event.address.split('\n')[0]
   return <div className="page invite">
@@ -195,13 +199,48 @@ function withCompletion(text: string, action: string, payload: Record<string, un
   return item?.category === 'fralda' && availableOf(item) === 0 ? `${text} Tamanho ${item.diaper_size} completo.` : text
 }
 
-type Save = (action: string, payload: Record<string, unknown>, success?: string) => Promise<boolean>
+type Save = (action: string, payload: Record<string, unknown>, success?: string, where?: string) => Promise<boolean>
 function Presence({ data, busy, closed, save }: { data: Snapshot; busy: boolean; closed: boolean; save: Save }) {
   const inv = data.invitation
   const [draft, setDraft] = useState<{ response: ResponseChoice; attending: number; version: number } | null>(null)
+  const [keepGifts, setKeepGifts] = useState(false)
+  // Quantas reservas já saíram quando o cancelamento em série para no meio.
+  const [cancelled, setCancelled] = useState(0)
+  const card = useRef<HTMLDivElement>(null)
+  const warning = useId()
   const value = draft ?? inv
-  async function submit(event: FormEvent) { event.preventDefault(); if (await save('rsvp', { response: value.response, attending: value.response === 'yes' ? value.attending || 1 : 0, version: value.version })) setDraft(null) }
-  return <div className="card invite-card">
+  // Quem não vai pode querer enviar o presente assim mesmo: o convite avisa e
+  // deixa a escolha, em vez de cancelar sozinho a reserva. Presente com compra
+  // já informada fica fora: não há pacote para liberar e a pessoa já comprou.
+  const reserved = data.items.filter(item => item.own?.status === 'reserved')
+  const units = (item: GuestItem, n: number) => item.category === 'fralda' ? (n === 1 ? 'pacote' : 'pacotes') : (n === 1 ? 'unidade' : 'unidades')
+  const stale = inv.response === 'no' && reserved.length > 0 && !keepGifts && !closed
+  // O cancelamento pedido aqui responde aqui (`presenca`), e não no cartão do
+  // presente, que pode estar na outra aba. Se um falhar, os seguintes não vão:
+  // o erro e o “Verificar tentativa anterior” ficam ao lado do botão, e o aviso
+  // diz quantas já saíram — senão a pessoa só veria a lista encurtar sozinha.
+  async function cancelAll() {
+    const done = reserved.length > 1 ? 'Reservas canceladas. Os presentes voltaram para a lista.' : undefined
+    setCancelled(0)
+    let out = 0
+    for (const item of reserved) {
+      if (!await save('cancel', { item_id: item.id, version: item.own!.version }, done, 'presenca')) { setCancelled(out); return }
+      out++
+    }
+    card.current?.focus()
+  }
+  // Manter é uma escolha, não um descarte de aviso: responde com confirmação e
+  // devolve o foco ao cartão, já que o botão clicado desaparece.
+  function keep() { setKeepGifts(true); setCancelled(0); card.current?.focus() }
+  async function submit(event: FormEvent) {
+    event.preventDefault()
+    // A confirmação da resposta já avisa do presente: um anúncio só, na ordem
+    // certa. O aviso é desenhado dentro do cartão, logo acima desta mensagem.
+    const keeping = value.response === 'no' && reserved.length > 0
+    const message = keeping ? 'Resposta salva. Você ainda tem presente reservado: escolha logo acima se quer manter ou cancelar.' : undefined
+    if (await save('rsvp', { response: value.response, attending: value.response === 'yes' ? value.attending || 1 : 0, version: value.version }, message)) { setDraft(null); setKeepGifts(false); setCancelled(0) }
+  }
+  return <div ref={card} tabIndex={-1} className="card invite-card">
     <p className="text-muted">Resposta atual: {responseLabels[inv.response]}{inv.response === 'yes' ? ` · ${inv.attending} pessoa(s)` : ''}.</p>
     {closed ? <p>As respostas foram encerradas. Para mudar algo, fale com a organização.</p> : <form className="flex flex-col gap-5" onSubmit={submit}>
       <fieldset disabled={busy}><legend className="font-semibold">Sua confirmação</legend>
@@ -211,6 +250,18 @@ function Presence({ data, busy, closed, save }: { data: Snapshot; busy: boolean;
       {draft && inv.version !== draft.version && <p role="status">Sua resposta mudou em outra sessão. <button type="button" className="text-link" onClick={() => setDraft(null)}>Usar resposta atual</button></p>}
       <Button type="submit" className="self-start" busy={busy} disabled={value.response === 'pending'}>{busy ? 'Aguarde…' : 'Confirmar presença'}</Button>
     </form>}
+    {stale && <div role="group" aria-labelledby={warning} className="state state-warning">
+      <p id={warning}>Você marcou que não poderá ir e ainda tem presente reservado neste convite:</p>
+      <ul className="list-disc pl-5">{reserved.map(item => <li key={item.id}>{item.title} · {item.own!.quantity} {units(item, item.own!.quantity)}</li>)}</ul>
+      {cancelled > 0 && <p>{cancelled === 1 ? 'Uma reserva já foi cancelada' : `${cancelled} reservas já foram canceladas`}; o que está nesta lista continua reservado.</p>}
+      <p>Se não for enviar, cancele para liberar para outra pessoa.</p>
+      <div className="flex flex-wrap gap-3">
+        <Button variant="danger" size="sm" busy={busy} onClick={() => void cancelAll()}>Cancelar {reserved.length === 1 ? 'reserva' : 'reservas'}</Button>
+        <Button variant="ghost" size="sm" disabled={busy} onClick={keep}>Manter: vou enviar o presente</Button>
+      </div>
+    </div>}
+    {keepGifts && !closed && inv.response === 'no' && reserved.length > 0 &&
+      <p role="status" className="hint">Combinado: seu presente continua reservado para você. Se mudar de ideia, cancele na lista de presentes.</p>}
   </div>
 }
 
