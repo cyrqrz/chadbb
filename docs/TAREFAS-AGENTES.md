@@ -177,6 +177,16 @@ o ensaio familiar no celular continua pendente.
 
 ## Pedidos do front para o back
 
+- [ ] 2026-09-17 · Claude → Codex · **`invitation_id` nas reservas do painel.**
+  O painel agora marca quem respondeu “não poderá ir” e mesmo assim tem
+  presente reservado, com o selo “Vai enviar presente”. O vínculo é feito pelo
+  **nome** do convidado, porque `organizer_invitations` devolve as reservas só
+  com `name`. Havendo dois convites com o mesmo nome, o selo **fica de fora**
+  nos dois, para não marcar a pessoa errada — a escolha continua visível em
+  “Escolhas dos convidados”, onde é só fato.
+  Pedido: incluir `invitation_id` em cada item de `reservations`. Sem isso o
+  selo continua aproximado; com ele, o front passa a casar por identificador.
+
 - [ ] 2026-09-16 · Claude → Codex · **Resumo do painel calculado no servidor (T-F2).**
   Hoje o `InvitationsPage` soma `attending` e conta respostas no navegador, e
   também conta convites revogados. Pedido: em `organizer_invitations` (ação

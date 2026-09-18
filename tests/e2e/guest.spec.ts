@@ -17,9 +17,9 @@ function snapshot(items: GuestItem[]): Snapshot {
 const diaper: GuestItem = { id: '70000000-0000-4000-8000-000000000007', title: 'Fraldas tamanho P', description: 'Pacote fictício.',
   category: 'fralda', diaper_size: 'P', limit: 6, committed: 0, own: null }
 
-async function backend(page: Page, options: { items?: GuestItem[]; failReads?: () => boolean; event?: Partial<Snapshot['event']>; refuseExchange?: boolean } = {}) {
+async function backend(page: Page, options: { items?: GuestItem[]; failReads?: () => boolean; event?: Partial<Snapshot['event']>; invitation?: Partial<Snapshot['invitation']>; refuseExchange?: boolean } = {}) {
   let current = snapshot(options.items ?? [diaper])
-  current = { ...current, event: { ...current.event, ...options.event } }
+  current = { ...current, event: { ...current.event, ...options.event }, invitation: { ...current.invitation, ...options.invitation } }
   await page.route('https://e2e.supabase.co/functions/v1/guest', async route => {
     const body = route.request().postDataJSON()
     const reply = (status: number, json: unknown) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(json) })
@@ -369,6 +369,7 @@ test.describe('G3 · página inicial e prévia', () => {
     expect(image.status()).toBe(200)
     expect(image.headers()['content-type']).toBe('image/png')
   })
+
 })
 
 test('G3 · pergunta dos presentes não é título e as opções de presença não quebram a 200%', async ({ page }) => {
@@ -450,6 +451,259 @@ test.describe('G3.1 · card de fralda (referência do sistema de cards)', () => 
     await expect(card.getByRole('button', { name: 'Escolher presente' })).toBeVisible()
     await expect(card.locator('.card-actions')).toHaveCount(0)
     await expect(card.getByText('Pacotes de Fraldas tamanho P')).toHaveCount(0)
+    await expectAccessible(page)
+  })
+})
+
+// Quem responde que não vai continua com a reserva ativa: o convite avisa e
+// deixa escolher entre cancelar ou manter (muita gente não vai, mas envia).
+test.describe('ausência com presente reservado', () => {
+  async function reserveAndDecline(page: import('@playwright/test').Page) {
+    await page.goto(`/convite#${token}`)
+    await page.getByRole('button', { name: 'Fraldas', exact: true }).click()
+    const card = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Fraldas tamanho P' }) })
+    await card.getByRole('spinbutton').fill('2')
+    await card.getByRole('button', { name: 'Escolher presente' }).click()
+    await expect(page.getByRole('status')).toHaveText('Presente reservado para você.')
+    await page.getByRole('radio', { name: 'Não poderá ir' }).check()
+    await page.getByRole('button', { name: 'Confirmar presença' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'Resposta salva' })).toBeVisible()
+    return card
+  }
+
+  test('avisa a reserva que continua e permite cancelar', async ({ page }) => {
+    await backend(page)
+    const card = await reserveAndDecline(page)
+    const warning = page.getByRole('group', { name: /ainda tem presente reservado/ })
+    await expect(warning).toContainText('Fraldas tamanho P · 2 pacotes')
+    await expectAccessible(page)
+    await warning.getByRole('button', { name: /Cancelar reservas?/ }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'Reserva cancelada.' })).toBeVisible()
+    await expect(warning).toHaveCount(0)
+    await page.getByRole('button', { name: 'Fraldas', exact: true }).click()
+    await expect(card.getByRole('button', { name: 'Escolher presente' })).toBeVisible()
+    await expect(card.getByText('6 de 6 disponíveis')).toBeVisible()
+  })
+
+  test('“Manter” guarda a reserva e tira o aviso, sem chamar o servidor', async ({ page }) => {
+    const calls: string[] = []
+    page.on('request', request => { if (request.url().includes('/functions/v1/guest') && request.method() === 'POST') calls.push(String(request.postDataJSON()?.action)) })
+    await backend(page)
+    const card = await reserveAndDecline(page)
+    const warning = page.getByRole('group', { name: /ainda tem presente reservado/ })
+    await warning.getByRole('button', { name: 'Manter: vou enviar o presente' }).click()
+    await expect(warning).toHaveCount(0)
+    expect(calls.filter(action => action === 'cancel')).toHaveLength(0)
+    // A consulta periódica (5 s) não pode trazer o aviso de volta.
+    await expect.poll(() => calls.filter(action => action === 'read').length, { timeout: 15_000 }).toBeGreaterThan(1)
+    await expect(warning).toHaveCount(0)
+    await page.getByRole('button', { name: 'Fraldas', exact: true }).click()
+    await expect(card.getByText('Sua reserva 2 pacotes')).toBeVisible()
+  })
+
+  test('quem confirma presença não vê o aviso', async ({ page }) => {
+    await backend(page)
+    await page.goto(`/convite#${token}`)
+    await page.getByRole('button', { name: 'Fraldas', exact: true }).click()
+    const card = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Fraldas tamanho P' }) })
+    await card.getByRole('spinbutton').fill('2')
+    await card.getByRole('button', { name: 'Escolher presente' }).click()
+    await expect(page.getByRole('status')).toHaveText('Presente reservado para você.')
+    await page.getByRole('radio', { name: 'Vai participar' }).check()
+    await page.getByRole('button', { name: 'Confirmar presença' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'Resposta salva' })).toBeVisible()
+    await expect(page.getByText('ainda tem presente reservado')).toHaveCount(0)
+  })
+
+  const presenceOf = (page: import('@playwright/test').Page) => page.getByRole('region', { name: 'Podemos contar com você?' })
+  const treat: GuestItem = { id: '70000000-0000-4000-8000-00000000000a', title: 'Mamadeira fictícia', description: 'Mimo fictício.',
+    category: 'mimo', diaper_size: null, limit: null, committed: 0, own: null }
+
+  // Um anúncio só, na ordem certa: a confirmação da resposta já diz que o
+  // presente continua reservado, em vez de duas regiões vivas disputando.
+  test('salvar a recusa faz um anúncio só, que já cita o presente reservado', async ({ page }) => {
+    await backend(page)
+    await reserveAndDecline(page)
+    const live = presenceOf(page).locator('[role="status"]')
+    await expect(live).toHaveCount(1)
+    await expect(live).toContainText('Resposta salva')
+    await expect(live).toContainText('presente reservado')
+    // Mudou de ideia: o aviso some e a reserva continua de pé.
+    await page.getByRole('radio', { name: 'Vai participar' }).check()
+    await page.getByRole('button', { name: 'Confirmar presença' }).click()
+    await expect(live).toHaveText('Resposta salva. Obrigado por avisar!')
+    await expect(page.getByRole('group', { name: /ainda tem presente reservado/ })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Fraldas', exact: true }).click()
+    await expect(page.getByText('Sua reserva 2 pacotes')).toBeVisible()
+  })
+
+  test('confirmação do cancelamento aparece junto do aviso e o foco não se perde', async ({ page }) => {
+    await backend(page)
+    await reserveAndDecline(page)
+    const presence = presenceOf(page)
+    await presence.getByRole('button', { name: /Cancelar reservas?/ }).click()
+    await expect(presence.getByText('Reserva cancelada.')).toBeVisible()
+    expect(await presence.evaluate(node => node.contains(document.activeElement))).toBe(true)
+  })
+
+  test('falha ao cancelar avisa a pessoa mesmo com o presente em outra aba', async ({ page }) => {
+    await backend(page, { items: [diaper, treat] })
+    await page.goto(`/convite#${token}`)
+    await page.getByRole('button', { name: 'Mimos', exact: true }).click()
+    const card = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Mamadeira fictícia' }) })
+    await card.getByRole('spinbutton').fill('1')
+    await card.getByRole('button', { name: 'Escolher presente' }).click()
+    await expect(page.getByRole('status')).toHaveText('Presente reservado para você.')
+    await page.getByRole('radio', { name: 'Não poderá ir' }).check()
+    await page.getByRole('button', { name: 'Confirmar presença' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'Resposta salva' })).toBeVisible()
+    await page.getByRole('button', { name: 'Fraldas', exact: true }).click()
+    await page.route('https://e2e.supabase.co/functions/v1/guest', async route => {
+      if (route.request().postDataJSON().action === 'cancel') return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'TEMPORARILY_UNAVAILABLE' }) })
+      await route.fallback()
+    })
+    const presence = presenceOf(page)
+    await presence.getByRole('button', { name: /Cancelar reservas?/ }).click()
+    await expect(presence.getByRole('alert')).toContainText('temporariamente indisponível')
+    await expect(presence.getByRole('button', { name: 'Verificar tentativa anterior' })).toBeVisible()
+  })
+
+  test('duas reservas saem em sequência e o clique impaciente não repete o pedido', async ({ page }) => {
+    const cancels: string[] = []
+    page.on('request', request => {
+      const body = request.url().includes('/functions/v1/guest') && request.method() === 'POST' ? request.postDataJSON() : null
+      if (body?.action === 'cancel') cancels.push(String(body.payload.item_id))
+    })
+    await backend(page, { items: [diaper, treat] })
+    await page.goto(`/convite#${token}`)
+    const fralda = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Fraldas tamanho P' }) })
+    await fralda.getByRole('spinbutton').fill('2')
+    await fralda.getByRole('button', { name: 'Escolher presente' }).click()
+    await expect(page.getByRole('status')).toHaveText('Presente reservado para você.')
+    await page.getByRole('button', { name: 'Mimos', exact: true }).click()
+    const mimo = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Mamadeira fictícia' }) })
+    await mimo.getByRole('button', { name: 'Escolher presente' }).click()
+    await expect(page.getByRole('status')).toHaveText('Presente reservado para você.')
+    await page.getByRole('radio', { name: 'Não poderá ir' }).check()
+    await page.getByRole('button', { name: 'Confirmar presença' }).click()
+    const warning = page.getByRole('group', { name: /ainda tem presente reservado/ })
+    await expect(warning.getByRole('listitem')).toHaveText(['Fraldas tamanho P · 2 pacotes', 'Mamadeira fictícia · 1 unidade'])
+    await page.route('https://e2e.supabase.co/functions/v1/guest', async route => {
+      if (route.request().postDataJSON().action === 'cancel') await new Promise(done => setTimeout(done, 400))
+      await route.fallback()
+    })
+    const button = warning.getByRole('button', { name: 'Cancelar reservas' })
+    await button.click()
+    await button.click({ force: true })
+    await expect(page.getByRole('status').filter({ hasText: 'Reservas canceladas.' })).toBeVisible()
+    await expect(warning).toHaveCount(0)
+    expect(cancels).toEqual([diaper.id, treat.id])
+    await expect(mimo.getByRole('button', { name: 'Escolher presente' })).toBeVisible()
+  })
+
+  test('quem já informou a compra não é empurrado a cancelar', async ({ page }) => {
+    await backend(page)
+    await page.goto(`/convite#${token}`)
+    await page.getByRole('button', { name: 'Fraldas', exact: true }).click()
+    const card = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Fraldas tamanho P' }) })
+    await card.getByRole('spinbutton').fill('2')
+    await card.getByRole('button', { name: 'Escolher presente' }).click()
+    await expect(page.getByRole('status')).toHaveText('Presente reservado para você.')
+    await card.getByRole('button', { name: 'Já comprei' }).click()
+    await expect(page.getByRole('status')).toHaveText('Compra informada. A organização vai ver o aviso.')
+    await page.getByRole('radio', { name: 'Não poderá ir' }).check()
+    await page.getByRole('button', { name: 'Confirmar presença' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'Resposta salva' })).toBeVisible()
+    await expect(page.getByText('ainda tem presente reservado')).toHaveCount(0)
+  })
+
+  // Quem volta ao convite no dia seguinte já encontra o aviso, sem precisar responder de novo.
+  const held: GuestItem = { ...diaper, committed: 2, own: { id: 'r1', quantity: 2, version: 1, status: 'reserved' } }
+
+  test('ao reabrir o convite o aviso já está lá, no caminho do teclado', async ({ page }) => {
+    await backend(page, { items: [held], invitation: { response: 'no', version: 4 } })
+    await page.goto(`/convite#${token}`)
+    const warning = page.getByRole('group', { name: /ainda tem presente reservado/ })
+    await expect(warning).toContainText('Fraldas tamanho P · 2 pacotes')
+    await page.getByRole('button', { name: 'Confirmar presença', exact: true }).focus()
+    await page.keyboard.press('Tab')
+    await expect(warning.getByRole('button', { name: 'Cancelar reserva' })).toBeFocused()
+    await expectAccessible(page)
+  })
+
+  test('evento encerrado esconde o aviso, e o cancelamento continua no cartão', async ({ page }) => {
+    await backend(page, { items: [held], invitation: { response: 'no', version: 4 }, event: { status: 'closed' } })
+    await page.goto(`/convite#${token}`)
+    await expect(page.getByText('ainda tem presente reservado')).toHaveCount(0)
+    await page.getByRole('button', { name: 'Fraldas', exact: true }).click()
+    const card = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Fraldas tamanho P' }) })
+    await expect(card.getByRole('button', { name: 'Cancelar reserva' })).toBeVisible()
+  })
+
+  // A confirmação da resposta é desenhada depois do cartão, e o aviso fica
+  // dentro dele: mandar “veja logo abaixo” aponta para o lugar errado.
+  test('a confirmação da recusa não manda olhar para o lado errado', async ({ page }) => {
+    await backend(page)
+    await reserveAndDecline(page)
+    const message = presenceOf(page).locator('[role="status"]')
+    const warning = page.getByRole('group', { name: /ainda tem presente reservado/ })
+    const [box, note] = [await warning.boundingBox(), await message.boundingBox()]
+    expect(box!.y, 'o aviso é desenhado antes da confirmação').toBeLessThan(note!.y)
+    expect(await message.innerText()).not.toMatch(/abaixo/)
+  })
+
+  // Quem escolhe manter o presente merece resposta: o aviso sumir não é
+  // confirmação, e quem usa teclado ou leitor de tela fica sem saber o que houve.
+  test('“Manter” confirma a escolha e não deixa o foco no vazio', async ({ page }) => {
+    await backend(page)
+    await reserveAndDecline(page)
+    const presence = presenceOf(page)
+    await presence.getByRole('button', { name: 'Manter: vou enviar o presente' }).click()
+    await expect(page.getByRole('group', { name: /ainda tem presente reservado/ })).toHaveCount(0)
+    await expect(presence.locator('[role="status"]').filter({ hasText: /continua reservado/ })).toBeVisible()
+    expect(await presence.evaluate(node => node.contains(document.activeElement)), 'o foco ficou no vazio').toBe(true)
+  })
+
+  test('cancelamento que falha no meio diz o que já saiu e o que ficou', async ({ page }) => {
+    await backend(page, { items: [diaper, treat] })
+    await page.goto(`/convite#${token}`)
+    const fralda = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Fraldas tamanho P' }) })
+    await fralda.getByRole('spinbutton').fill('2')
+    await fralda.getByRole('button', { name: 'Escolher presente' }).click()
+    await expect(page.getByRole('status')).toHaveText('Presente reservado para você.')
+    await page.getByRole('button', { name: 'Mimos', exact: true }).click()
+    const mimo = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Mamadeira fictícia' }) })
+    await mimo.getByRole('button', { name: 'Escolher presente' }).click()
+    await expect(page.getByRole('status')).toHaveText('Presente reservado para você.')
+    await page.getByRole('radio', { name: 'Não poderá ir' }).check()
+    await page.getByRole('button', { name: 'Confirmar presença' }).click()
+    const warning = page.getByRole('group', { name: /ainda tem presente reservado/ })
+    await expect(warning.getByRole('listitem')).toHaveCount(2)
+    // O servidor cai depois de cancelar o primeiro: o segundo não sai.
+    let seen = 0
+    await page.route('https://e2e.supabase.co/functions/v1/guest', async route => {
+      if (route.request().postDataJSON().action === 'cancel' && ++seen > 1)
+        return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'TEMPORARILY_UNAVAILABLE' }) })
+      await route.fallback()
+    })
+    const presence = presenceOf(page)
+    await presence.getByRole('button', { name: 'Cancelar reservas' }).click()
+    await expect(presence.getByRole('alert')).toContainText('temporariamente indisponível')
+    // Estado parcial dito com palavras, não deduzido de uma lista que encurtou.
+    await expect(warning).toContainText(/uma reserva já foi cancelada/i)
+    await expect(warning.getByRole('listitem')).toHaveText(['Mamadeira fictícia · 1 unidade'])
+  })
+
+  test('aviso cabe em 320 px com texto a 200% e os botões têm 44 px', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 740 })
+    await backend(page)
+    await reserveAndDecline(page)
+    await page.addStyleTag({ content: 'html { font-size: 200% !important; }' })
+    const presence = presenceOf(page)
+    for (const name of [/^Cancelar reservas?$/, 'Manter: vou enviar o presente']) {
+      const box = await presence.getByRole('button', { name }).boundingBox()
+      expect(box!.height, String(name)).toBeGreaterThanOrEqual(44)
+    }
     await expectAccessible(page)
   })
 })

@@ -66,6 +66,14 @@ export function InvitationsPage() {
   if (query.isPending && !(failedLast(query) && loadError)) return <LoadingState>Carregando seu painel…</LoadingState>
   if (!query.data) return <div className="tab-panel"><ErrorState title="Não foi possível abrir o painel." message={errorMessage(loadError)} busy={query.isFetching} onRetry={() => void query.refetch()} /></div>
   const data = query.data
+  // Quem respondeu que não vai e mesmo assim reservou presente. O vínculo é pelo
+  // nome porque as reservas do painel ainda não trazem o convite (pedido ao Codex
+  // em docs/TAREFAS-AGENTES.md): com nomes repetidos não há como saber de quem é
+  // a reserva, então o selo fica de fora em vez de marcar a pessoa errada. A
+  // escolha continua visível em "Escolhas dos convidados", onde é só fato.
+  const homonyms = new Map<string, number>()
+  for (const inv of data.invitations) homonyms.set(inv.name, (homonyms.get(inv.name) ?? 0) + 1)
+  const sendingGift = new Set(data.reservations.filter(r => r.status !== 'cancelled' && homonyms.get(r.name) === 1).map(r => r.name))
   const feedback = <>{notice && <div className="mt-4"><SuccessMessage>{notice}</SuccessMessage></div>}{error && <div className="mt-4"><ErrorState message={error} /></div>}</>
   const formOpen = open
   // O aviso fica junto do que o provocou: formulário de convite, edição ou a lista.
@@ -107,7 +115,7 @@ export function InvitationsPage() {
         {feedbackPlace === 'edit' && feedback}
       </section>}
       {!data.invitations.length ? <div className="mt-5"><EmptyState title="Nenhum convite ainda.">{closed ? 'Este evento foi encerrado sem convites.' : ready ? 'Use “Convidar alguém” para criar o primeiro convite.' : 'Depois de publicar o evento, use “Convidar alguém” para criar o primeiro convite.'}</EmptyState></div> :
-      <ul className="mt-5 grid gap-4 md:grid-cols-2">{data.invitations.map(inv => <GuestCard key={inv.id} invitation={inv} canEdit={!busy && ready} canRevoke={!busy}
+      <ul className="mt-5 grid gap-4 md:grid-cols-2">{data.invitations.map(inv => <GuestCard key={inv.id} invitation={inv} sending={inv.response === 'no' && sendingGift.has(inv.name)} canEdit={!busy && ready} canRevoke={!busy}
         onEdit={() => { setEditing({ ...inv }); setError(''); setNotice('') }}
         onRotate={() => { if (window.confirm('Gerar um novo link e invalidar o anterior? Respostas e presentes serão mantidos.')) void act('rotate', { id: inv.id }) }}
         onRevoke={() => { if (window.confirm('Revogar este acesso? Respostas e presentes serão mantidos.')) void act('revoke', { id: inv.id }) }} />)}</ul>}
@@ -125,8 +133,8 @@ const responseIcons: Partial<Record<Invitation['response'], string>> = { no: '�
 
 // G2.1: uma ação de edição (secundária), reemitir como auxiliar e revogar como
 // destrutiva; o nome do convidado fica só no título e no nome acessível.
-function GuestCard({ invitation: inv, canEdit, canRevoke, onEdit, onRotate, onRevoke }: {
-  invitation: Invitation; canEdit: boolean; canRevoke: boolean; onEdit: () => void; onRotate: () => void; onRevoke: () => void
+function GuestCard({ invitation: inv, sending, canEdit, canRevoke, onEdit, onRotate, onRevoke }: {
+  invitation: Invitation; sending: boolean; canEdit: boolean; canRevoke: boolean; onEdit: () => void; onRotate: () => void; onRevoke: () => void
 }) {
   return <li className="card card-stack guest-card">
     <header className="card-header">
@@ -136,7 +144,8 @@ function GuestCard({ invitation: inv, canEdit, canRevoke, onEdit, onRotate, onRe
       </div>
       <h3 className="card-title">{inv.name}</h3>
     </header>
-    <p><StatusBadge tone={responseTones[inv.response]} icon={responseIcons[inv.response]}>{responseLabels[inv.response]}{inv.response === 'yes' ? ` · ${inv.attending} pessoa(s)` : ''}</StatusBadge></p>
+    <p className="card-badges"><StatusBadge tone={responseTones[inv.response]} icon={responseIcons[inv.response]}>{responseLabels[inv.response]}{inv.response === 'yes' ? ` · ${inv.attending} pessoa(s)` : ''}</StatusBadge>
+      {sending && <StatusBadge tone="brand">Vai enviar presente</StatusBadge>}</p>
     {inv.revoked && <p className="hint">O link antigo não funciona mais; as respostas e escolhas foram preservadas.</p>}
     <div className="card-actions">
       <Button variant="secondary" size="sm" disabled={!canEdit} onClick={onEdit}>Editar convite<span className="sr-only"> de {inv.name}</span></Button>

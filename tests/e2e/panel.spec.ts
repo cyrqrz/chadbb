@@ -737,6 +737,9 @@ test.describe('G3.1 · cards do organizador', () => {
     await expect(page).toHaveURL(new RegExp(`/eventos/${eventId}$`))
   })
 
+  // Regressão: os cards de evento ficam dentro de um `.stagger`, e a animação
+  // de entrada preenchida (`both`) vencia o cascade e travava o `transform`,
+  // matando a elevação do hover que a G3.1 aprovou. Ver `.stagger` no CSS.
   test('eventos: card de evento com a mesma anatomia', async ({ page }) => {
     await backend(page, () => ({ status: 200, json: full }), () => ({ status: 200, json: [event], headers: { 'content-range': '0-0/1' } }))
     await page.goto('/eventos')
@@ -1182,5 +1185,65 @@ test.describe('reconsulta sem tremida', () => {
     const seen = await watch(page, 'main h2')
     expect(seen.flashed).toBe(false)
     expect(seen.tops).toHaveLength(1)
+  })
+})
+
+// Convidado que não vai mas reservou presente: a organização precisa entender o número.
+test.describe('painel: quem não vai e mesmo assim reservou', () => {
+  const withGift = { ...full, reservations: [...full.reservations,
+    { name: 'Convidado fictício 2', title: 'Fraldas tamanho M', category: 'fralda' as const, diaper_size: 'M' as const, quantity: 2, status: 'reserved' }] }
+  const card = (page: Page, name: string) => page.getByRole('listitem').filter({ has: page.getByRole('heading', { name }) })
+
+  test('painel marca quem não vai e mesmo assim vai enviar presente', async ({ page }) => {
+    await backend(page, () => ({ status: 200, json: withGift }))
+    await page.goto(`/eventos/${eventId}/convites`)
+    const declined = card(page, 'Convidado fictício 2')
+    await expect(declined).toContainText('Não poderá ir')
+    await expect(declined.locator('.badge', { hasText: 'Vai enviar presente' })).toBeVisible()
+    await expect(card(page, 'Convidado fictício 1').locator('.badge', { hasText: 'Vai enviar presente' })).toHaveCount(0)
+    await expectAccessible(page)
+  })
+
+  test('os dois selos cabem em 320 px com texto a 200%', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 740 })
+    await backend(page, () => ({ status: 200, json: withGift }))
+    await page.goto(`/eventos/${eventId}/convites`)
+    await page.addStyleTag({ content: 'html { font-size: 200% !important; }' })
+    const badges = card(page, 'Convidado fictício 2').locator('.card-badges .badge')
+    await expect(badges).toHaveCount(3)
+    for (const badge of await badges.all()) await expect(badge).toBeVisible()
+    await expectAccessible(page)
+  })
+
+  // Quem escolheu presente e ainda não respondeu não disse que não vem: o selo
+  // “Vai enviar presente” significa “não vem, mas manda”. Em quem está sem
+  // resposta ele inventa uma ausência, e o convite nem faz essa pergunta a
+  // essa pessoa (o aviso do convite só aparece para quem respondeu que não vai).
+  test('quem ainda não respondeu não é anunciado como ausente que manda presente', async ({ page }) => {
+    const noAnswerGift = { ...full, reservations: [...full.reservations,
+      { name: 'Convidado fictício 5', title: 'Fraldas tamanho G', category: 'fralda' as const, diaper_size: 'G' as const, quantity: 1, status: 'reserved' }] }
+    await backend(page, () => ({ status: 200, json: noAnswerGift }))
+    await page.goto(`/eventos/${eventId}/convites`)
+    const waiting = card(page, 'Convidado fictício 5')
+    await expect(waiting).toContainText('Sem resposta')
+    await expect(waiting.locator('.badge', { hasText: 'Vai enviar presente' })).toHaveCount(0)
+    // A escolha continua visível onde é fato, sem virar intenção de ausência.
+    await expect(page.getByRole('region', { name: 'Escolhas dos convidados' })).toContainText('Convidado fictício 5')
+  })
+
+  // O selo casa reserva com convite pelo nome (o back ainda não manda
+  // `invitation_id`). Com dois convites de mesmo nome não há como saber de quem
+  // é a reserva: melhor não afirmar nada do que marcar a pessoa errada.
+  test('dois convites de mesmo nome não recebem o selo por adivinhação', async ({ page }) => {
+    const twins: Dashboard = { ...full,
+      invitations: [...full.invitations, invitation(6, { name: 'Convidado fictício 2', response: 'no', kind: 'individual', capacity: 1 })],
+      reservations: [...full.reservations,
+        { name: 'Convidado fictício 2', title: 'Fraldas tamanho M', category: 'fralda' as const, diaper_size: 'M' as const, quantity: 2, status: 'reserved' }] }
+    await backend(page, () => ({ status: 200, json: twins }))
+    await page.goto(`/eventos/${eventId}/convites`)
+    const homonyms = page.getByRole('listitem').filter({ has: page.getByRole('heading', { name: 'Convidado fictício 2' }) })
+    await expect(homonyms).toHaveCount(2)
+    await expect(homonyms.locator('.badge', { hasText: 'Vai enviar presente' })).toHaveCount(0)
+    await expect(page.getByRole('region', { name: 'Escolhas dos convidados' })).toContainText('Convidado fictício 2')
   })
 })
