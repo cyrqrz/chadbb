@@ -1,6 +1,6 @@
 import { readPublicConfig } from '../../lib/config'
 import { supabase } from '../../lib/supabase'
-import { fromLocalDate } from './model'
+import { fromLocalDate, isEventId } from './model'
 import type { EventDraft, EventRecord } from './model'
 
 export function getClient() {
@@ -15,6 +15,7 @@ export async function listEvents(page: number) {
   return { events: data as EventRecord[], count: count ?? 0 }
 }
 export async function getEvent(id: string) {
+  if (!isEventId(id)) return null
   const { data, error } = await getClient().from('events').select('*').eq('id', id).maybeSingle()
   if (error) throw error
   return data as EventRecord | null

@@ -1110,6 +1110,16 @@ test.describe('G4 · painel do evento', () => {
       expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44)
   })
 
+  test('endereço com id inválido diz “Evento não encontrado”, sem consultar o servidor', async ({ page }) => {
+    const pedidos: string[] = []
+    await backend(page, () => ({ status: 200, json: full }))
+    page.on('request', request => { if (request.url().includes('e2e.supabase.co/rest')) pedidos.push(new URL(request.url()).pathname) })
+    await page.goto('/eventos/%3Cid%3E')
+    await expect(page.getByRole('heading', { name: 'Evento não encontrado' })).toBeVisible()
+    await expect(tabs(page)).toHaveCount(0)
+    expect(pedidos).toEqual([])
+  })
+
   test('prévia sem data pede para preencher os dados do evento', async ({ page }) => {
     await backend(page, () => ({ status: 200, json: full }), () => ({ status: 200, json: [{ ...event, starts_at: null, status: 'draft' }] }))
     await page.goto(`/eventos/${eventId}/previa`)
