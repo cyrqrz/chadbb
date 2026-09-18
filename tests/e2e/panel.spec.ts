@@ -191,7 +191,7 @@ test('falha ao conferir a lista avisa no catálogo e some quando a consulta volt
   await expect(alert).toContainText('Não foi possível conferir o que já está na lista', { timeout: 15_000 })
   await expectAccessible(page)
   // Enquanto confere de novo, o aviso continua no lugar e o botão fica indisponível.
-  const retry = alert.getByRole('button', { name: 'Tentar novamente' })
+  const retry = alert.getByRole('button', { name: 'Conferir a lista de novo' })
   await retry.click()
   await expect(retry).toBeDisabled()
   await expect(retry).toBeEnabled({ timeout: 10_000 })
@@ -352,6 +352,148 @@ test('voltar a uma tela que falhou mostra carregando, não o erro antigo', async
   // A consulta em cache ainda guarda o erro, mas a nova tentativa ao montar é uma carga nova.
   await expect(page.getByRole('status').filter({ hasText: 'Carregando evento…' })).toBeVisible()
   await expect(page.getByRole('alert')).toContainText('Não foi possível abrir o evento.', { timeout: 15_000 })
+})
+
+// G4b.1 · achados A11–A13 da auditoria (docs/design/audit.md).
+const listItem = (n: number) => {
+  const size = (['P', 'M', 'G', 'XG'] as const)[n % 4]
+  const item = product(n % 10, size)
+  return { id: `91000000-0000-4000-8000-${String(n).padStart(12, '0')}`, event_id: eventId, product_id: item.id, quantity_requested: 6,
+    category: 'fralda', diaper_size: size, version: 1, product: { ...item, title: `Fralda fictícia ${n}` } }
+}
+const isListQuery = (url: URL) => url.searchParams.get('select')?.startsWith('id,event_id') ?? false
+
+test('A11 · voltar a uma categoria que falhou mostra carregando, não o erro antigo', async ({ page }) => {
+  await backend(page, () => ({ status: 200, json: full }), undefined, {
+    '/rest/v1/event_items': ({ url, body }) => isListQuery(url) && url.searchParams.get('category') === 'eq.fralda'
+      ? { status: 500, json: { message: 'unavailable' } } : none({ url, body }),
+    '/rest/v1/products': none,
+  })
+  await page.goto(`/eventos/${eventId}/presentes`)
+  const diapers = page.getByRole('region', { name: 'Fraldas na lista' })
+  await expect(diapers.getByRole('alert')).toBeVisible({ timeout: 15_000 })
+  await page.getByRole('button', { name: 'Mimos', exact: true }).click()
+  await expect(page.getByRole('region', { name: 'Mimos na lista' }).getByText('Nenhum mimo na lista.')).toBeVisible()
+  // A nova tentativa de Fraldas demora: enquanto isso, a tela diz que está carregando.
+  await page.route('**/rest/v1/event_items**', async route => {
+    if (isListQuery(new URL(route.request().url()))) await new Promise(resolve => setTimeout(resolve, 1500))
+    await route.fallback()
+  })
+  await page.getByRole('button', { name: 'Fraldas', exact: true }).click()
+  await expect(diapers.getByRole('status').filter({ hasText: 'Carregando a lista…' })).toBeVisible()
+  await expect(diapers.getByRole('alert')).toHaveCount(0)
+  await expect(diapers.getByRole('alert')).toBeVisible({ timeout: 15_000 })
+})
+
+test('A12 · página da lista que falha mantém a paginação para voltar', async ({ page }) => {
+  await backend(page, () => ({ status: 200, json: full }), undefined, {
+    '/rest/v1/event_items': ({ url, body }) => !isListQuery(url) ? none({ url, body })
+      : url.searchParams.get('offset') === '12' ? { status: 500, json: { message: 'unavailable' } }
+      : { status: 200, json: Array.from({ length: 12 }, (_, n) => listItem(n + 1)), headers: { 'content-range': '0-11/13' } },
+    '/rest/v1/products': none,
+  })
+  await page.goto(`/eventos/${eventId}/presentes`)
+  const diapers = page.getByRole('region', { name: 'Fraldas na lista' })
+  await expect(diapers.getByRole('heading', { name: 'Fralda fictícia 1', exact: true })).toBeVisible()
+  await diapers.getByRole('navigation', { name: 'Paginação da lista' }).getByRole('button', { name: 'Próxima' }).click()
+  await expect(diapers.getByRole('alert')).toBeVisible({ timeout: 15_000 })
+  // Os itens da página anterior não voltam como se fossem atuais; só a navegação fica.
+  await expect(diapers.getByRole('heading', { name: 'Fralda fictícia 1', exact: true })).toHaveCount(0)
+  const pages = diapers.getByRole('navigation', { name: 'Paginação da lista' })
+  await expect(pages).toContainText('Página 2 de 2')
+  await pages.getByRole('button', { name: 'Anterior' }).click()
+  await expect(diapers.getByRole('heading', { name: 'Fralda fictícia 1', exact: true })).toBeVisible()
+  await expect(diapers.getByRole('alert')).toHaveCount(0)
+})
+
+test('A13 · falha só na consulta do evento avisa no topo da lista', async ({ page }) => {
+  let failing = false
+  await backend(page, () => ({ status: 200, json: full }), () => failing ? { status: 500, json: { message: 'unavailable' } } : { status: 200, json: [event] },
+    { '/rest/v1/event_items': none, '/rest/v1/products': none })
+  await page.goto(`/eventos/${eventId}/presentes`)
+  await expect(page.getByRole('heading', { name: 'Fraldas na lista' })).toBeVisible()
+  failing = true
+  await page.waitForResponse(r => r.url().includes('/rest/v1/events') && r.status() === 500, { timeout: 20_000 })
+  // Só a situação do evento pode estar velha: a lista abaixo acabou de ser consultada.
+  const alert = page.getByRole('alert').filter({ hasText: 'Não foi possível conferir se o evento continua aberto.' })
+  await expect(alert).toBeVisible()
+  await expect(page.getByRole('alert')).toHaveCount(1)
+  await expect(page.getByRole('heading', { name: 'Fraldas na lista' })).toBeVisible()
+  await expectAccessible(page)
+  failing = false
+  await alert.getByRole('button', { name: 'Conferir de novo' }).click()
+  await expect(alert).toHaveCount(0)
+})
+
+test('A13 · com o servidor fora, nenhum aviso nem botão se repete', async ({ page }) => {
+  let failing = false
+  const down = { status: 500, json: { message: 'unavailable' } }
+  await backend(page, () => ({ status: 200, json: full }), () => failing ? down : { status: 200, json: [event] },
+    { '/rest/v1/event_items': a => failing ? down : none(a), '/rest/v1/products': none })
+  await page.goto(`/eventos/${eventId}/presentes`)
+  await expect(page.getByRole('heading', { name: 'Fraldas na lista' })).toBeVisible()
+  failing = true
+  await expect(page.getByRole('alert').filter({ hasText: 'Não foi possível conferir se o evento continua aberto.' })).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByRole('region', { name: 'Fraldas na lista' }).getByRole('alert')).toBeVisible({ timeout: 20_000 })
+  const texts = await page.getByRole('alert').allInnerTexts()
+  expect(new Set(texts).size).toBe(texts.length)
+  const names = await page.getByRole('alert').getByRole('button').allInnerTexts()
+  expect(new Set(names).size).toBe(names.length)
+})
+
+const thirteen = (url: URL) => url.searchParams.get('offset') === '12' ? { status: 500, json: { message: 'unavailable' } }
+  : { status: 200, json: Array.from({ length: 12 }, (_, n) => listItem(n + 1)), headers: { 'content-range': '0-11/13' } }
+test('A12 · trocar de página pelo teclado não solta o foco, nem no erro', async ({ page }) => {
+  let delay = 0
+  await backend(page, () => ({ status: 200, json: full }), undefined, {
+    '/rest/v1/event_items': ({ url, body }) => !isListQuery(url) ? none({ url, body }) : thirteen(url), '/rest/v1/products': none })
+  await page.route('**/rest/v1/event_items**', async route => { if (delay) await new Promise(resolve => setTimeout(resolve, delay)); await route.fallback() })
+  await page.goto(`/eventos/${eventId}/presentes`)
+  const pages = page.getByRole('navigation', { name: 'Paginação da lista' })
+  await expect(pages).toContainText('Página 1 de 2')
+  delay = 800
+  await pages.getByRole('button', { name: 'Próxima' }).focus()
+  await page.keyboard.press('Enter')
+  // Durante a carga e depois do erro, o foco continua na paginação.
+  await expect(page.getByRole('region', { name: 'Fraldas na lista' }).getByRole('status').filter({ hasText: 'Carregando a lista…' })).toBeVisible()
+  expect(await page.evaluate(() => document.activeElement?.closest('nav')?.getAttribute('aria-label'))).toBe('Paginação da lista')
+  await expect(page.getByRole('region', { name: 'Fraldas na lista' }).getByRole('alert')).toBeVisible({ timeout: 15_000 })
+  // Na última página, "Próxima" fica indisponível sem soltar o foco.
+  await expect(pages.getByRole('button', { name: 'Próxima' })).toHaveAttribute('aria-disabled', 'true')
+  await expect(pages.getByRole('button', { name: 'Próxima' })).toBeFocused()
+  await pages.getByRole('button', { name: 'Anterior' }).focus()
+  await page.keyboard.press('Enter')
+  await expect(pages).toContainText('Página 1 de 2')
+  expect(await page.evaluate(() => document.activeElement?.closest('nav')?.getAttribute('aria-label'))).toBe('Paginação da lista')
+})
+
+test('A12 · página do catálogo que falha mantém a paginação para voltar', async ({ page }) => {
+  const products = Array.from({ length: 12 }, (_, n) => ({ ...product(n % 10, 'M'), id: `81000000-0000-4000-8000-${String(n).padStart(12, '0')}`, title: `Produto fictício ${n + 1}` }))
+  await backend(page, () => ({ status: 200, json: full }), undefined, { '/rest/v1/event_items': none,
+    '/rest/v1/products': ({ url }) => url.searchParams.get('offset') === '12' ? { status: 500, json: { message: 'unavailable' } }
+      : { status: 200, json: products, headers: { 'content-range': '0-11/13' } } })
+  await page.goto(`/eventos/${eventId}/presentes`)
+  const catalog = page.getByRole('region', { name: 'Incluir itens avulsos' })
+  await expect(catalog.getByText('Produto fictício 1', { exact: true })).toBeVisible()
+  await catalog.getByRole('button', { name: 'Próxima' }).click()
+  await expect(catalog.getByRole('alert')).toBeVisible({ timeout: 15_000 })
+  await expect(catalog.getByRole('navigation', { name: 'Paginação do catálogo' })).toContainText('Página 2 de 2')
+  await catalog.getByRole('button', { name: 'Anterior' }).click()
+  await expect(catalog.getByText('Produto fictício 1', { exact: true })).toBeVisible()
+  await expect(catalog.getByRole('alert')).toHaveCount(0)
+})
+test('A12 · erro de página com a paginação cabe em 320 px com texto a 200% e alvos de 44 px', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 740 })
+  await backend(page, () => ({ status: 200, json: full }), undefined, {
+    '/rest/v1/event_items': ({ url, body }) => !isListQuery(url) ? none({ url, body }) : thirteen(url), '/rest/v1/products': none })
+  await page.goto(`/eventos/${eventId}/presentes`)
+  const diapers = page.getByRole('region', { name: 'Fraldas na lista' })
+  await diapers.getByRole('button', { name: 'Próxima' }).click()
+  await expect(diapers.getByRole('alert')).toBeVisible({ timeout: 15_000 })
+  await page.addStyleTag({ content: 'html { font-size: 200% !important; }' })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBe(0)
+  for (const b of await diapers.getByRole('button').all()) { const box = await b.boundingBox(); expect(box!.height).toBeGreaterThanOrEqual(44); expect(box!.x + box!.width).toBeLessThanOrEqual(320) }
+  await expectAccessible(page)
 })
 
 test.describe('G2.1 · card de convidado', () => {

@@ -30,13 +30,14 @@ export function SuccessMessage({ children }: { children: ReactNode }) {
 
 // Texto visível sem região viva: indica que a tela está sendo reconsultada e,
 // se a última consulta falhou, avisa que os dados são da consulta anterior.
-export function RefreshStatus({ fetching, failed, onRetry, label = 'Atualizando…' }: {
-  fetching: boolean; failed: boolean; onRetry: () => void; label?: string
+// `message` e `retryLabel` distinguem avisos que podem aparecer juntos na mesma tela.
+export function RefreshStatus({ fetching, failed, onRetry, label = 'Atualizando…', message = 'Não foi possível atualizar. Os dados abaixo são da última consulta.', retryLabel = 'Tentar novamente' }: {
+  fetching: boolean; failed: boolean; onRetry: () => void; label?: string; message?: string; retryLabel?: string
 }) {
   if (failed) return <div role="alert" className="state state-error mt-4">
-    <p>Não foi possível atualizar. Os dados abaixo são da última consulta.</p>
+    <p>{message}</p>
     {/* Texto fixo: a região de alerta é relida a cada mudança, e a tela tenta de novo sozinha. */}
-    <Button variant="secondary" busy={fetching} onClick={onRetry}>Tentar novamente</Button>
+    <Button variant="secondary" busy={fetching} onClick={onRetry}>{retryLabel}</Button>
   </div>
   return <SlowRefresh fetching={fetching} label={label} />
 }
