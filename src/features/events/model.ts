@@ -4,10 +4,26 @@ export type EventRecord = {
   title: string; public_description: string; starts_at: string | null; ends_at: string | null
   private_address: string; private_instructions: string; cover_path: string | null
   personal_data_purged_at: string | null
+  guests_done_at: string | null; gifts_done_at: string | null
   version: number; created_at: string; updated_at: string
 }
 export type EventDraft = Pick<EventRecord, 'title' | 'public_description' | 'private_address' | 'private_instructions' | 'cover_path'> & { localDate: string; localEndDate: string }
 export const statusLabels: Record<EventStatus, string> = { draft: 'Rascunho', published: 'Publicado', closed: 'Encerrado' }
+
+// Etapas depois de publicar, na ordem sugerida. Quem decide se estão concluídas é
+// o organizador, e a data fica no banco; aqui só se lê o que o servidor devolveu.
+export type SetupStep = 'guests' | 'gifts'
+export const setupStepInfo: Record<SetupStep, { label: string; short: string; path: string }> = {
+  guests: { label: 'Convidados e presença', short: 'Convidados', path: '' },
+  gifts: { label: 'Lista de presentes', short: 'Presentes', path: 'presentes' },
+}
+export function pendingSteps(event: Pick<EventRecord, 'status' | 'guests_done_at' | 'gifts_done_at'>): SetupStep[] {
+  if (event.status !== 'published') return []
+  return (['guests', 'gifts'] as const).filter(step => !event[`${step}_done_at`])
+}
+// Pronto: publicado e sem etapa pendente. Rascunho ainda está em configuração.
+export const inSetup = (event: Pick<EventRecord, 'status' | 'guests_done_at' | 'gifts_done_at'>) =>
+  event.status === 'draft' || pendingSteps(event).length > 0
 
 // O id do evento vem do endereço, que qualquer um pode digitar ou colar errado.
 // Um texto que não é uuid faz o Postgres responder 400, e a tela acaba culpando

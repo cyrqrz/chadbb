@@ -10,3 +10,4 @@ supabase/.branches/
 coverage/
 test-results/
 playwright-report/
+tests/qa-tmp/

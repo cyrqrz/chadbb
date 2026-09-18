@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { coverUrl, eventKeys, getEvent, saveEvent, transitionEvent, uploadCover } from './api'
 import { toDraft, validateDraft, validateImage } from './model'
@@ -18,15 +18,17 @@ export function EventPage() {
   const { session } = useAuth()
   const query = useQuery({ queryKey: [...eventKeys.detail(id), session?.user.id], queryFn: () => getEvent(id), retry: false, ...live })
   const loadError = useLastError(query.error)
+  // Vindo da criação: o aviso “Evento criado” aparece enquanto o evento for rascunho.
+  const created = (useLocation().state as { created?: boolean } | null)?.created === true
   // Erro só substitui a tela enquanto nada foi carregado; depois, o editor fica e avisa.
   if (query.isPending && !(failedLast(query) && loadError)) return <LoadingState>Carregando evento…</LoadingState>
   if (query.data === undefined) return <div className="tab-panel"><h2 className="tab-title">Dados do evento</h2><div className="mt-6"><ErrorState title="Não foi possível abrir o evento." message={errorMessage(loadError)} busy={query.isFetching} onRetry={() => void query.refetch()} /></div></div>
   if (!query.data) return <EventNotFound />
-  return <EventEditor key={query.data.id} server={query.data} refreshing={query.isFetching} refreshFailed={query.isError} retry={() => void query.refetch()} />
+  return <EventEditor key={query.data.id} server={query.data} created={created} refreshing={query.isFetching} refreshFailed={query.isError} retry={() => void query.refetch()} />
 }
 // `server` acompanha a consulta; `record` é a versão que este formulário editou.
 // O rascunho digitado nunca é substituído por uma atualização recebida.
-function EventEditor({ server, refreshing, refreshFailed, retry }: { server: EventRecord; refreshing: boolean; refreshFailed: boolean; retry: () => void }) {
+function EventEditor({ server, created, refreshing, refreshFailed, retry }: { server: EventRecord; created: boolean; refreshing: boolean; refreshFailed: boolean; retry: () => void }) {
   const [record, setRecord] = useState(server)
   const [draft, setDraft] = useState(() => toDraft(server))
   const [busy, setBusy] = useState(false)
@@ -35,6 +37,10 @@ function EventEditor({ server, refreshing, refreshFailed, retry }: { server: Eve
   const [confirmClose, setConfirmClose] = useState(false)
   const [publicConsent, setPublicConsent] = useState(false)
   const [imageFile, setImageFile] = useState<File | null>(null)
+  // Publicado nesta tela: o aviso com o próximo passo recebe o foco, porque o botão some.
+  const [justPublished, setJustPublished] = useState(false)
+  const publishedNotice = useRef<HTMLDivElement>(null)
+  useEffect(() => { if (justPublished) publishedNotice.current?.focus() }, [justPublished])
   const cache = useQueryClient()
   const { session } = useAuth()
   const purged = record.personal_data_purged_at !== null
@@ -76,7 +82,10 @@ function EventEditor({ server, refreshing, refreshFailed, retry }: { server: Eve
     const validation = status === 'published' ? validateDraft(draft, true) : null
     if (validation) { setError(validation); return }
     setBusy(true); setError(null); setMessage('')
-    try { await accept(await transitionEvent(record, status)); setConfirmClose(false); setMessage(status === 'published' ? 'Evento publicado.' : 'Evento encerrado.') }
+    try {
+      await accept(await transitionEvent(record, status)); setConfirmClose(false)
+      if (status === 'published') setJustPublished(true); else setMessage('Evento encerrado.')
+    }
     catch (cause) { setError(errorMessage(cause)) } finally { setBusy(false) }
   }
   async function reload() {
@@ -88,6 +97,8 @@ function EventEditor({ server, refreshing, refreshFailed, retry }: { server: Eve
   return <div className="tab-panel max-w-3xl">
     <div className="flex flex-wrap items-center gap-4"><h2 className="tab-title">Dados do evento</h2><SlowRefresh fetching={refreshing} className="mt-0" /></div>
     {refreshFailed && <RefreshStatus fetching={refreshing} failed onRetry={retry} />}
+    {created && record.status === 'draft' && <div className="state state-success flow-notice mt-6"><p><strong>Evento criado.</strong> Complete os dados e veja a prévia do convite antes de publicar.</p><PreviewLink id={record.id} dirty={dirty} primary />{dirty && <p className="text-sm">Salve as alterações para ver a prévia.</p>}</div>}
+    {justPublished && record.status === 'published' && <div ref={publishedNotice} tabIndex={-1} role="status" className="state state-success flow-notice mt-6"><p><strong>Evento publicado.</strong> Agora crie os convites e envie os links.</p><Link className="button" to={`/eventos/${record.id}`}>Seguir para convidados e presença</Link></div>}
     {outdated && <div role="status" className="notice mt-6"><p>Este evento mudou em outra sessão. O que você digitou continua aqui.</p><Button variant="secondary" size="sm" className="mt-3" disabled={busy} onClick={() => void reload()}>Recarregar dados</Button></div>}
     {purged ? <p className="notice mt-6">Os dados pessoais deste evento foram excluídos conforme a política de retenção. Restam apenas título e datas.</p> :
       closed && <p className="notice mt-6">Este evento foi encerrado. Os detalhes estão disponíveis apenas para consulta.</p>}
@@ -114,10 +125,17 @@ function EventEditor({ server, refreshing, refreshFailed, retry }: { server: Eve
     {error && <div className="mt-6"><ErrorState message={error} busy={busy} onRetry={() => void reload()} retryLabel="Recarregar dados" /></div>}
     {message && <div className="mt-6"><SuccessMessage>{message}</SuccessMessage></div>}
     {!closed && <div className="mt-10 border-t border-stone-300 pt-6">
-      {dirty && <p className="mb-4 text-sm text-stone-600">Salve as alterações antes de publicar ou encerrar.</p>}
-      {record.status === 'draft' ? <button className="secondary" disabled={busy || dirty} onClick={() => void transition('published')}>Publicar evento</button> :
+      {dirty && <p className="mb-4 text-sm text-stone-600">{record.status === 'draft' ? 'Salve as alterações antes de ver a prévia ou publicar.' : 'Salve as alterações antes de encerrar.'}</p>}
+      {record.status === 'draft' ? <div className="flow-actions"><PreviewLink id={record.id} dirty={dirty || busy} /><button className="secondary" disabled={busy || dirty} onClick={() => void transition('published')}>Publicar evento</button></div> :
         confirmClose ? <div className="notice"><p>Encerrar este evento? Ele não poderá receber novas reservas nem ser reaberto.</p><div className="mt-4 flex flex-wrap gap-4"><button className="btn-danger btn-danger-strong" disabled={busy || dirty} onClick={() => void transition('closed')}>Confirmar encerramento</button><Button variant="ghost" disabled={busy} onClick={() => setConfirmClose(false)}>Continuar com evento aberto</Button></div></div> :
           <button className="btn-danger" disabled={busy || dirty} onClick={() => setConfirmClose(true)}>Encerrar evento</button>}
     </div>}
   </div>
+}
+
+// A prévia lê o que está salvo: com alterações pendentes, sair da tela perderia o
+// que foi digitado, então o botão espera o salvamento.
+function PreviewLink({ id, dirty, primary = false }: { id: string; dirty: boolean; primary?: boolean }) {
+  const className = primary ? 'button' : 'secondary'
+  return dirty ? <button type="button" className={className} disabled>Ver prévia</button> : <Link className={className} to={`/eventos/${id}/previa`}>Ver prévia</Link>
 }

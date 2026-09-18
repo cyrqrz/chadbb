@@ -13,6 +13,7 @@ import { EmptyState, ErrorState, LoadingState, RefreshStatus, SuccessMessage } f
 import { Button, Progress, StatusBadge } from '../../components/ui'
 import type { StatusTone } from '../../components/ui'
 import { EventNotFound } from '../events/EventLayout'
+import { StepCompletion } from '../events/SetupDock'
 
 export function InvitationsPage() {
   const { id = '' } = useParams()
@@ -85,6 +86,7 @@ export function InvitationsPage() {
   }
   return <div className="tab-panel">
     <RefreshStatus fetching={query.isFetching} failed={query.isError} onRetry={() => void query.refetch()} label="Atualizando painel…" />
+    {event.data && <StepCompletion event={event.data} step="guests" />}
     <Summary summary={panelSummary(data)} />
 
     <section className="mt-10" aria-labelledby="invites-title">

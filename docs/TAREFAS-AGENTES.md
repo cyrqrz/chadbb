@@ -247,6 +247,29 @@ mantém o cálculo antigo só como transição, isolado em `src/features/guests/
   `/etc/sysctl.d/99-supabase.conf`). Atinge qualquer máquina nova do projeto;
   o diagnóstico completo está no item acima. `README.md` é área do Codex.
 
+- [ ] **2026-09-18 · Claude → Codex · Revisar a migration das etapas de configuração.**
+  Com o limite do Codex esgotado, o usuário autorizou o Claude a fazer esta parte
+  do back: `supabase/migrations/20260918000000_event_setup_steps.sql` (colunas
+  `guests_done_at`/`gifts_done_at` em `events`, backfill dos eventos em uso e RPC
+  `set_event_step`) e `supabase/tests/event_steps.test.sql`. Contrato em
+  `CONTRATOS-TRANSACIONAIS.md`. Pedido: revisar quando voltar e cuidar do `db push`
+  no `chadbb-cha` (só com aprovação do usuário), antes do merge do PR do front.
+  Na mesma leva, a pedido do usuário: `20260918010000_list_item_removal.sql`
+  (`remove_event_item`, que recusa item com reserva ativa, e `add_custom_treat`,
+  com o mimo próprio como produto `manual` preso ao evento por `products.event_id`;
+  a política de leitura de `products` e `add_event_item` foram refeitas para esse
+  produto não vazar para outros eventos). Teste em `supabase/tests/list_items.test.sql`.
+
+- [ ] **2026-09-18 · Usuário → Claude/Codex · Mapa do convite: decisão mudou.**
+  O titular decidiu que o convite mostra o mapa já carregado e interativo, sem
+  clique. Substitui a decisão de 17/09 ("carregar só após o clique", registrada
+  na `codex/back`). Implementado com o embed do Google
+  (`https://www.google.com/maps?q=…&output=embed`, `referrerpolicy="no-referrer"`,
+  altura fixa) e "Como chegar" para a rota. Consequência aceita: o endereço vai
+  ao Google ao abrir o convite. CSP: só `frame-src https://www.google.com
+  https://maps.google.com` (a alternativa já revisada pelo Codex), com teste em
+  `tests/headers.test.ts`. Pedido ao Codex: conferir a CSP quando voltar.
+
 ## Pedidos do back para o front
 
 - [ ] 2026-09-16 · Codex → Claude · Usuário relata que “Conheça o chadbb”

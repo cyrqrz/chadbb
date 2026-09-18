@@ -1,5 +1,81 @@
 # Retomar o chadbb em outra máquina
 
+## Retomada do front — 2026-09-18, Claude (`claude/front`)
+
+Esta seção vale para o clone do Claude (`~/projetos/chadbb-claude`). O commit
+desta data traz, sem PR ainda:
+
+- **Fluxo de criação semi-linear:** "Evento criado" → prévia → publicar → etapas
+  "Convidados e presença" e "Lista de presentes" marcadas pelo organizador
+  (`events.guests_done_at`/`gifts_done_at`, RPC `set_event_step`), barra de
+  pendências no rodapé e abas escondidas na tela de dados durante a configuração.
+- **Lista editável:** remover item (`remove_event_item`, recusa com reserva
+  ativa), mimo próprio (`add_custom_treat`) e seção única "Adicionar à lista"
+  com só as sugestões que faltam.
+- **Mapa no convite:** embed interativo do Google carregado com o convite
+  (decisão do titular em 18/09, substitui a de 17/09), "Como chegar", bloco
+  "Informação importante" e `frame-src` do Google na CSP.
+- Migrations novas: `20260918000000_event_setup_steps.sql` e
+  `20260918010000_list_item_removal.sql`, com pgTAP `event_steps` e `list_items`.
+
+### 1. Código e dependências
+
+```sh
+cd ~/projetos/chadbb-claude
+git fetch origin && git checkout claude/front && git pull
+npm ci
+```
+
+### 2. Banco local (Supabase na máquina nova)
+
+As migrations de 18/09 só foram aplicadas no banco local da máquina do trabalho.
+Na máquina nova, com a stack no ar (`npm run db:start`, no clone do Codex ou neste):
+
+```sh
+cd ~/projetos/chadbb-claude
+npx supabase migration list --local   # conferir o que falta
+npx supabase migration up --local     # aplica 20260918000000 e 20260918010000
+npm run db:test                       # esperado: 7 arquivos, 137 testes ok
+```
+
+Se `migration up` recusar com `LegacyMigrationMissingLocalError` (o banco tem
+migration que este clone não tem, como `20260917010000_guest_rates_batch` da
+`codex/back`), **não** use `migration repair`. Aplique cada arquivo numa transação
+e registre a versão (não apaga nada):
+
+```sh
+for m in 20260918000000_event_setup_steps 20260918010000_list_item_removal; do
+  { echo "begin;"; cat supabase/migrations/$m.sql
+    echo "insert into supabase_migrations.schema_migrations(version, name) values ('${m%%_*}', '${m#*_}');"
+    echo "commit;"; } | docker exec -i supabase_db_chadbb psql -U postgres -d postgres -v ON_ERROR_STOP=1
+done
+```
+
+Alternativa destrutiva (apaga os dados locais, pede aprovação): `npm run db:reset`
+a partir deste clone.
+
+### 3. Conferência antes de seguir
+
+```sh
+npm run check        # 51 unitários, lint, tipos e build
+npm run test:e2e     # porta 4173 livre; ~10 min
+```
+
+### 4. Pendente — `db push` no `chadbb-cha` (gate remoto, aprovação manual)
+
+Obrigatório **antes do merge do PR** do front: sem as migrations, "Concluí…",
+"Remover da lista" e "Adicionar mimo" falham em produção.
+
+1. Confirmar a ordem com a `codex/back`: a migration `20260917010000_guest_rates_batch`
+   é anterior às de 18/09. Se ela já estiver no remoto, o push a partir deste clone
+   recusa; faça o push de uma branch que tenha as três (ex.: depois do merge da
+   `codex/back` na `main` e `git pull origin main` aqui).
+2. `db push --dry-run` com `--project-ref fcykqrlnofmdtmewlejr`, sem `supabase link`,
+   sem `--linked` e sem `--db-url` (regra 2 do `AGENTS.md`). A lista deve ter só as
+   migrations esperadas. Mostrar ao titular e esperar aprovação.
+3. `db push` e `migration list` remoto igual ao local.
+4. Abrir o PR `claude/front` → `main` com a CI verde.
+
 ## Retomada prioritária — 2026-09-16, Codex/back
 
 Esta seção prevalece sobre o registro histórico abaixo. Clone do Codex:

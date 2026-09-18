@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createEvent, deleteEvent, eventKeys, listEvents } from './api'
 import type { EventRecord } from './model'
-import { statusLabels } from './model'
+import { pendingSteps, statusLabels } from './model'
 import { errorMessage } from '../../lib/errors'
 import { failedLast, live } from '../../lib/query'
 import { useLastError } from '../../lib/useLastError'
@@ -31,17 +31,20 @@ export function EventsPage() {
   }
   const create = useMutation({ mutationFn: createEvent, onSuccess: async event => {
     await cache.invalidateQueries({ queryKey: eventKeys.all })
-    navigate(`/eventos/${event.id}/dados`)
+    navigate(`/eventos/${event.id}/dados`, { state: { created: true } })
   } })
   const loadError = useLastError(query.error)
   function submit(e: FormEvent) { e.preventDefault(); if (!create.isPending) create.mutate(title) }
+  // Primeiro uso: sem nenhum evento, o formulário já vem aberto no lugar do aviso vazio.
+  const firstUse = query.data?.count === 0 && page === 0
+  const form = (autoFocus: boolean) => <form onSubmit={submit} className="mt-6 space-y-4"><label className="field">Nome do evento<input autoFocus={autoFocus} maxLength={120} placeholder="Chá de bebê da família" value={title} onChange={e => setTitle(e.target.value)} /></label><p className="text-sm text-stone-600">Depois você completa os detalhes, vê a prévia e publica.</p><button className="button" disabled={create.isPending}>{create.isPending ? 'Criando…' : 'Criar evento'}</button>{create.error && <p role="alert" className="error">{errorMessage(create.error)}</p>}</form>
   return <section className="page">
-    <div className="flex flex-wrap items-center justify-between gap-6"><div><p className="eyebrow">Organize com carinho</p><h1 className="page-title">Seus eventos</h1><SlowRefresh fetching={query.isFetching} /></div><button className="button" onClick={() => setCreating(!creating)}>{creating ? 'Fechar formulário' : 'Criar evento'}</button></div>
-    {creating && <form onSubmit={submit} className="card mt-8 space-y-4"><label className="field">Nome do evento<input autoFocus maxLength={120} placeholder="Chá de bebê da família" value={title} onChange={e => setTitle(e.target.value)} /></label><p className="text-sm text-stone-600">Você pode completar os detalhes depois.</p><button className="button" disabled={create.isPending}>{create.isPending ? 'Criando…' : 'Criar rascunho'}</button>{create.error && <p role="alert" className="error">{errorMessage(create.error)}</p>}</form>}
+    <div className="flex flex-wrap items-center justify-between gap-6"><div><p className="eyebrow">Organize com carinho</p><h1 className="page-title">Seus eventos</h1><SlowRefresh fetching={query.isFetching} /></div>{!firstUse && <button className="button" onClick={() => setCreating(!creating)}>{creating ? 'Fechar formulário' : 'Novo evento'}</button>}</div>
+    {creating && !firstUse && <div className="card mt-8">{form(true)}</div>}
     {query.isPending && !(failedLast(query) && loadError) ? <LoadingState>Carregando eventos…</LoadingState> : !query.data ? <div className="mt-10"><ErrorState title="Não foi possível carregar seus eventos." message={errorMessage(loadError)} busy={query.isFetching} onRetry={() => void query.refetch()} /></div> : <>
       {deleted.title && <div className="mt-8"><p ref={notice} tabIndex={-1} role="status" className="state state-success">Evento “{deleted.title}” excluído.</p></div>}
       {query.isError && <RefreshStatus fetching={query.isFetching} failed onRetry={() => void query.refetch()} />}
-      {query.data.events.length === 0 ? <div className="card mt-10"><h2 className="text-xl font-semibold">Seu primeiro encontro começa aqui.</h2><p className="mt-3 text-stone-600">Crie um evento para preparar os detalhes do chá de bebê.</p></div> :
+      {query.data.events.length === 0 ? <div className="card mt-10"><h2 className="text-xl font-semibold">Seu primeiro encontro começa aqui.</h2><p className="mt-3 text-stone-600">Dê um nome ao evento para começar a preparar o chá de bebê.</p>{form(false)}</div> :
         <div className="stagger mt-10 grid gap-5 md:grid-cols-2">{query.data.events.map(event => <EventCard key={event.id} event={event} onDeleted={onDeleted} />)}</div>}
       <Pagination page={page} count={query.data.count} pageSize={12} onChange={setPage} label="Paginação dos eventos" />
     </>}
@@ -61,6 +64,7 @@ function EventCard({ event, onDeleted }: { event: EventRecord; onDeleted: (title
   // Trava síncrona: o clique duplo chega antes de o botão ficar ocupado.
   const sending = useRef(false)
   const title = event.title || 'Evento sem título'
+  const pending = pendingSteps(event).length
   // Já excluído ou mudado em outra aba: a lista é reconsultada para mostrar o estado real.
   const remove = useMutation({ mutationFn: () => deleteEvent(event), onSettled: () => { sending.current = false }, onError: async cause => {
     if (['EVENT_NOT_FOUND', 'EVENT_VERSION_CONFLICT'].includes((cause as Error).message)) await cache.invalidateQueries({ queryKey: eventKeys.all })
@@ -71,7 +75,7 @@ function EventCard({ event, onDeleted }: { event: EventRecord; onDeleted: (title
   useEffect(() => { if (confirming) question.current?.focus() }, [confirming])
   const content = <>
     <header className="card-header">
-      <div className="card-badges"><StatusBadge tone={event.status === 'published' ? 'success' : 'neutral'}>{statusLabels[event.status]}</StatusBadge></div>
+      <div className="card-badges"><StatusBadge tone={event.status === 'published' ? 'success' : 'neutral'}>{statusLabels[event.status]}</StatusBadge>{pending > 0 && <StatusBadge tone="warning">{pending === 1 ? '1 etapa pendente' : `${pending} etapas pendentes`}</StatusBadge>}</div>
       <h2 className="card-title text-h2" id={`${confirmId}-titulo`}>{title}</h2>
       <p className="card-description">{eventDate(event)}</p>
     </header>

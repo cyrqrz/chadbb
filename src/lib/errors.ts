@@ -1,7 +1,7 @@
 export function errorMessage(error: unknown): string {
   const object = error && typeof error === 'object' ? error as { message?: string; code?: string; status?: number } : {}
   const messages: Record<string, string> = {
-    EVENT_NOT_PUBLISHED: 'Publique o evento antes de criar convites.',
+    EVENT_NOT_PUBLISHED: 'Publique o evento antes de criar convites ou concluir etapas.',
     INVITATION_VERSION_CONFLICT: 'Este convite mudou. Atualize o painel e revise os dados antes de salvar.',
     INVALID_INVITATION: 'Confira o nome, o tipo e o limite de pessoas do convite.',
     CAPACITY_BELOW_ATTENDING: 'O limite não pode ser menor que o número de pessoas já confirmadas.',
@@ -28,6 +28,8 @@ export function errorMessage(error: unknown): string {
     DIAPER_LIMIT_REQUIRED: 'Cada tamanho de fralda precisa de um limite de pacotes.',
     TREAT_HAS_NO_LIMIT: 'Mimos não têm limite de quantidade: o convidado informa quanto vai levar.',
     DIAPER_SIZE_ALREADY_LISTED: 'Este tamanho de fralda já está na lista deste evento.',
+    ITEM_HAS_RESERVATIONS: 'Um convidado já escolheu este presente. Ele não pode sair da lista.',
+    INVALID_TREAT: 'Informe o nome do mimo (até 160 caracteres) e uma descrição de até 2.000.',
     INVALID_COVER: 'Imagem inválida para este evento. Envie a imagem novamente.',
   }
   if (object.message && messages[object.message]) return messages[object.message]

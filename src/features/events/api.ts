@@ -1,7 +1,7 @@
 import { readPublicConfig } from '../../lib/config'
 import { supabase } from '../../lib/supabase'
 import { fromLocalDate, isEventId } from './model'
-import type { EventDraft, EventRecord } from './model'
+import type { EventDraft, EventRecord, SetupStep } from './model'
 
 export function getClient() {
   if (!supabase) throw new Error('BACKEND_UNAVAILABLE')
@@ -37,6 +37,11 @@ export async function saveEvent(event: EventRecord, draft: EventDraft) {
 }
 export async function transitionEvent(event: EventRecord, status: 'published' | 'closed') {
   const { data, error } = await getClient().rpc('transition_event', { p_event_id: event.id, p_version: event.version, p_status: status }).single()
+  if (error) throw error
+  return data as EventRecord
+}
+export async function setEventStep(event: EventRecord, step: SetupStep, done: boolean) {
+  const { data, error } = await getClient().rpc('set_event_step', { p_event_id: event.id, p_version: event.version, p_step: step, p_done: done }).single()
   if (error) throw error
   return data as EventRecord
 }

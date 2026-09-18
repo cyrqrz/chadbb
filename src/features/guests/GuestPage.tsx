@@ -165,10 +165,14 @@ export function GuestEvent({ access, preview = false }: { access: { token: strin
     </InviteSection>
 
     <InviteSection id="local" title="Local e instruções">
-      <div className="invite-place">
-        <p className="whitespace-pre-line">{event.address || 'Local a combinar com a organização.'}</p>
-        {event.address && <a className="secondary self-start" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address)}`} target="_blank" rel="noopener noreferrer">Abrir no mapa<span className="sr-only"> (abre em nova aba)</span></a>}
-        {event.instructions && <p className="whitespace-pre-line text-muted">{event.instructions}</p>}
+      <div className="venue-card">
+        <p className="whitespace-pre-line font-semibold">{event.address || 'Local a combinar com a organização.'}</p>
+        {event.address && <VenueMap address={event.address} />}
+        {event.address && <a className="secondary self-start" href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(event.address)}`} target="_blank" rel="noopener noreferrer">Como chegar<span className="sr-only"> (abre em nova aba)</span></a>}
+        {event.instructions && <aside className="guest-notice" aria-labelledby="local-aviso">
+          <p id="local-aviso" className="guest-notice-title"><span aria-hidden="true">ⓘ </span>Informação importante</p>
+          <p className="whitespace-pre-line">{event.instructions}</p>
+        </aside>}
       </div>
     </InviteSection>
   </div>
@@ -329,4 +333,17 @@ function GuestGift({ item, alternatives, busy, closed, save, feedback }: { item:
       {!purchased && <p id={purchaseHint} className="hint">“Já comprei” só avisa a organização que você já tem o presente. O site não faz pagamento nem confere a compra.</p>}
     </div>}
   </article>
+}
+
+// Mapa interativo do Google, carregado com o convite (decisão do titular em
+// 2026-09-18: o endereço vai ao Google ao abrir o convite). A área tem altura
+// fixa para não empurrar a página; "Como chegar" abre a rota no Google Maps.
+function VenueMap({ address }: { address: string }) {
+  const [loaded, setLoaded] = useState(false)
+  const place = address.split('\n')[0]
+  return <div className={`venue-map${loaded ? ' is-loaded' : ''}`}>
+    {!loaded && <span className="venue-map-placeholder" aria-hidden="true">Carregando mapa…</span>}
+    <iframe title={`Mapa do local: ${place}`} src={`https://www.google.com/maps?q=${encodeURIComponent(address)}&hl=pt-BR&output=embed`}
+      loading="lazy" referrerPolicy="no-referrer" onLoad={() => setLoaded(true)} />
+  </div>
 }

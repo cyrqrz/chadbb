@@ -3,6 +3,11 @@ import type { Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import type { GuestItem, Snapshot } from '../../src/features/guests/api'
 
+// O convite carrega o mapa do Google em iframe: nos testes ele é simulado, sem rede externa.
+test.beforeEach(async ({ page }) => {
+  await page.route('https://www.google.com/maps**', route => route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Mapa simulado</title>' }))
+})
+
 // Convite com a função `guest` simulada e dados fictícios. As regras de saldo e
 // versão são testadas no banco; aqui só a apresentação de cada estado.
 const token = 'a'.repeat(64)
@@ -249,13 +254,18 @@ test.describe('G3 · convite', () => {
     for (const button of [less, more]) expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44)
   })
 
-  test('local com link para o mapa em nova aba', async ({ page }) => {
+  test('local com mapa embutido e rota em nova aba', async ({ page }) => {
     await backend(page)
     await page.goto(`/convite#${token}`)
     const local = page.getByRole('region', { name: 'Local e instruções' })
     await expect(local).toContainText('Endereço fictício')
-    const map = local.getByRole('link', { name: /Abrir no mapa/ })
-    await expect(map).toHaveAttribute('href', 'https://www.google.com/maps/search/?api=1&query=Endere%C3%A7o%20fict%C3%ADcio')
+    const map = local.getByRole('link', { name: /Como chegar/ })
+    await expect(map).toHaveAttribute('href', 'https://www.google.com/maps/dir/?api=1&destination=Endere%C3%A7o%20fict%C3%ADcio')
+    // Mapa interativo embutido, com nome acessível e o endereço do convite.
+    const frame = local.locator('iframe')
+    await expect(frame).toHaveAttribute('title', 'Mapa do local: Endereço fictício')
+    await expect(frame).toHaveAttribute('src', 'https://www.google.com/maps?q=Endere%C3%A7o%20fict%C3%ADcio&hl=pt-BR&output=embed')
+    await expect(frame).toHaveAttribute('referrerpolicy', 'no-referrer')
     await expect(map).toHaveAttribute('target', '_blank')
     await expect(map).toHaveAttribute('rel', /noopener/)
   })

@@ -1,8 +1,9 @@
 import { Suspense } from 'react'
-import { Link, NavLink, Navigate, Outlet, useParams } from 'react-router-dom'
+import { Link, NavLink, Navigate, Outlet, useMatch, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { eventKeys, getEvent } from './api'
-import { daysUntil, statusLabels } from './model'
+import { daysUntil, inSetup, pendingSteps, statusLabels } from './model'
+import { SetupDock } from './SetupDock'
 import { live } from '../../lib/query'
 import { useAuth } from '../auth/context'
 import { BackLink, StatusBadge } from '../../components/ui'
@@ -24,7 +25,13 @@ export function EventLayout() {
   const event = query.data
   const when = event?.starts_at ? new Date(event.starts_at).toLocaleString('pt-BR', { dateStyle: 'long', timeStyle: 'short', timeZone: 'America/Sao_Paulo' }) : null
   const left = event && event.status !== 'closed' ? countdown(daysUntil(event.starts_at)) : null
-  return <section className="page">
+  // Na configuração (rascunho ou etapa pendente), a tela de dados fica sem abas:
+  // o caminho segue pelos botões do fluxo e pela barra de pendências.
+  const onData = useMatch('/eventos/:id/dados') !== null
+  // Enquanto o evento carrega, a tela de dados fica sem abas: evita que apareçam e sumam.
+  const showTabs = event !== null && !(onData && (!event || inSetup(event)))
+  const docked = Boolean(event && pendingSteps(event).length)
+  return <section className={docked ? 'page page-docked' : 'page'}>
     <BackLink to="/eventos">Seus eventos</BackLink>
     <header className="event-header">
       <div className="event-header-text">
@@ -35,11 +42,12 @@ export function EventLayout() {
       {event !== null && <Link className="secondary self-start" to={`/eventos/${id}/previa`}>Ver como o convidado vê</Link>}
     </header>
     {/* Evento inexistente: a aba mostra “Evento não encontrado”; abas e prévia não levariam a nada. */}
-    {event !== null && <nav aria-label="Áreas do evento" className="event-tabs">
+    {showTabs && <nav aria-label="Áreas do evento" className="event-tabs">
       {tabs.map(([path, label]) => <NavLink key={label} end to={`/eventos/${id}${path ? `/${path}` : ''}`}>{label}</NavLink>)}
     </nav>}
     {/* A troca de aba carrega só o conteúdo; o cabeçalho fica. */}
     <Suspense fallback={<LoadingState>Carregando…</LoadingState>}><Outlet /></Suspense>
+    {event && <SetupDock event={event} />}
   </section>
 }
 

@@ -3,6 +3,11 @@
 import { expect, test } from '@playwright/test'
 import type { Snapshot } from '../../src/features/guests/api'
 
+// O convite carrega o mapa do Google em iframe: nos testes ele é simulado, sem rede externa.
+test.beforeEach(async ({ page }) => {
+  await page.route('https://www.google.com/maps**', route => route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Mapa simulado</title>' }))
+})
+
 const token = 'b'.repeat(64)
 const makeSnapshot = (version: number | null): Snapshot => ({
   invitation: { name: 'Pessoa fictícia', kind: 'individual', capacity: 1, response: 'pending', attending: 0, version: 1 },

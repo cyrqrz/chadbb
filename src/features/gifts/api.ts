@@ -4,12 +4,15 @@ import { searchPattern } from './model'
 
 export const giftKeys = { items: (eventId: string) => ['event-items', eventId] as const, catalog: ['catalog'] as const }
 export const PAGE_SIZE = 12
-const fields = 'id,title,description,platform,category,diaper_size,active'
-export async function listProducts(search: string, page: number, category?: Category) {
-  let query = getClient().from('products').select(fields, { count: 'exact' }).eq('active', true)
+const fields = 'id,title,description,platform,category,diaper_size,active,event_id'
+// O catálogo inteiro cabe numa consulta; o limite só protege contra crescimento inesperado.
+export const CATALOG_LIMIT = 200
+export async function listProducts(search: string, page: number, category?: Category, size = PAGE_SIZE) {
+  // Mimos próprios de um evento não entram no catálogo.
+  let query = getClient().from('products').select(fields, { count: 'exact' }).eq('active', true).is('event_id', null)
   if (category) query = query.eq('category', category)
   if (search.trim()) query = query.ilike('title', searchPattern(search))
-  const { data, error, count } = await query.order('title').order('id').range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
+  const { data, error, count } = await query.order('title').order('id').range(page * size, (page + 1) * size - 1)
   if (error) throw error
   return { products: data as Product[], count: count ?? 0 }
 }
@@ -44,6 +47,16 @@ export async function setQuantity(item: EventItem, quantity: number | null) {
   return data as Omit<EventItem, 'product'>
 }
 
+// Item com reserva ativa é recusado pelo servidor (ITEM_HAS_RESERVATIONS).
+export async function removeItem(item: EventItem) {
+  const { error } = await getClient().rpc('remove_event_item', { p_event_id: item.event_id, p_item_id: item.id, p_version: item.version }).single()
+  if (error) throw error
+}
+export async function addCustomTreat(eventId: string, title: string, description: string) {
+  const { data, error } = await getClient().rpc('add_custom_treat', { p_event_id: eventId, p_title: title, p_description: description }).single()
+  if (error) throw error
+  return data as Omit<EventItem, 'product'>
+}
 export async function prepareList(eventId: string) {
   const { data, error } = await getClient().rpc('prepare_family_list', { p_event_id: eventId })
   if (error) throw error

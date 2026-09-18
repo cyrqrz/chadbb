@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -10,7 +10,8 @@ import { useLastError } from '../../lib/useLastError'
 import { EmptyState, ErrorState, LoadingState, RefreshStatus, SuccessMessage } from '../../components/States'
 import { Button, Pagination, QuantityField, StatusBadge } from '../../components/ui'
 import { EventNotFound } from '../events/EventLayout'
-import { addItem, giftKeys, listedProducts, listItems, listProducts, PAGE_SIZE, prepareList, setQuantity } from './api'
+import { StepCompletion } from '../events/SetupDock'
+import { addCustomTreat, addItem, CATALOG_LIMIT, giftKeys, listedProducts, listItems, listProducts, PAGE_SIZE, prepareList, removeItem, setQuantity } from './api'
 import { parseQuantity, platformLabels, categoryLabels } from './model'
 import type { Category, DiaperSize, EventItem, Product } from './model'
 import type { ListedItem } from './api'
@@ -26,9 +27,9 @@ export function GiftListPage() {
   // A13: reconsulta do evento que falha avisa; o "encerrado" exibido pode estar desatualizado.
   const eventStatus = event.isError && <RefreshStatus fetching={event.isFetching} failed onRetry={() => void event.refetch()}
     message="Não foi possível conferir se o evento continua aberto. Se ele tiver sido encerrado, as alterações serão recusadas." retryLabel="Conferir de novo" />
-  return <GiftList key={id} eventId={id} closed={event.data.status === 'closed'} eventStatus={eventStatus} />
+  return <GiftList key={id} eventId={id} closed={event.data.status === 'closed'} eventStatus={eventStatus} step={<StepCompletion event={event.data} step="gifts" />} />
 }
-function GiftList({ eventId, closed, eventStatus }: { eventId: string; closed: boolean; eventStatus: ReactNode }) {
+function GiftList({ eventId, closed, eventStatus, step }: { eventId: string; closed: boolean; eventStatus: ReactNode; step: ReactNode }) {
   const { session } = useAuth()
   const [category, setCategory] = useState<Category>('fralda')
   const [page, setPage] = useState(0)
@@ -41,7 +42,7 @@ function GiftList({ eventId, closed, eventStatus }: { eventId: string; closed: b
   async function prepare() {
     setPreparing(true); setNotice(null); setFocusSummary(false)
     const fromEmpty = empty
-    try { const count = await prepareList(eventId); await cache.invalidateQueries({ queryKey: giftKeys.items(eventId) }); setFocusSummary(fromEmpty); setNotice({ ok: true, text: count ? 'Lista do chá preparada.' : 'Os itens do chá já estão na lista.' }) }
+    try { const count = await prepareList(eventId); await cache.invalidateQueries({ queryKey: giftKeys.items(eventId) }); setFocusSummary(fromEmpty); setNotice({ ok: true, text: !count ? 'Os itens do chá já estão na lista.' : fromEmpty ? 'Lista do chá preparada.' : `${count} ${count === 1 ? 'item da lista pronta voltou' : 'itens da lista pronta voltaram'} para a lista.` }) }
     catch (cause) { setNotice({ ok: false, text: errorMessage(cause) }) } finally { setPreparing(false) }
   }
   // A11: o erro guardado é o desta categoria e página. A12: a última contagem
@@ -51,11 +52,20 @@ function GiftList({ eventId, closed, eventStatus }: { eventId: string; closed: b
   if (query.data && query.data.count !== total) setTotal(query.data.count)
   const listed = useQuery({ queryKey: [...giftKeys.items(eventId), 'listed', session?.user.id], queryFn: () => listedProducts(eventId), ...live })
   const empty = listed.data?.length === 0
+  // O cartão removido some: o foco vai para o aviso, e não para o início da página.
+  const [removed, setRemoved] = useState({ title: '', count: 0 })
+  const removedNotice = useRef<HTMLParagraphElement>(null)
+  useEffect(() => { if (removed.count) removedNotice.current?.focus() }, [removed])
+  function onRemoved(title: string) {
+    if (page > 0 && query.data?.items.length === 1) setPage(page - 1)
+    setRemoved(current => ({ title, count: current.count + 1 }))
+  }
   // Sem dado anterior, a nova tentativa volta a consulta para "pending" e zera isError;
   // comparar as datas mantém o aviso na tela durante a tentativa.
   return <div className="tab-panel">
     <h2 className="tab-title">Lista de presentes</h2>
     {eventStatus}
+    {step}
     <p className="mt-4 max-w-2xl text-stone-600">Fraldas por tamanho e mimos de livre escolha. Os convidados veem esta lista pelo link do convite.</p>
     {!closed && empty && <section aria-labelledby="quick-start" className="quick-start mt-8">
       <p className="eyebrow">Recomendado</p>
@@ -72,19 +82,20 @@ function GiftList({ eventId, closed, eventStatus }: { eventId: string; closed: b
     {!empty && <ListSummary listed={listed.data} failed={listed.errorUpdatedAt > listed.dataUpdatedAt} focus={focusSummary}>
       {/* Enquanto a conferência não responde, ainda não se sabe se é "Preparar" ou "Completar". */}
       {!closed && (listed.data || listed.errorUpdatedAt > listed.dataUpdatedAt) && <div className="card-actions">
-        <p className="text-muted">Faltou algum item da lista pronta? Este botão inclui só o que falta.</p>
+        <p className="text-muted">Faltou algum item da lista pronta? Este botão inclui de novo tudo o que falta, inclusive o que você removeu.</p>
         <button className="secondary self-start" disabled={preparing} onClick={() => void prepare()}>{preparing ? 'Preparando…' : 'Completar a lista do chá'}</button>
         {notice && (notice.ok ? <SuccessMessage>{notice.text}</SuccessMessage> : <ErrorState message={notice.text} />)}
       </div>}
     </ListSummary>}
     {closed && <p className="notice mt-6">Evento encerrado. A lista está disponível apenas para consulta.</p>}
-    <nav aria-label="Categorias de presentes" className="mt-10"><div className="segmented">{(['fralda', 'mimo'] as Category[]).map(value => <button key={value} aria-pressed={category === value} onClick={() => { setCategory(value); setPage(0); setTotal(null) }}>{categoryLabels[value]}</button>)}</div></nav>
+    <nav aria-label="Categorias de presentes" className="mt-10"><div className="segmented">{(['fralda', 'mimo'] as Category[]).map(value => <button key={value} aria-pressed={category === value} onClick={() => { setCategory(value); setPage(0); setTotal(null); setRemoved({ title: '', count: 0 }) }}>{categoryLabels[value]}</button>)}</div></nav>
     <section key={`list-${category}`} aria-labelledby="list-title" className="fade-swap mt-6">
       <h2 id="list-title" className="text-2xl font-bold">{categoryLabels[category]} na lista</h2>
       {query.isPending && !(failedLast(query) && listError) ? <LoadingState>Carregando a lista…</LoadingState> : !query.data ? <div className="mt-5"><ErrorState message={errorMessage(listError)} busy={query.isFetching} onRetry={() => void query.refetch()} retryLabel="Recarregar lista" /></div> : <>
         <RefreshStatus fetching={query.isFetching} failed={query.isError} onRetry={() => void query.refetch()} retryLabel="Recarregar lista" label={`${query.data.count} ${query.data.count === 1 ? 'item' : 'itens'} · atualizando…`} />
+        {removed.title && <p ref={removedNotice} tabIndex={-1} role="status" className="state state-success mt-3">“{removed.title}” saiu da lista.</p>}
         {!query.data.count ? <div className="mt-3"><EmptyState title={category === 'fralda' ? 'Nenhum tamanho de fralda na lista.' : 'Nenhum mimo na lista.'}>{closed ? 'Nenhum presente foi incluído nesta categoria.' : 'Use a lista pronta do chá acima ou inclua um item pelo catálogo abaixo.'}</EmptyState></div> : <>
-          <div className="stagger mt-3 grid gap-5 md:grid-cols-2">{query.data.items.map(item => <ItemCard key={item.id} item={item} closed={closed} />)}</div>
+          <div className="stagger mt-3 grid gap-5 md:grid-cols-2">{query.data.items.map(item => <ItemCard key={item.id} item={item} closed={closed} onRemoved={onRemoved} />)}</div>
         </>}
       </>}
       {/* Fora dos ramos de estado: a paginação continua montada ao carregar e na falha, e o foco não cai. */}
@@ -115,7 +126,7 @@ function ListSummary({ listed, failed, focus, children }: { listed?: ListedItem[
     {children}
   </section>
 }
-function ItemCard({ item, closed }: { item: EventItem; closed: boolean }) {
+function ItemCard({ item, closed, onRemoved }: { item: EventItem; closed: boolean; onRemoved: (title: string) => void }) {
   const [baseline, setBaseline] = useState(item)
   const [quantity, setValue] = useState(String(item.quantity_requested ?? ''))
   const [busy, setBusy] = useState(false)
@@ -149,10 +160,11 @@ function ItemCard({ item, closed }: { item: EventItem; closed: boolean }) {
     <header className="card-header">
       <div className="card-badges">
         <StatusBadge tone="neutral">{item.category === 'fralda' ? `Tamanho ${item.diaper_size}` : 'Mimo'}</StatusBadge>
-        {!item.product.active && <StatusBadge tone="warning">Fora do catálogo</StatusBadge>}
+        {item.product.event_id ? <StatusBadge tone="brand">Criado por você</StatusBadge> : !item.product.active && <StatusBadge tone="warning">Fora do catálogo</StatusBadge>}
       </div>
       <h3 className="card-title">{item.product.title}</h3>
-      {!item.product.active && <p className="card-description">Este produto saiu do catálogo. Ele continua na sua lista.</p>}
+      {item.product.event_id && item.product.description && <p className="card-description whitespace-pre-line break-words">{item.product.description}</p>}
+      {!item.product.event_id && !item.product.active && <p className="card-description">Este produto saiu do catálogo. Ele continua na sua lista.</p>}
     </header>
     {item.category === 'mimo' ? <p className="availability-text">Sem limite de quantidade. Cada convidado informa quantos vai levar.</p> : <form onSubmit={save} className="flex flex-col gap-3">
       <QuantityField context={item.product.title} unit="pacotes" value={quantity} max={10000} disabled={busy || closed} onChange={text => { setValue(text); setMessage('') }} />
@@ -166,37 +178,131 @@ function ItemCard({ item, closed }: { item: EventItem; closed: boolean }) {
       setBaseline(item); setValue(String(item.quantity_requested ?? '')); setError(null); setMessage('Quantidade recarregada.')
     }}>Recarregar quantidade</Button>}
     {message && <SuccessMessage>{message}</SuccessMessage>}
+    {!closed && <RemoveItem item={item} disabled={busy} onRemoved={onRemoved} />}
   </article>
 }
+// Remover pede confirmação no próprio cartão. Com reserva ativa o servidor recusa,
+// e o motivo aparece aqui; a lista é reconsultada para mostrar o estado real.
+function RemoveItem({ item, disabled, onRemoved }: { item: EventItem; disabled: boolean; onRemoved: (title: string) => void }) {
+  const [confirming, setConfirming] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  // Com reserva ativa não adianta insistir: some o "Remover" e fica só "Fechar".
+  const [blocked, setBlocked] = useState(false)
+  const errorText = useRef<HTMLParagraphElement>(null)
+  const panelId = useId()
+  const question = useRef<HTMLParagraphElement>(null)
+  const trigger = useRef<HTMLButtonElement>(null)
+  // Trava síncrona: o clique duplo chega antes de o botão ficar ocupado.
+  const sending = useRef(false)
+  const cache = useQueryClient()
+  useEffect(() => { if (confirming) question.current?.focus() }, [confirming])
+  // O botão focado some com o bloqueio: o foco vai para o motivo.
+  useEffect(() => { if (blocked) errorText.current?.focus() }, [blocked])
+  function cancel() { setConfirming(false); setError(null); setBlocked(false); trigger.current?.focus() }
+  async function remove() {
+    if (sending.current) return
+    sending.current = true; setBusy(true); setError(null)
+    try {
+      await removeItem(item)
+      onRemoved(item.product.title)
+      await cache.invalidateQueries({ queryKey: giftKeys.items(item.event_id) })
+    } catch (cause) {
+      const code = (cause as Error).message
+      // Outra aba já removeu: o resultado é o que a pessoa pediu, e o cartão vai sumir.
+      if (code === 'ITEM_NOT_FOUND') onRemoved(item.product.title)
+      else { setError(code === 'ITEM_VERSION_CONFLICT' ? 'Este presente mudou em outra aba. A lista foi atualizada: confira e confirme de novo.' : errorMessage(cause)); setBlocked(code === 'ITEM_HAS_RESERVATIONS') }
+      await cache.invalidateQueries({ queryKey: giftKeys.items(item.event_id) })
+    } finally { sending.current = false; setBusy(false) }
+  }
+  return <div className="card-actions">
+    <button ref={trigger} type="button" className="btn-ghost btn-sm self-start" disabled={disabled} aria-expanded={confirming} aria-controls={panelId}
+      aria-label={`Remover da lista: ${item.product.title}`} onClick={() => confirming ? cancel() : setConfirming(true)}>Remover da lista</button>
+    {confirming && <div id={panelId} className="card-disclosure">
+      <p ref={question} tabIndex={-1}>Remover “{item.product.title}” da lista? Os convidados deixam de ver este presente.{item.product.event_id ? ' Este mimo foi criado por você e será apagado.' : ''}</p>
+      <div className="flex flex-wrap gap-3">
+        {!blocked && <Button variant="danger" busy={busy} onClick={() => void remove()}>{busy ? 'Removendo…' : 'Remover'}</Button>}
+        <Button variant="ghost" disabled={busy} onClick={cancel}>{blocked ? 'Fechar' : 'Cancelar'}</Button>
+      </div>
+      {error && <p ref={errorText} tabIndex={-1} role="alert" className="error">{error}</p>}
+    </div>}
+  </div>
+}
+// Mimo que não está no catálogo: só nome e descrição, sem limite, só para este evento.
+function CustomTreatForm({ eventId }: { eventId: string }) {
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [message, setMessage] = useState('')
+  const sending = useRef(false)
+  const nameField = useRef<HTMLInputElement>(null)
+  const [nameInvalid, setNameInvalid] = useState(false)
+  const errorId = useId()
+  const cache = useQueryClient()
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    if (sending.current) return
+    if (!title.trim()) { setError('Informe o nome do mimo.'); setNameInvalid(true); nameField.current?.focus(); return }
+    sending.current = true; setBusy(true); setError(null); setNameInvalid(false); setMessage('')
+    try {
+      await addCustomTreat(eventId, title, description)
+      setMessage(`“${title.trim()}” entrou na lista.`); setTitle(''); setDescription('')
+      await cache.invalidateQueries({ queryKey: giftKeys.items(eventId) })
+    } catch (cause) {
+      const code = (cause as Error).message
+      setNameInvalid(code === 'ITEM_ALREADY_EXISTS' || code === 'INVALID_TREAT')
+      setError(code === 'ITEM_ALREADY_EXISTS' ? 'Já existe um mimo com esse nome na lista.' : errorMessage(cause))
+    } finally { sending.current = false; setBusy(false) }
+  }
+  return <section aria-labelledby="custom-treat" className="card mt-6">
+    <h3 id="custom-treat" className="card-title">Adicionar mimo próprio</h3>
+    <p className="mt-1 text-muted">Escreva o nome de qualquer mimo. Vale só para este evento, sem limite de quantidade.</p>
+    <form onSubmit={submit} className="mt-4 grid gap-4">
+      {/* readOnly, e não disabled: com Enter no campo, o foco continua nele durante o envio. */}
+      <label className="field">Nome do mimo<input ref={nameField} maxLength={160} value={title} readOnly={busy} aria-invalid={nameInvalid || undefined} aria-describedby={nameInvalid ? errorId : undefined} onChange={e => { setTitle(e.target.value); setMessage(''); setError(null); setNameInvalid(false) }} placeholder="Ex.: Livro de pano" /></label>
+      <label className="field">Descrição (opcional)<textarea rows={2} maxLength={2000} value={description} readOnly={busy} onChange={e => { setDescription(e.target.value); setMessage('') }} /></label>
+      <Button type="submit" variant="secondary" className="justify-self-start" busy={busy}>{busy ? 'Adicionando…' : 'Adicionar mimo'}</Button>
+    </form>
+    {message && <div className="mt-4"><SuccessMessage>{message}</SuccessMessage></div>}
+    {error && <p id={errorId} role="alert" className="error mt-4">{error}</p>}
+  </section>
+}
+// Uma seção só para incluir: mimo próprio (na aba Mimos) e as sugestões do catálogo
+// que ainda não estão na lista. O catálogo é pequeno e vem inteiro, sem busca.
 function Catalog({ eventId, category, listed, listedFailed, listedFetching, retryListed }: {
   eventId: string; category: Category; listed?: { product_id: string; diaper_size: DiaperSize | null }[]; listedFailed: boolean; listedFetching: boolean; retryListed: () => void
 }) {
   const { session } = useAuth()
-  const [search, setSearch] = useState('')
-  const [term, setTerm] = useState('')
-  const [page, setPage] = useState(0)
-  const query = useQuery({ queryKey: [...giftKeys.catalog, session?.user.id, category, term, page], queryFn: () => listProducts(term, page, category) })
-  const catalogError = useLastError(query.error, `${term}:${page}`)
-  const [total, setTotal] = useState<number | null>(null)
-  if (query.data && query.data.count !== total) setTotal(query.data.count)
-  function submit(e: FormEvent) { e.preventDefault(); setTerm(search.trim()); setPage(0); setTotal(null) }
+  const query = useQuery({ queryKey: [...giftKeys.catalog, session?.user.id, category], queryFn: () => listProducts('', 0, category, CATALOG_LIMIT) })
+  const catalogError = useLastError(query.error)
+  // A sugestão incluída some da lista: o foco vai para o aviso, e não para o início da página.
+  const [added, setAdded] = useState({ title: '', count: 0 })
+  const addedNotice = useRef<HTMLParagraphElement>(null)
+  useEffect(() => { if (added.count) addedNotice.current?.focus() }, [added])
   // Fralda é por tamanho: outro produto do mesmo tamanho também conta como já incluído.
   const isListed = (product: Product) => listed?.some(row => row.product_id === product.id || (product.diaper_size !== null && row.diaper_size === product.diaper_size))
+  // Sem saber o que já está na lista (falha), mostra tudo: o banco recusa repetição.
+  const suggestions = query.data?.products.filter(product => listedFailed || !isListed(product)) ?? []
+  const noun = category === 'fralda' ? 'tamanhos de fralda' : 'mimos'
   return <section aria-labelledby="catalog-title" className="mt-14 border-t border-stone-300 pt-10">
-    <h2 id="catalog-title" className="text-2xl font-bold">Incluir itens avulsos</h2>
-    <p className="mt-2 max-w-2xl text-stone-600">Use o catálogo só para algo que não veio na lista pronta. O que já está na lista aparece marcado; para mudar a quantidade, use o cartão acima.</p>
-    {listedFailed && <div className="mt-4"><ErrorState message="Não foi possível conferir o que já está na lista. Se um item já estiver incluído, o sistema recusa a repetição." busy={listedFetching} onRetry={retryListed} retryLabel="Conferir a lista de novo" /></div>}
-    <form onSubmit={submit} role="search" className="mt-6 flex flex-wrap items-end gap-3"><label className="field min-w-0 flex-1">Buscar produto<input type="search" maxLength={120} value={search} onChange={e => setSearch(e.target.value)} placeholder={category === 'fralda' ? 'Ex.: tamanho M' : 'Ex.: mamadeira'} /></label><button className="secondary">Buscar</button></form>
-    {query.isPending && !(failedLast(query) && catalogError) ? <LoadingState>Carregando catálogo…</LoadingState> : !query.data ? <div className="mt-6"><ErrorState message={errorMessage(catalogError)} busy={query.isFetching} onRetry={() => void query.refetch()} retryLabel="Recarregar catálogo" /></div> : <>
-      {!query.data.count ? <div className="mt-6"><EmptyState title={term ? 'Nenhum produto encontrado.' : 'O catálogo ainda não tem produtos disponíveis.'}>{term && 'Tente outro nome.'}</EmptyState></div> : <div className="stagger mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{query.data.products.map(product => <ProductCard key={product.id} product={product} eventId={eventId} listed={isListed(product) ?? false} />)}</div>}
-    </>}
-    {total !== null && <Pagination page={page} count={total} pageSize={PAGE_SIZE} onChange={setPage} label="Paginação do catálogo" />}
+    <h2 id="catalog-title" className="text-2xl font-bold">Adicionar à lista</h2>
+    {category === 'mimo' && <CustomTreatForm eventId={eventId} />}
+    <section aria-labelledby="catalog-suggestions" className="mt-8">
+      <h3 id="catalog-suggestions" className="text-xl font-semibold">Sugestões do catálogo</h3>
+      {listedFailed && <div className="mt-4"><ErrorState message="Não foi possível conferir o que já está na lista. Se um item já estiver incluído, o sistema recusa a repetição." busy={listedFetching} onRetry={retryListed} retryLabel="Conferir a lista de novo" /></div>}
+      {added.title && <p ref={addedNotice} tabIndex={-1} role="status" className="state state-success mt-4">“{added.title}” entrou na lista.</p>}
+      {(query.isPending && !(failedLast(query) && catalogError)) || (!listed && !listedFailed) ? <LoadingState>Carregando sugestões…</LoadingState>
+        : !query.data ? <div className="mt-4"><ErrorState message={errorMessage(catalogError)} busy={query.isFetching} onRetry={() => void query.refetch()} retryLabel="Recarregar sugestões" /></div>
+        : !query.data.count ? <p className="mt-3 text-muted">O catálogo ainda não tem {noun}.</p>
+        : !suggestions.length && query.data.count <= query.data.products.length ? <p className="mt-3 text-muted">Todos os {noun} do catálogo já estão na lista.</p>
+        : <>{query.data.count > query.data.products.length && <p className="mt-3 text-muted">Mostrando {query.data.products.length} de {query.data.count} sugestões do catálogo.</p>}<ul className="catalog-rows stagger mt-4">{suggestions.map(product => <li key={product.id}><ProductCard product={product} eventId={eventId} onAdded={title => setAdded(current => ({ title, count: current.count + 1 }))} /></li>)}</ul></>}
+    </section>
   </section>
 }
-function ProductCard({ product, eventId, listed }: { product: Product; eventId: string; listed: boolean }) {
+function ProductCard({ product, eventId, onAdded }: { product: Product; eventId: string; onAdded: (title: string) => void }) {
   const [quantity, setValue] = useState('1')
   const [busy, setBusy] = useState(false)
-  const [message, setMessage] = useState('')
   const [error, setError] = useState<string | null>(null)
   const cache = useQueryClient()
   const diaper = product.category === 'fralda'
@@ -205,34 +311,29 @@ function ProductCard({ product, eventId, listed }: { product: Product; eventId: 
     const value = diaper ? parseQuantity(quantity) : null
     if (diaper && value === null) { setError('Informe uma quantidade inteira entre 1 e 10.000.'); return }
     if (busy) return
-    setBusy(true); setError(null); setMessage('')
+    setBusy(true); setError(null)
     try {
       await addItem(eventId, product.id, value)
+      onAdded(product.title)
       await cache.invalidateQueries({ queryKey: giftKeys.items(eventId) })
-      setMessage('Incluído na lista.')
     } catch (cause) {
       setError(errorMessage(cause))
       await cache.invalidateQueries({ queryKey: giftKeys.items(eventId) })
       await cache.invalidateQueries({ queryKey: eventKeys.detail(eventId) })
     } finally { setBusy(false) }
   }
-  return <article className={`card card-stack ${listed ? 'product-listed' : ''}`}>
-    <header className="card-header">
-      <div className="card-badges">
-        {diaper && <StatusBadge tone="neutral">Tamanho {product.diaper_size}</StatusBadge>}
+  return <article className="catalog-row" aria-labelledby={`produto-${product.id}`}>
+    <div className="catalog-row-text">
+      <div className="flex flex-wrap items-center gap-2">
+        <h4 id={`produto-${product.id}`} className="font-semibold">{product.title}</h4>
         {product.platform !== 'manual' && <StatusBadge tone="neutral">{platformLabels[product.platform]}</StatusBadge>}
-        {listed && <StatusBadge tone="success">Já na lista</StatusBadge>}
       </div>
-      <h3 className="card-title">{product.title}</h3>
-      {!diaper && product.description && <p className="card-description whitespace-pre-line break-words">{product.description}</p>}
-    </header>
-    <div className="mt-auto">
-      {listed ? <p className="hint">{diaper ? 'Este tamanho já está na lista. Ajuste os pacotes no cartão acima.' : 'Os convidados já podem escolher este mimo.'}</p> :
-        <form onSubmit={add} className="flex flex-col gap-3">
-          {diaper ? <QuantityField label="Pacotes" context={product.title} unit="pacotes" value={quantity} max={10000} disabled={busy} onChange={text => { setValue(text); setMessage('') }} /> : <p className="hint">Sem limite de quantidade.</p>}
-          <Button type="submit" variant="secondary" className="self-start" busy={busy} aria-label={`Adicionar ${product.title} à lista`}>{busy ? 'Adicionando…' : 'Adicionar'}</Button>
-        </form>}
+      {!diaper && product.description && <p className="text-sm text-muted whitespace-pre-line break-words">{product.description}</p>}
     </div>
-    {message && <SuccessMessage>{message}</SuccessMessage>}{error && <ErrorState message={error} />}
+    <form onSubmit={add} className="catalog-row-form">
+      {diaper && <QuantityField label="Pacotes" context={product.title} unit="pacotes" value={quantity} max={10000} disabled={busy} onChange={text => { setValue(text); setError(null) }} />}
+      <Button type="submit" variant="secondary" size="sm" busy={busy} aria-label={`Adicionar ${product.title} à lista`}>{busy ? 'Adicionando…' : 'Adicionar'}</Button>
+    </form>
+    {error && <ErrorState message={error} />}
   </article>
 }

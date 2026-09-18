@@ -1,9 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { daysUntil, fromLocalDate, isEventId, toLocalDate, validateDraft, validateImage } from '../src/features/events/model'
+import { daysUntil, fromLocalDate, inSetup, isEventId, pendingSteps, toLocalDate, validateDraft, validateImage } from '../src/features/events/model'
 import { errorMessage } from '../src/lib/errors'
 
 const draft = { title: '', public_description: '', private_address: '', private_instructions: '', localDate: '', localEndDate: '', cover_path: null }
 describe('evento', () => {
+  it('lista as etapas pendentes só de evento publicado, na ordem sugerida', () => {
+    const base = { status: 'published' as const, guests_done_at: null, gifts_done_at: null }
+    expect(pendingSteps(base)).toEqual(['guests', 'gifts'])
+    expect(pendingSteps({ ...base, guests_done_at: '2026-09-18T12:00:00Z' })).toEqual(['gifts'])
+    expect(pendingSteps({ ...base, status: 'draft' })).toEqual([])
+    expect(pendingSteps({ ...base, status: 'closed' })).toEqual([])
+    expect(inSetup({ ...base, status: 'draft' })).toBe(true)
+    expect(inSetup(base)).toBe(true)
+    expect(inSetup({ ...base, guests_done_at: 'x', gifts_done_at: 'y' })).toBe(false)
+  })
   it('aceita rascunho incompleto, mas não publicação', () => {
     expect(validateDraft(draft)).toBeNull()
     expect(validateDraft(draft, true)).toContain('título')

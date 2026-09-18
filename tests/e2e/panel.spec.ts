@@ -5,11 +5,16 @@ import type { EventRecord } from '../../src/features/events/model'
 import type { Dashboard, Invitation } from '../../src/features/guests/api'
 import { session, userId } from './session'
 
+// O convite carrega o mapa do Google em iframe: nos testes ele é simulado, sem rede externa.
+test.beforeEach(async ({ page }) => {
+  await page.route('https://www.google.com/maps**', route => route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Mapa simulado</title>' }))
+})
+
 // Painel do organizador com backend simulado e dados fictícios.
 const eventId = '20000000-0000-4000-8000-000000000002'
 const event: EventRecord = { id: eventId, owner_id: userId, type: 'baby_shower', status: 'published', title: 'Chá de teste',
   public_description: '', private_address: '', private_instructions: '', starts_at: '2035-09-10T17:30:00Z', ends_at: '2035-09-10T21:00:00Z',
-  personal_data_purged_at: null, cover_path: null, version: 3, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' }
+  personal_data_purged_at: null, guests_done_at: '2026-01-02T00:00:00Z', gifts_done_at: '2026-01-02T00:00:00Z', cover_path: null, version: 3, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' }
 function invitation(n: number, fields: Partial<Invitation>): Invitation {
   return { id: `30000000-0000-4000-8000-00000000000${n}`, name: `Convidado fictício ${n}`, kind: 'family', capacity: 4, response: 'pending',
     attending: 0, version: 1, revoked: false, expires_at: '2035-09-17T17:30:00Z', ...fields }
@@ -137,7 +142,7 @@ test('detalhes e lista de presentes mostram o mesmo estado de erro', async ({ pa
 
 const product = (n: number, size: 'P' | 'M' | 'G' | 'XG') => ({ id: `80000000-0000-4000-8000-00000000000${n}`, title: `Fraldas tamanho ${size}`,
   description: 'Uma unidade equivale a um pacote.', platform: 'manual', category: 'fralda', diaper_size: size, active: true })
-test('catálogo marca o que já está na lista e destaca a lista pronta', async ({ page }) => {
+test('sugestões do catálogo mostram só o que falta na lista', async ({ page }) => {
   const g = product(1, 'G')
   const listedG = { id: '90000000-0000-4000-8000-000000000009', event_id: eventId, product_id: g.id, quantity_requested: 12, category: 'fralda', diaper_size: 'G', version: 1, product: g }
   await backend(page, () => ({ status: 200, json: full }), undefined, {
@@ -146,13 +151,134 @@ test('catálogo marca o que já está na lista e destaca a lista pronta', async 
   })
   await page.goto(`/eventos/${eventId}/presentes`)
   await expect(page.getByRole('button', { name: 'Completar a lista do chá' })).toBeVisible()
-  const catalog = page.getByRole('region', { name: 'Incluir itens avulsos' })
-  const cardG = catalog.getByRole('article').filter({ hasText: 'Fraldas tamanho G' })
-  await expect(cardG).toContainText('Já na lista')
-  await expect(cardG.getByRole('button')).toHaveCount(0)
+  const catalog = page.getByRole('region', { name: 'Adicionar à lista' })
+  await expect(catalog.getByRole('button', { name: 'Adicionar Fraldas tamanho M à lista' })).toBeVisible()
+  // O tamanho G já está na lista: não aparece como sugestão.
+  await expect(catalog.getByRole('article').filter({ hasText: 'Fraldas tamanho G' })).toHaveCount(0)
+  await expect(catalog.getByRole('searchbox')).toHaveCount(0)
   await expect(catalog.getByText('Catálogo manual')).toHaveCount(0)
   await expect(catalog.getByRole('button', { name: 'Adicionar Fraldas tamanho M à lista' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Mimos', exact: true })).toHaveAttribute('aria-pressed', 'false')
+  await expectAccessible(page)
+})
+
+test('remover item: confirma no cartão, avisa e recusa quando alguém já escolheu', async ({ page }) => {
+  const mimo = (n: number, title: string) => ({ id: `81000000-0000-4000-8000-00000000000${n}`, title, description: '', platform: 'manual', category: 'mimo', diaper_size: null, active: true, event_id: null })
+  const row = (n: number, title: string) => ({ id: `91000000-0000-4000-8000-00000000000${n}`, event_id: eventId, product_id: mimo(n, title).id, quantity_requested: null, category: 'mimo', diaper_size: null, version: 1, product: mimo(n, title) })
+  let items = [row(1, 'Pomada fictícia'), row(2, 'Mamadeira fictícia')]
+  const removed: unknown[] = []
+  await backend(page, () => ({ status: 200, json: full }), undefined, {
+    '/rest/v1/event_items': ({ url }) => ({ status: 200, json: url.searchParams.get('category') === 'eq.fralda' ? [] : items, headers: { 'content-range': `0-${items.length}/${items.length}` } }),
+    '/rest/v1/products': none,
+    '/rest/v1/rpc/remove_event_item': ({ body }) => {
+      removed.push(body)
+      if (body.p_item_id === row(2, '').id) return { status: 400, json: { message: 'ITEM_HAS_RESERVATIONS', code: 'P0001' } }
+      items = items.filter(item => item.id !== body.p_item_id)
+      return { status: 200, json: row(1, 'Pomada fictícia') }
+    },
+  })
+  await page.goto(`/eventos/${eventId}/presentes`)
+  await page.getByRole('button', { name: 'Mimos', exact: true }).click()
+  const pomada = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Pomada fictícia' }) })
+  await pomada.getByRole('button', { name: 'Remover da lista: Pomada fictícia' }).click()
+  await expect(pomada.getByText('Remover “Pomada fictícia” da lista?')).toBeFocused()
+  await pomada.getByRole('button', { name: 'Remover', exact: true }).click()
+  await expect(page.getByRole('status').filter({ hasText: '“Pomada fictícia” saiu da lista.' })).toBeFocused()
+  await expect(page.getByRole('heading', { name: 'Pomada fictícia' })).toHaveCount(0)
+  expect(removed[0]).toEqual({ p_event_id: eventId, p_item_id: row(1, '').id, p_version: 1 })
+  const mamadeira = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Mamadeira fictícia' }) })
+  await mamadeira.getByRole('button', { name: 'Remover da lista: Mamadeira fictícia' }).click()
+  await mamadeira.getByRole('button', { name: 'Remover', exact: true }).click()
+  await expect(mamadeira.getByRole('alert')).toHaveText('Um convidado já escolheu este presente. Ele não pode sair da lista.')
+  // O "Remover" não serve mais e some; o foco vai para o motivo, e "Fechar" devolve ao botão do cartão.
+  await expect(mamadeira.getByRole('alert')).toBeFocused()
+  await expect(mamadeira.getByRole('button', { name: 'Remover', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Mamadeira fictícia' })).toBeVisible()
+  await expectAccessible(page)
+  await mamadeira.getByRole('button', { name: 'Fechar' }).click()
+  await expect(mamadeira.getByRole('button', { name: 'Remover da lista: Mamadeira fictícia' })).toBeFocused()
+  // O aviso é da categoria em que o item saiu.
+  await page.getByRole('button', { name: 'Fraldas', exact: true }).click()
+  await expect(page.getByText('saiu da lista')).toHaveCount(0)
+})
+
+test('remover item já removido em outra aba conta como removido; conflito de versão explica o que houve', async ({ page }) => {
+  const mimo = (n: number, title: string) => ({ id: `81000000-0000-4000-8000-00000000000${n}`, title, description: '', platform: 'manual', category: 'mimo', diaper_size: null, active: true, event_id: null })
+  const row = (n: number, title: string) => ({ id: `91000000-0000-4000-8000-00000000000${n}`, event_id: eventId, product_id: mimo(n, title).id, quantity_requested: null, category: 'mimo', diaper_size: null, version: 1, product: mimo(n, title) })
+  let items = [row(1, 'Pomada fictícia'), row(2, 'Mamadeira fictícia')]
+  await backend(page, () => ({ status: 200, json: full }), undefined, {
+    '/rest/v1/event_items': () => ({ status: 200, json: items, headers: { 'content-range': `0-${items.length - 1}/${items.length}` } }),
+    '/rest/v1/products': none,
+    '/rest/v1/rpc/remove_event_item': ({ body }) => {
+      if (body.p_item_id === row(2, '').id) return { status: 400, json: { message: 'ITEM_VERSION_CONFLICT', code: 'P0001' } }
+      items = items.filter(item => item.id !== body.p_item_id)
+      return { status: 400, json: { message: 'ITEM_NOT_FOUND', code: 'P0001' } }
+    },
+  })
+  await page.goto(`/eventos/${eventId}/presentes`)
+  await page.getByRole('button', { name: 'Mimos', exact: true }).click()
+  const mamadeira = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Mamadeira fictícia' }) })
+  await mamadeira.getByRole('button', { name: 'Remover da lista: Mamadeira fictícia' }).click()
+  await mamadeira.getByRole('button', { name: 'Remover', exact: true }).click()
+  await expect(mamadeira.getByRole('alert')).toHaveText('Este presente mudou em outra aba. A lista foi atualizada: confira e confirme de novo.')
+  const pomada = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Pomada fictícia' }) })
+  await pomada.getByRole('button', { name: 'Remover da lista: Pomada fictícia' }).click()
+  await pomada.getByRole('button', { name: 'Remover', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Pomada fictícia' })).toHaveCount(0)
+  await expect(page.getByRole('status').filter({ hasText: '“Pomada fictícia” saiu da lista.' })).toBeFocused()
+})
+
+test('completar depois de remover diz que o item da lista pronta voltou', async ({ page }) => {
+  const rows = [{ product_id: '81000000-0000-4000-8000-000000000001', diaper_size: 'P', category: 'fralda', quantity_requested: 6 }]
+  await backend(page, () => ({ status: 200, json: full }), undefined, {
+    '/rest/v1/event_items': ({ url }) => isListQuery(url) ? { status: 200, json: [], headers: { 'content-range': '*/0' } } : { status: 200, json: rows, headers: { 'content-range': '0-0/1' } },
+    '/rest/v1/products': none,
+    '/rest/v1/rpc/prepare_family_list': () => ({ status: 200, json: 1 }),
+  })
+  await page.goto(`/eventos/${eventId}/presentes`)
+  await expect(page.getByText('inclui de novo tudo o que falta, inclusive o que você removeu')).toBeVisible()
+  await page.getByRole('button', { name: 'Completar a lista do chá' }).click()
+  await expect(page.getByRole('status').filter({ hasText: '1 item da lista pronta voltou para a lista.' })).toBeVisible()
+})
+
+test('mimo próprio: entra na lista com o selo “Criado por você” e recusa nome repetido', async ({ page }) => {
+  const own = { id: '82000000-0000-4000-8000-000000000001', title: 'Livro de pano', description: 'Qualquer cor', platform: 'manual', category: 'mimo', diaper_size: null, active: true, event_id: eventId }
+  let items: unknown[] = []
+  const calls: unknown[] = []
+  await backend(page, () => ({ status: 200, json: full }), undefined, {
+    '/rest/v1/event_items': () => ({ status: 200, json: items, headers: { 'content-range': items.length ? `0-0/${items.length}` : '*/0' } }),
+    '/rest/v1/products': none,
+    '/rest/v1/rpc/add_custom_treat': ({ body }) => {
+      calls.push(body)
+      if (items.length) return { status: 400, json: { message: 'ITEM_ALREADY_EXISTS', code: 'P0001' } }
+      items = [{ id: '92000000-0000-4000-8000-000000000001', event_id: eventId, product_id: own.id, quantity_requested: null, category: 'mimo', diaper_size: null, version: 1, product: own }]
+      return { status: 200, json: items[0] }
+    },
+  })
+  await page.goto(`/eventos/${eventId}/presentes`)
+  await page.getByRole('button', { name: 'Mimos', exact: true }).click()
+  const form = page.getByRole('region', { name: 'Adicionar mimo próprio' })
+  await form.getByRole('button', { name: 'Adicionar mimo' }).click()
+  await expect(form.getByRole('alert')).toHaveText('Informe o nome do mimo.')
+  // Erro ligado ao campo, e o foco vai para ele.
+  await expect(form.getByLabel('Nome do mimo')).toBeFocused()
+  await expect(form.getByLabel('Nome do mimo')).toHaveAttribute('aria-invalid', 'true')
+  await expect(form.getByLabel('Nome do mimo')).toHaveAccessibleDescription('Informe o nome do mimo.')
+  expect(calls).toEqual([])
+  await form.getByLabel('Descrição (opcional)').fill('Qualquer cor')
+  await form.getByLabel('Nome do mimo').fill('Livro de pano')
+  // Enter no celular ("Ir"): o campo fica só leitura durante o envio e não solta o foco.
+  await form.getByLabel('Nome do mimo').press('Enter')
+  await expect(form.getByRole('status')).toHaveText('“Livro de pano” entrou na lista.')
+  await expect(form.getByLabel('Nome do mimo')).toBeFocused()
+  expect(calls[0]).toEqual({ p_event_id: eventId, p_title: 'Livro de pano', p_description: 'Qualquer cor' })
+  const card = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Livro de pano' }) })
+  await expect(card).toContainText('Criado por você')
+  await expect(card).toContainText('Qualquer cor')
+  await form.getByLabel('Nome do mimo').fill('livro de pano')
+  await form.getByRole('button', { name: 'Adicionar mimo' }).click()
+  await expect(form.getByRole('alert')).toHaveText('Já existe um mimo com esse nome na lista.')
+  await expect(form.getByLabel('Nome do mimo')).toHaveValue('livro de pano')
   await expectAccessible(page)
 })
 
@@ -186,9 +312,11 @@ test('falha ao conferir a lista avisa no catálogo e some quando a consulta volt
     '/rest/v1/products': () => ({ status: 200, json: [g, product(2, 'M')], headers: { 'content-range': '0-1/2' } }),
   })
   await page.goto(`/eventos/${eventId}/presentes`)
-  const catalog = page.getByRole('region', { name: 'Incluir itens avulsos' })
+  const catalog = page.getByRole('region', { name: 'Adicionar à lista' })
   const alert = catalog.getByRole('alert')
   await expect(alert).toContainText('Não foi possível conferir o que já está na lista', { timeout: 15_000 })
+  // Sem saber o que já está na lista, todas as sugestões aparecem; o banco recusa repetição.
+  await expect(catalog.getByRole('button', { name: 'Adicionar Fraldas tamanho G à lista' })).toBeVisible()
   await expectAccessible(page)
   // Enquanto confere de novo, o aviso continua no lugar e o botão fica indisponível.
   const retry = alert.getByRole('button', { name: 'Conferir a lista de novo' })
@@ -198,7 +326,7 @@ test('falha ao conferir a lista avisa no catálogo e some quando a consulta volt
   failing = false
   await retry.click()
   await expect(alert).toHaveCount(0)
-  await expect(catalog.getByRole('article').filter({ hasText: 'Fraldas tamanho G' })).toContainText('Já na lista')
+  await expect(catalog.getByRole('article').filter({ hasText: 'Fraldas tamanho G' })).toHaveCount(0)
   await expect(catalog.getByRole('button', { name: 'Adicionar Fraldas tamanho M à lista' })).toBeVisible()
 })
 
@@ -467,21 +595,6 @@ test('A12 · trocar de página pelo teclado não solta o foco, nem no erro', asy
   expect(await page.evaluate(() => document.activeElement?.closest('nav')?.getAttribute('aria-label'))).toBe('Paginação da lista')
 })
 
-test('A12 · página do catálogo que falha mantém a paginação para voltar', async ({ page }) => {
-  const products = Array.from({ length: 12 }, (_, n) => ({ ...product(n % 10, 'M'), id: `81000000-0000-4000-8000-${String(n).padStart(12, '0')}`, title: `Produto fictício ${n + 1}` }))
-  await backend(page, () => ({ status: 200, json: full }), undefined, { '/rest/v1/event_items': none,
-    '/rest/v1/products': ({ url }) => url.searchParams.get('offset') === '12' ? { status: 500, json: { message: 'unavailable' } }
-      : { status: 200, json: products, headers: { 'content-range': '0-11/13' } } })
-  await page.goto(`/eventos/${eventId}/presentes`)
-  const catalog = page.getByRole('region', { name: 'Incluir itens avulsos' })
-  await expect(catalog.getByText('Produto fictício 1', { exact: true })).toBeVisible()
-  await catalog.getByRole('button', { name: 'Próxima' }).click()
-  await expect(catalog.getByRole('alert')).toBeVisible({ timeout: 15_000 })
-  await expect(catalog.getByRole('navigation', { name: 'Paginação do catálogo' })).toContainText('Página 2 de 2')
-  await catalog.getByRole('button', { name: 'Anterior' }).click()
-  await expect(catalog.getByText('Produto fictício 1', { exact: true })).toBeVisible()
-  await expect(catalog.getByRole('alert')).toHaveCount(0)
-})
 test('A12 · erro de página com a paginação cabe em 320 px com texto a 200% e alvos de 44 px', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 740 })
   await backend(page, () => ({ status: 200, json: full }), undefined, {
@@ -793,14 +906,27 @@ test.describe('G3.1 · cards do organizador', () => {
 
   test('catálogo: pacotes pelo stepper e nenhum botão preenchido nos cards', async ({ page }) => {
     await giftList(page)
-    const catalog = page.getByRole('region', { name: 'Incluir itens avulsos' })
+    const catalog = page.getByRole('region', { name: 'Adicionar à lista' })
     const m = catalog.getByRole('article').filter({ hasText: 'Fraldas tamanho M' })
     await expect(m.getByRole('spinbutton', { name: 'Pacotes de Fraldas tamanho M' })).toHaveValue('1')
     await m.getByRole('button', { name: 'Aumentar pacotes' }).click()
     await expect(m.getByRole('spinbutton', { name: 'Pacotes de Fraldas tamanho M' })).toHaveValue('2')
     await expect(m.getByRole('button', { name: 'Adicionar Fraldas tamanho M à lista' })).toHaveClass(/secondary/)
-    await expect(catalog.getByRole('article').filter({ hasText: 'Fraldas tamanho G' }).locator('.badge-success')).toHaveText('✓Já na lista')
+    await expect(catalog.getByRole('article').filter({ hasText: 'Fraldas tamanho G' })).toHaveCount(0)
     await sameAnatomy(page)
+  })
+
+  // Entre 370 e 500 px (e com texto a 200% até ~1000 px) o formulário cabia ao lado e
+  // espremia o nome do produto a uma palavra por linha. O nome curto fica numa linha só.
+  test('catálogo: nome da sugestão não é espremido pelo formulário', async ({ page }) => {
+    await giftList(page)
+    const title = page.getByRole('region', { name: 'Sugestões do catálogo' }).getByRole('heading', { name: 'Fraldas tamanho M', level: 4 })
+    for (const [width, zoom] of [[400, '100%'], [480, '100%'], [800, '200%']] as const) {
+      await page.setViewportSize({ width, height: 800 })
+      await page.evaluate(value => { document.documentElement.style.fontSize = value }, zoom)
+      const lines = await title.evaluate(h => Math.round(h.getBoundingClientRect().height / parseFloat(getComputedStyle(h).lineHeight)))
+      expect(lines, `${width}px, texto ${zoom}`).toBe(1)
+    }
   })
 
   // Lista com rotas de escrita simuladas; `calls` guarda o corpo de cada RPC.
@@ -820,7 +946,7 @@ test.describe('G3.1 · cards do organizador', () => {
     return calls
   }
   const listCard = (page: Page) => page.getByRole('region', { name: 'Fraldas na lista' }).getByRole('article')
-  const catalogCard = (page: Page) => page.getByRole('region', { name: 'Incluir itens avulsos' }).getByRole('article').filter({ hasText: 'Fraldas tamanho M' })
+  const catalogCard = (page: Page) => page.getByRole('region', { name: 'Adicionar à lista' }).getByRole('article').filter({ hasText: 'Fraldas tamanho M' })
 
   test('stepper: nome acessível do grupo e dos botões nos dois cards', async ({ page }) => {
     await giftListWith(page)
@@ -913,7 +1039,7 @@ test.describe('G3.1 · cards do organizador', () => {
     await expect(card.getByRole('alert')).toHaveCount(0)
   })
 
-  test('catálogo: sucesso e erro aparecem dentro do card do produto', async ({ page }) => {
+  test('catálogo: erro fica na linha do produto e o sucesso vira aviso com foco', async ({ page }) => {
     let fail = true
     const calls = await giftListWith(page, { write: () => fail ? { status: 500, json: { message: 'boom' } } : { status: 200, json: { id: 'x' } } })
     const card = catalogCard(page)
@@ -926,7 +1052,9 @@ test.describe('G3.1 · cards do organizador', () => {
     await expect(add).toBeFocused()
     fail = false
     await card.getByRole('button', { name: 'Adicionar Fraldas tamanho M à lista' }).click()
-    await expect(card.getByRole('status')).toHaveText('Incluído na lista.')
+    // O aviso fica no topo das sugestões e recebe o foco: a linha incluída sai de lá.
+    await expect(page.getByRole('region', { name: 'Sugestões do catálogo' }).getByRole('status')).toHaveText('“Fraldas tamanho M” entrou na lista.')
+    await expect(page.getByRole('region', { name: 'Sugestões do catálogo' }).getByRole('status')).toBeFocused()
     await expect(card.getByRole('alert')).toHaveCount(0)
     expect(calls.at(-1)).toEqual({ p_event_id: eventId, p_product_id: product(2, 'M').id, p_quantity: 2 })
   })
@@ -940,7 +1068,7 @@ test.describe('G3.1 · cards do organizador', () => {
     await expect(card.getByRole('button', { name: 'Diminuir pacotes' })).toBeDisabled()
     await expect(card.getByRole('button', { name: 'Aumentar pacotes' })).toBeDisabled()
     await expect(card.getByRole('button', { name: 'Atualizar quantidade' })).toHaveCount(0)
-    await expect(page.getByRole('region', { name: 'Incluir itens avulsos' })).toHaveCount(0)
+    await expect(page.getByRole('region', { name: 'Adicionar à lista' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: /Lista pronta|Preparar|Completar/ })).toHaveCount(0)
     await expectAccessible(page)
   })

@@ -22,4 +22,9 @@ describe('CSP de produção', () => {
     expect(fontSrc).toContain("'self'")
     expect(fontSrc).toContain('data:')
   })
+
+  // Mapa do local no convite: só o embed do Google pode ser carregado em iframe.
+  test('frame-src libera só o mapa do Google', () => {
+    expect(directive('frame-src')).toBe('frame-src https://www.google.com https://maps.google.com')
+  })
 })

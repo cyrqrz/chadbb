@@ -5,6 +5,8 @@ export type Product = {
   platform: 'amazon' | 'mercado_livre' | 'shopee' | 'manual'
   category: Category; diaper_size: DiaperSize | null
   active: boolean
+  // Preenchido só no mimo criado pelo organizador para este evento.
+  event_id?: string | null
 }
 export type EventItem = {
   id: string; event_id: string; product_id: string

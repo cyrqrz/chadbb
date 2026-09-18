@@ -5,7 +5,7 @@ import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'node_modules/**', 'supabase/functions/**', 'functions/**', 'test-results/**', 'playwright-report/**'] },
+  { ignores: ['dist/**', 'node_modules/**', 'supabase/functions/**', 'functions/**', 'test-results/**', 'playwright-report/**', 'tests/qa-tmp/**'] },
   js.configs.recommended,
   { files: ['**/*.mjs'], languageOptions: { globals: globals.node } },
   // O corpo de page.evaluate() é serializado e roda no navegador, embora o teste seja Node.
