@@ -370,6 +370,67 @@ test.describe('G3 · página inicial e prévia', () => {
     expect(image.headers()['content-type']).toBe('image/png')
   })
 
+  // Pedido do titular em 2026-09-17: os três passos estavam apagados, só com
+  // um fio em cima. Viram cartões com peso próprio e reagem ao mouse.
+  const stepCards = (page: import('@playwright/test').Page) =>
+    page.getByRole('listitem').filter({ has: page.getByRole('heading', { level: 3 }) })
+
+  test('os três passos são cartões com superfície e contorno próprios', async ({ page }) => {
+    await page.goto('/')
+    const cards = stepCards(page)
+    await expect(cards).toHaveCount(3)
+    for (const title of ['Prepare o encontro', 'Convide com carinho', 'Acompanhe os presentes']) {
+      await expect(page.getByRole('heading', { level: 3, name: title })).toBeVisible()
+    }
+    // Cartão de verdade: fundo, borda em volta e sombra — não um fio só no topo.
+    const first = cards.first()
+    const style = await first.evaluate(el => {
+      const s = getComputedStyle(el)
+      return { bg: s.backgroundColor, shadow: s.boxShadow, widths: [s.borderTopWidth, s.borderRightWidth, s.borderBottomWidth, s.borderLeftWidth], radius: parseFloat(s.borderTopLeftRadius) }
+    })
+    expect(style.bg).not.toBe('rgba(0, 0, 0, 0)')
+    expect(style.shadow).not.toBe('none')
+    expect(style.radius).toBeGreaterThan(0)
+    for (const width of style.widths) expect(parseFloat(width)).toBeGreaterThan(0)
+  })
+
+  test('passar o mouse eleva o cartão do passo, com transição curta', async ({ page }) => {
+    await page.goto('/')
+    const first = stepCards(page).first()
+    const read = () => first.evaluate(el => {
+      const s = getComputedStyle(el)
+      return { shadow: s.boxShadow, transform: s.transform, border: s.borderTopColor, duration: s.transitionDuration }
+    })
+    const before = await read()
+    await first.hover()
+    await expect.poll(async () => (await read()).transform).not.toBe(before.transform)
+    const after = await read()
+    expect(after.shadow).not.toBe(before.shadow)
+    expect(after.border).not.toBe(before.border)
+    // Movimento discreto: 120–200 ms no pedido (com movimento reduzido, ~0 ms).
+    for (const part of after.duration.split(',')) {
+      const ms = parseFloat(part) * (part.includes('ms') ? 1 : 1000)
+      expect(ms).toBeLessThanOrEqual(200)
+    }
+  })
+
+  test('o número do passo continua decorativo para o leitor de tela', async ({ page }) => {
+    await page.goto('/')
+    // A ordem já vem da lista numerada; o "01" não deve ser lido de novo.
+    await expect(page.getByRole('list').filter({ has: page.getByRole('heading', { level: 3 }) })).toHaveCount(1)
+    for (const number of ['01', '02', '03']) {
+      await expect(page.getByText(number, { exact: true })).toHaveAttribute('aria-hidden', 'true')
+    }
+  })
+
+  test('os passos cabem em 320 px com texto a 200% e passam no axe', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 740 })
+    await page.goto('/')
+    await page.addStyleTag({ content: 'html { font-size: 200% !important; }' })
+    await expect(stepCards(page).first()).toBeVisible()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
+    await expectAccessible(page)
+  })
 })
 
 test('G3 · pergunta dos presentes não é título e as opções de presença não quebram a 200%', async ({ page }) => {
@@ -705,5 +766,47 @@ test.describe('ausência com presente reservado', () => {
       expect(box!.height, String(name)).toBeGreaterThanOrEqual(44)
     }
     await expectAccessible(page)
+  })
+})
+
+// Entrada em cascata da página inicial: `.stagger` passou a usar
+// `animation-fill-mode: backwards` (era `both`, que congelava o `transform` e
+// matava a elevação dos cartões). O que precisa continuar de pé: os passos
+// entram na ordem, um depois do outro, e terminam no lugar, sem piscar.
+test.describe('cascata da página inicial', () => {
+  test.use({ reducedMotion: 'no-preference' })
+
+  test('os passos entram na ordem e terminam no lugar', async ({ page }) => {
+    await page.addInitScript(() => {
+      const seen: string[] = []
+      Object.defineProperty(window, '__entrada', { get: () => seen })
+      document.addEventListener('animationstart', event => {
+        const target = event.target as HTMLElement
+        if (target.matches?.('.stagger > *')) seen.push((target.textContent ?? '').slice(0, 2))
+      }, true)
+    })
+    await page.goto('/')
+    await expect(page.getByRole('heading', { level: 3, name: 'Prepare o encontro' })).toBeVisible()
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __entrada: string[] }).__entrada)).toEqual(['01', '02', '03'])
+    const states = await page.evaluate(async () => {
+      const items = [...document.querySelectorAll('.stagger > *')] as HTMLElement[]
+      await Promise.all(items.flatMap(el => el.getAnimations().map(a => a.finished.then(() => {}, () => {}))))
+      return items.map(el => { const s = getComputedStyle(el); return { fill: s.animationFillMode, opacity: s.opacity, transform: s.transform } })
+    })
+    expect(states).toHaveLength(3)
+    for (const state of states) expect(state).toEqual({ fill: 'backwards', opacity: '1', transform: 'none' })
+  })
+
+  test('presentes do convite: nada fica invisível nem deslocado depois da entrada', async ({ page }) => {
+    await backend(page)
+    await page.goto(`/convite#${token}`)
+    await expect(page.getByRole('heading', { name: 'Fraldas tamanho P' })).toBeVisible()
+    const states = await page.evaluate(async () => {
+      const items = [...document.querySelectorAll('.stagger > *')] as HTMLElement[]
+      await Promise.all(items.flatMap(el => el.getAnimations().map(a => a.finished.then(() => {}, () => {}))))
+      return items.map(el => { const s = getComputedStyle(el); return { fill: s.animationFillMode, opacity: s.opacity, transform: s.transform } })
+    })
+    expect(states.length).toBeGreaterThan(0)
+    for (const state of states) expect(state).toEqual({ fill: 'backwards', opacity: '1', transform: 'none' })
   })
 })

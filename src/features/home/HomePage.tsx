@@ -33,8 +33,8 @@ export function HomePage() {
     </section>
     <section aria-labelledby="como-funciona" className="pb-20">
       <h2 id="como-funciona" className="mb-8 text-h2 font-bold">Do convite ao abraço</h2>
-      <ol className="stagger grid gap-8 md:grid-cols-3">{steps.map(([number, title, description]) =>
-        <li key={number} className="border-t border-line pt-5"><span className="text-label font-bold text-brand" aria-hidden="true">{number}</span><h3 className="mt-3 text-h3 font-bold">{title}</h3><p className="mt-2 text-muted">{description}</p></li>,
+      <ol className="stagger grid gap-6 md:grid-cols-3">{steps.map(([number, title, description]) =>
+        <li key={number} className="card step-card"><span className="step-number" aria-hidden="true">{number}</span><h3 className="step-title">{title}</h3><p className="text-muted">{description}</p></li>,
       )}</ol>
     </section>
   </>

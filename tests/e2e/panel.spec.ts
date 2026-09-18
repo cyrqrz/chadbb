@@ -740,6 +740,19 @@ test.describe('G3.1 · cards do organizador', () => {
   // Regressão: os cards de evento ficam dentro de um `.stagger`, e a animação
   // de entrada preenchida (`both`) vencia o cascade e travava o `transform`,
   // matando a elevação do hover que a G3.1 aprovou. Ver `.stagger` no CSS.
+  test('eventos: a animação de entrada não mata a elevação no hover', async ({ page }) => {
+    await backend(page, () => ({ status: 200, json: full }), () => ({ status: 200, json: [event], headers: { 'content-range': '0-0/1' } }))
+    await page.goto('/eventos')
+    const card = page.getByRole('link', { name: /Chá de teste/ })
+    await expect(card).toBeVisible()
+    const transform = () => card.evaluate(el => getComputedStyle(el).transform)
+    // A entrada precisa ter terminado antes de medir: com `both` o valor ficava
+    // preso em "none" para sempre, e não só durante a animação.
+    await expect.poll(transform).toBe('none')
+    await card.hover()
+    await expect.poll(transform).not.toBe('none')
+  })
+
   test('eventos: card de evento com a mesma anatomia', async ({ page }) => {
     await backend(page, () => ({ status: 200, json: full }), () => ({ status: 200, json: [event], headers: { 'content-range': '0-0/1' } }))
     await page.goto('/eventos')
@@ -1245,5 +1258,44 @@ test.describe('painel: quem não vai e mesmo assim reservou', () => {
     await expect(homonyms).toHaveCount(2)
     await expect(homonyms.locator('.badge', { hasText: 'Vai enviar presente' })).toHaveCount(0)
     await expect(page.getByRole('region', { name: 'Escolhas dos convidados' })).toContainText('Convidado fictício 2')
+  })
+})
+
+// A entrada em cascata (`.stagger`) usa `animation-fill-mode: backwards`: o
+// estado inicial vale durante o atraso, e o final volta a ser o padrão da tela
+// (era `both`, que congelava o `transform` e matava a elevação dos cards).
+// Estas telas são todas as listas em cascata do organizador.
+test.describe('entrada em cascata sem sobra', () => {
+  test.use({ reducedMotion: 'no-preference' })
+  const settled = (page: Page) => page.evaluate(async () => {
+    const items = [...document.querySelectorAll('.stagger > *')] as HTMLElement[]
+    await Promise.all(items.flatMap(el => el.getAnimations().map(a => a.finished.then(() => {}, () => {}))))
+    return items.map(el => { const s = getComputedStyle(el); return { fill: s.animationFillMode, opacity: s.opacity, transform: s.transform } })
+  })
+
+  const screens: [string, string][] = [['painel de convites', 'convites'], ['lista de presentes e catálogo', 'presentes']]
+  for (const [label, path] of screens) {
+    test(`${label}: nada fica invisível nem deslocado depois da entrada`, async ({ page }) => {
+      await backend(page, () => ({ status: 200, json: full }), undefined, {
+        '/rest/v1/event_items': () => ({ status: 200, json: [], headers: { 'content-range': '*/0' } }),
+        '/rest/v1/products': () => ({ status: 200, json: [product(1, 'G'), product(2, 'M')], headers: { 'content-range': '0-1/2' } }),
+      })
+      await page.goto(`/eventos/${eventId}/${path}`)
+      // A G4 carrega a aba dentro de um Suspense: o h1 é do cabeçalho comum e
+      // aparece antes do conteúdo. Esperar o próprio item em cascata.
+      await expect(page.locator('.stagger > *').first()).toBeVisible()
+      const states = await settled(page)
+      expect(states.length, 'nenhum item em cascata na tela').toBeGreaterThan(0)
+      for (const state of states) expect(state).toEqual({ fill: 'backwards', opacity: '1', transform: 'none' })
+    })
+  }
+
+  test('“Seus eventos”: nada fica invisível nem deslocado depois da entrada', async ({ page }) => {
+    await backend(page, () => ({ status: 200, json: full }), () => ({ status: 200, json: [event], headers: { 'content-range': '0-0/1' } }))
+    await page.goto('/eventos')
+    await expect(page.getByRole('link', { name: /Chá de teste/ })).toBeVisible()
+    const states = await settled(page)
+    expect(states.length).toBeGreaterThan(0)
+    for (const state of states) expect(state).toEqual({ fill: 'backwards', opacity: '1', transform: 'none' })
   })
 })
