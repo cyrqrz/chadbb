@@ -1,16 +1,26 @@
 # Retomada do Claude (front) — 2026-09-17, fim do dia
 
+> Próxima sessão no **PC do trabalho**. Tudo está no GitHub; nada ficou só na
+> máquina de casa. Comece pelo PR #18, que está aberto e com a CI verde.
+
 A G4 está **na `main` e em produção**. O front do MVP tem o painel do evento,
 o convite, o sistema de cards e o login por código funcionando em
 `chadbb.pages.dev`, conferidos contra o banco de verdade.
 
-## Como retomar
+## Como retomar (PC do trabalho)
 
 1. `cd ~/projetos/chadbb-claude && git fetch origin`
 2. `git checkout claude/front && git pull origin main`
 3. `npm ci` (Node 22).
 4. Ler `AGENTS.md`, `docs/TAREFAS-AGENTES.md`, `docs/design/PLANO-VISUAL.md`,
    `docs/design/CARDS.md`, `docs/design/G4-PAINEL.md` e este arquivo.
+5. Abrir a sessão **a partir de `~/projetos/chadbb-claude`**, e não do clone do
+   Codex: os agentes do projeto (entre eles o `qa-ux`) vêm do diretório de
+   trabalho.
+6. Conferir o que o PC do trabalho tem: Docker, `gh` autenticado, a faixa de
+   portas reservada para o Supabase local e a chave do Resend em
+   `~/.config/chadbb/`. A seção do ambiente no fim deste arquivo descreve a
+   máquina de casa e **não vale** aqui.
 
 ## Onde paramos
 
@@ -56,34 +66,46 @@ cabeçalho com "Faltam N dias" depois de preencher a data, o "Convidar alguém"
 destravando ao publicar, e as fraldas em lista de progresso. Há um evento de
 teste em rascunho na produção para apagar quando terminar.
 
-## `claude/wip-ausencia` — o que fazer com ela
+## `claude/wip-ausencia` — limpa, no PR #18
 
-A branch está parada em `56be8f8` e o commit mistura duas coisas. Ela nasceu
-antes da G4, então precisa da `main` nova antes de qualquer coisa.
+Era um commit WIP único, misturando duas coisas, em cima de código de antes da
+G4. Em 2026-09-17 foi reconstruída sobre a `main` (`fedd88e`) e separada em dois
+commits, que podem ser julgados um de cada vez. **PR #18 aberto, CI verde.**
 
-**Revisado e testado** (e2e 264/264, browser 8/8 na época):
+| Commit | O que é | Situação |
+|---|---|---|
+| `cb0362e` | Ausência com presente reservado: o aviso no convite e o selo "Vai enviar presente" no painel | **revisado**, pronto para mergear |
+| `42507cd` | Visual da página inicial e do destaque do login, mais `.stagger` de `both` para `backwards` | **revisão de UX não terminou** |
 
-- `GuestPage.tsx` (`Presence`): quem responde "Não poderá ir" com reserva ativa
-  vê a lista do que está reservado e escolhe entre "Cancelar reserva(s)" e
-  "Manter: vou enviar o presente". Decisão do titular: **não cancelar sozinho**,
-  porque muita gente não vai e mesmo assim envia o presente.
-- `InvitationsPage.tsx`: selo "Vai enviar presente" no card de quem não vai. O
-  vínculo é **pelo nome**; o pedido de `invitation_id` nas reservas está no
-  quadro, em "Pedidos do front para o back".
-- Testes: grupo "ausência com presente reservado" em `tests/e2e/guest.spec.ts` e
-  um teste em `tests/e2e/panel.spec.ts`.
+Decisão do titular que sustenta o primeiro: o site **não cancela reserva
+sozinho** quando alguém diz que não vai, porque muita gente não vai e mesmo
+assim manda o presente.
 
-**Não revisado** (o agente de QA foi interrompido no meio): cartões dos passos
-na página inicial (`HomePage.tsx`, `.step-card`, `.step-number`), destaque do
-"É convidado?" (`.login-guest`), `.stagger` com `animation … backwards`, e
-testes novos em `guest.spec.ts`, `login.spec.ts` e `panel.spec.ts`.
-`npm run check` passava, mas o e2e completo não rodou depois desses ajustes.
+O selo do painel casa reserva com convite **pelo nome**, porque
+`organizer_invitations` devolve as reservas só com `name`. Com dois convites de
+mesmo nome o selo fica de fora nos dois, de propósito. O pedido de
+`invitation_id` está no quadro.
 
-Plano: trazer a `main`, rodar o e2e completo, separar o que passar e fizer
-sentido num commit próprio ("visual da página inicial") e descartar o resto.
-Depois chamar o `qa-ux` de novo, porque a revisão dessa parte não terminou.
+O `42507cd` traz junto uma correção de bug: com `animation-fill-mode: both` o
+estado final de `rise` ficava preenchido, ganhava do cascade e travava o
+`transform` — a elevação no hover não saía do lugar em nenhuma lista em cascata.
 
-## Ambiente desta máquina (casa)
+**O que falta nele:** a revisão de UX. Ele foi escrito pelo agente `qa-ux` numa
+sessão interrompida e a revisão não terminou. Está separado de propósito: dá
+para mergear só o `cb0362e`. Para chamar o `qa-ux`, é preciso abrir a sessão
+**a partir de `~/projetos/chadbb-claude`** — os agentes do projeto vêm do
+diretório de trabalho, e numa sessão aberta no clone do Codex ele não carrega.
+
+Evidências do PR #18: `check` 49 unitários; e2e **332/332** com o `cb0362e`
+isolado e **354/354** com os dois; `test:browser:local` **8/8**.
+
+Achado no caminho: os testes da cascata esperavam o `h1` antes de medir, mas a
+G4 carrega a aba dentro de um `Suspense` e o `h1` é do cabeçalho comum. A espera
+passou a ser pelo próprio item em cascata.
+
+## Ambiente da máquina de casa
+
+Nada aqui vale para o PC do trabalho; está registrado para quando voltar a ela.
 
 - Três clones em `~/projetos`: `chadbb` (main), `chadbb-codex` (codex/back),
   `chadbb-claude` (claude/front).
