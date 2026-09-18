@@ -304,9 +304,13 @@
   /* `.card` eleva em 240 ms; aqui o pedido é 120–200 ms, então a duração é
      reescrita só neste cartão, sem mexer no sistema de cards. */
   .step-card { display: flex; flex-direction: column; align-items: flex-start; gap: 0.75rem; padding: clamp(1.25rem, 3vw, 1.75rem); transition: border-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard); }
-  .step-card:hover { border-color: var(--color-brand); box-shadow: var(--shadow-md); transform: translateY(-3px); }
   .step-number { display: inline-grid; place-items: center; width: 2.5rem; height: 2.5rem; border-radius: var(--radius-pill); background: var(--color-brand-soft); color: var(--color-brand-hover); font-size: var(--text-body-sm); font-weight: 800; font-variant-numeric: lining-nums; transition: background var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard); }
-  .step-card:hover .step-number { background: var(--color-brand); color: var(--color-surface); }
+  /* Só onde há mouse: no toque, o :hover gruda depois do toque e o passo
+     ficaria elevado como se estivesse selecionado. */
+  @media (hover: hover) {
+    .step-card:hover { border-color: var(--color-brand); box-shadow: var(--shadow-md); transform: translateY(-3px); }
+    .step-card:hover .step-number { background: var(--color-brand); color: var(--color-surface); }
+  }
   .step-title { font-size: var(--text-h3); line-height: var(--text-h3--line-height); font-weight: 700; }
 
   .card-stack { display: flex; flex-direction: column; gap: var(--card-gap); }

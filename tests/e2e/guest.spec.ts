@@ -394,7 +394,8 @@ test.describe('G3 · página inicial e prévia', () => {
     for (const width of style.widths) expect(parseFloat(width)).toBeGreaterThan(0)
   })
 
-  test('passar o mouse eleva o cartão do passo, com transição curta', async ({ page }) => {
+  test('passar o mouse eleva o cartão do passo, com transição curta', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'sem mouse: o toque é coberto por "no toque, o passo não fica elevado"')
     await page.goto('/')
     const first = stepCards(page).first()
     const read = () => first.evaluate(el => {
@@ -795,6 +796,72 @@ test.describe('cascata da página inicial', () => {
     })
     expect(states).toHaveLength(3)
     for (const state of states) expect(state).toEqual({ fill: 'backwards', opacity: '1', transform: 'none' })
+  })
+
+  // Sem piscar: durante o atraso do stagger o item já está no estado inicial
+  // (invisível). Se aparecesse e depois sumisse, a opacidade cairia em algum
+  // quadro. Amostra a cada quadro desde a inserção até o fim da entrada.
+  test('os passos não piscam antes de entrar: a opacidade só sobe', async ({ page }) => {
+    await page.addInitScript(() => {
+      const samples: number[][] = [[], [], []]
+      Object.defineProperty(window, '__opacidade', { get: () => samples })
+      const tick = () => {
+        const items = [...document.querySelectorAll('.stagger > *')] as HTMLElement[]
+        items.slice(0, 3).forEach((el, i) => samples[i].push(Number(getComputedStyle(el).opacity)))
+        if (!items.length || items.some(el => el.getAnimations().some(a => a.playState !== 'finished'))) requestAnimationFrame(tick)
+      }
+      requestAnimationFrame(tick)
+    })
+    await page.goto('/')
+    await expect(page.getByRole('heading', { level: 3, name: 'Acompanhe os presentes' })).toBeVisible()
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __opacidade: number[][] }).__opacidade.every(s => s.at(-1) === 1))).toBe(true)
+    const samples = await page.evaluate(() => (window as unknown as { __opacidade: number[][] }).__opacidade)
+    for (const series of samples) {
+      expect(series.length).toBeGreaterThan(1)
+      expect(series[0], 'o passo apareceu antes da entrada começar').toBeLessThan(1)
+      for (let i = 1; i < series.length; i++) expect(series[i]).toBeGreaterThanOrEqual(series[i - 1])
+    }
+  })
+
+  // Com movimento liberado (o caso real de quem usa mouse), a elevação precisa
+  // funcionar depois da entrada e na duração pedida (120–200 ms).
+  test('passo: sobe no hover depois da entrada, com transição de 120 a 200 ms', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'sem mouse: o toque é coberto pelo teste seguinte')
+    await page.goto('/')
+    const card = page.locator('.stagger > *').first()
+    await expect(card).toBeVisible()
+    await page.evaluate(() => Promise.all(document.getAnimations().map(a => a.finished.catch(() => {}))))
+    // Deslocamento vertical real: com `both` o valor fica "matrix(1, 0, 0, 1, 0, 0)",
+    // que é diferente de "none" mas não sai do lugar.
+    const lift = () => card.evaluate(el => new DOMMatrix(getComputedStyle(el).transform).m42)
+    expect(await lift()).toBe(0)
+    await card.hover()
+    await expect.poll(lift).toBeLessThan(0)
+    const durations = await card.evaluate(el => getComputedStyle(el).transitionDuration.split(',').map(part => parseFloat(part) * (part.includes('ms') ? 1 : 1000)))
+    for (const ms of durations) {
+      expect(ms).toBeGreaterThanOrEqual(120)
+      expect(ms).toBeLessThanOrEqual(200)
+    }
+  })
+
+  // No toque, o :hover gruda depois do toque; o passo não pode ficar elevado
+  // nem com a borda da marca, como se estivesse selecionado.
+  test('no toque, o passo não fica elevado', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'só em tela de toque')
+    await page.goto('/')
+    const card = page.locator('.stagger > *').first()
+    await expect(card).toBeVisible()
+    await page.evaluate(() => Promise.all(document.getAnimations().map(a => a.finished.catch(() => {}))))
+    const read = () => card.evaluate(el => {
+      const s = getComputedStyle(el)
+      return { lift: new DOMMatrix(s.transform).m42, border: s.borderTopColor, shadow: s.boxShadow }
+    })
+    const before = await read()
+    // O navegador de toque mantém o :hover no último elemento tocado; o hover()
+    // reproduz esse estado (o tap() do Playwright não o deixa grudado).
+    await card.hover()
+    await page.waitForTimeout(300)
+    expect(await read()).toEqual(before)
   })
 
   test('presentes do convite: nada fica invisível nem deslocado depois da entrada', async ({ page }) => {
