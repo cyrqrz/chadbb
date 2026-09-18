@@ -22,12 +22,14 @@ export async function listItems(eventId: string, page: number, category?: Catego
   if (error) throw error
   return { items: data as unknown as EventItem[], count: count ?? 0 }
 }
-// Só identificadores: o catálogo marca o que já está na lista. O banco continua
-// recusando repetição (ITEM_ALREADY_EXISTS e DIAPER_SIZE_ALREADY_LISTED).
+// Todas as linhas da lista, sem paginação: o catálogo marca o que já está na
+// lista e o resumo soma os pacotes pedidos. O banco continua recusando
+// repetição (ITEM_ALREADY_EXISTS e DIAPER_SIZE_ALREADY_LISTED).
+export type ListedItem = { product_id: string; diaper_size: DiaperSize | null; category: Category; quantity_requested: number | null }
 export async function listedProducts(eventId: string) {
-  const { data, error } = await getClient().from('event_items').select('product_id,diaper_size').eq('event_id', eventId)
+  const { data, error } = await getClient().from('event_items').select('product_id,diaper_size,category,quantity_requested').eq('event_id', eventId)
   if (error) throw error
-  return data as { product_id: string; diaper_size: DiaperSize | null }[]
+  return data as ListedItem[]
 }
 export async function addItem(eventId: string, productId: string, quantity: number | null) {
   const { data, error } = await getClient().rpc('add_event_item', { p_event_id: eventId, p_product_id: productId, p_quantity: quantity }).single()

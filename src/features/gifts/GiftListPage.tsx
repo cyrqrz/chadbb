@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -13,6 +13,7 @@ import { EventNotFound } from '../events/EventLayout'
 import { addItem, giftKeys, listedProducts, listItems, listProducts, PAGE_SIZE, prepareList, setQuantity } from './api'
 import { parseQuantity, platformLabels, categoryLabels } from './model'
 import type { Category, DiaperSize, EventItem, Product } from './model'
+import type { ListedItem } from './api'
 
 export function GiftListPage() {
   const { id = '' } = useParams()
@@ -33,11 +34,14 @@ function GiftList({ eventId, closed, eventStatus }: { eventId: string; closed: b
   const [page, setPage] = useState(0)
   const [preparing, setPreparing] = useState(false)
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null)
+  // Preparar a lista vazia troca o destaque pelo resumo: o foco vai para o resumo.
+  const [focusSummary, setFocusSummary] = useState(false)
   const cache = useQueryClient()
   const query = useQuery({ queryKey: [...giftKeys.items(eventId), session?.user.id, category, page], queryFn: () => listItems(eventId, page, category), ...live })
   async function prepare() {
-    setPreparing(true); setNotice(null)
-    try { const count = await prepareList(eventId); await cache.invalidateQueries({ queryKey: giftKeys.items(eventId) }); setNotice({ ok: true, text: count ? 'Lista do chá preparada.' : 'Os itens do chá já estão na lista.' }) }
+    setPreparing(true); setNotice(null); setFocusSummary(false)
+    const fromEmpty = empty
+    try { const count = await prepareList(eventId); await cache.invalidateQueries({ queryKey: giftKeys.items(eventId) }); setFocusSummary(fromEmpty); setNotice({ ok: true, text: count ? 'Lista do chá preparada.' : 'Os itens do chá já estão na lista.' }) }
     catch (cause) { setNotice({ ok: false, text: errorMessage(cause) }) } finally { setPreparing(false) }
   }
   // A11: o erro guardado é o desta categoria e página. A12: a última contagem
@@ -53,18 +57,26 @@ function GiftList({ eventId, closed, eventStatus }: { eventId: string; closed: b
     <h2 className="tab-title">Lista de presentes</h2>
     {eventStatus}
     <p className="mt-4 max-w-2xl text-stone-600">Fraldas por tamanho e mimos de livre escolha. Os convidados veem esta lista pelo link do convite.</p>
-    {!closed && <section aria-labelledby="quick-start" className={empty ? 'quick-start mt-8' : 'card mt-8'}>
-      {empty && <p className="eyebrow">Recomendado</p>}
+    {!closed && empty && <section aria-labelledby="quick-start" className="quick-start mt-8">
+      <p className="eyebrow">Recomendado</p>
       <div className="flex flex-wrap items-center justify-between gap-5">
         <div className="min-w-0 max-w-2xl">
-          <h2 id="quick-start" className={empty ? 'text-2xl font-bold' : 'text-lg font-bold'}>{empty ? 'Comece com a lista pronta do chá' : 'Lista pronta do chá'}</h2>
-          <p className="mt-2 text-stone-600">{empty ? 'Um toque inclui os quatro tamanhos de fralda com a quantidade de pacotes certa e os mimos sugeridos. Depois é só ajustar.' : 'Se algum item da lista pronta ficou de fora, este botão inclui só o que falta.'}</p>
+          <h2 id="quick-start" className="text-2xl font-bold">Comece com a lista pronta do chá</h2>
+          <p className="mt-2 text-stone-600">Um toque inclui os quatro tamanhos de fralda com a quantidade de pacotes certa e os mimos sugeridos. Depois é só ajustar.</p>
           <ul className="size-chips mt-4" aria-label="Pacotes por tamanho na lista pronta">{[['P', 6], ['M', 19], ['G', 19], ['XG', 6]].map(([size, amount]) => <li key={size}><strong>{size}</strong> · {amount} pacotes</li>)}<li>+ 23 mimos sem limite</li></ul>
         </div>
-        <button className={empty ? 'button' : 'secondary'} disabled={preparing} onClick={() => void prepare()}>{preparing ? 'Preparando…' : empty ? 'Preparar lista do chá' : 'Completar a lista do chá'}</button>
+        <button className="button" disabled={preparing} onClick={() => void prepare()}>{preparing ? 'Preparando…' : 'Preparar lista do chá'}</button>
       </div>
       {notice && <div className="mt-4">{notice.ok ? <SuccessMessage>{notice.text}</SuccessMessage> : <ErrorState message={notice.text} />}</div>}
     </section>}
+    {!empty && <ListSummary listed={listed.data} failed={listed.errorUpdatedAt > listed.dataUpdatedAt} focus={focusSummary}>
+      {/* Enquanto a conferência não responde, ainda não se sabe se é "Preparar" ou "Completar". */}
+      {!closed && (listed.data || listed.errorUpdatedAt > listed.dataUpdatedAt) && <div className="card-actions">
+        <p className="text-muted">Faltou algum item da lista pronta? Este botão inclui só o que falta.</p>
+        <button className="secondary self-start" disabled={preparing} onClick={() => void prepare()}>{preparing ? 'Preparando…' : 'Completar a lista do chá'}</button>
+        {notice && (notice.ok ? <SuccessMessage>{notice.text}</SuccessMessage> : <ErrorState message={notice.text} />)}
+      </div>}
+    </ListSummary>}
     {closed && <p className="notice mt-6">Evento encerrado. A lista está disponível apenas para consulta.</p>}
     <nav aria-label="Categorias de presentes" className="mt-10"><div className="segmented">{(['fralda', 'mimo'] as Category[]).map(value => <button key={value} aria-pressed={category === value} onClick={() => { setCategory(value); setPage(0); setTotal(null) }}>{categoryLabels[value]}</button>)}</div></nav>
     <section key={`list-${category}`} aria-labelledby="list-title" className="fade-swap mt-6">
@@ -80,6 +92,28 @@ function GiftList({ eventId, closed, eventStatus }: { eventId: string; closed: b
     </section>
     {!closed && <Catalog key={category} eventId={eventId} category={category} listed={listed.data} listedFailed={listed.errorUpdatedAt > listed.dataUpdatedAt} listedFetching={listed.isFetching} retryListed={() => void listed.refetch()} />}
   </div>
+}
+// G4b.2: pacotes pedidos por tamanho e mimos na lista. Só apresentação do que a
+// consulta devolveu; reservas e progresso ficam no Painel.
+const sizes: DiaperSize[] = ['P', 'M', 'G', 'XG']
+function ListSummary({ listed, failed, focus, children }: { listed?: ListedItem[]; failed: boolean; focus: boolean; children: ReactNode }) {
+  const title = useRef<HTMLHeadingElement>(null)
+  useEffect(() => { if (focus) title.current?.focus() }, [focus])
+  const diapers = listed?.filter(row => row.category === 'fralda') ?? []
+  const treats = listed?.filter(row => row.category === 'mimo').length ?? 0
+  return <section aria-labelledby="list-summary" className="card card-stack mt-8">
+    <h2 id="list-summary" ref={title} tabIndex={-1} className="card-title">Lista do chá</h2>
+    {/* Sem total de pacotes: o front não soma agregados (regra 6); ele vem com summary.diapers do servidor. */}
+    {listed ? <>
+      <ul className="size-chips" aria-label="Pacotes pedidos por tamanho">{sizes.map(size => {
+        const row = diapers.find(item => item.diaper_size === size)
+        return <li key={size} className={row ? '' : 'text-muted'}><strong>{size}</strong> {row ? `${row.quantity_requested ?? 0} ${row.quantity_requested === 1 ? 'pacote' : 'pacotes'}` : 'fora da lista'}</li>
+      })}</ul>
+      <p><strong>{treats}</strong> {treats === 1 ? 'mimo na lista' : 'mimos na lista'}, sem limite de quantidade.</p>
+    {/* A falha já tem aviso com nova tentativa no catálogo, e a consulta se repete sozinha. */}
+    </> : failed ? <p className="text-muted">Não foi possível conferir a lista agora.</p> : <LoadingState>Conferindo a lista…</LoadingState>}
+    {children}
+  </section>
 }
 function ItemCard({ item, closed }: { item: EventItem; closed: boolean }) {
   const [baseline, setBaseline] = useState(item)

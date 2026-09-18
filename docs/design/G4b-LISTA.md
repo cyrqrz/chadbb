@@ -25,14 +25,14 @@ pôs a aba Presentes no cabeçalho comum (`G4-PAINEL.md`, “Fora deste gate”)
 
 | Tema | Decisão |
 |---|---|
-| Resumo no topo | Uma faixa “Lista do chá” com os pacotes pedidos por tamanho (P · M · G · XG) e o total, e o número de mimos na lista. São os **pedidos**, somados do que a própria consulta devolve; reservas e progresso continuam no Painel |
+| Resumo no topo | Um cartão “Lista do chá” com os pacotes pedidos por tamanho (P · M · G · XG, ou “fora da lista”) e o número de mimos. **Sem total somado no front** (regra 6 e `PLANO-VISUAL.md`): o total entra quando o servidor mandar `summary.diapers` (pedido no quadro). Reservas e progresso continuam no Painel |
 | Lista pronta | Lista vazia: continua o destaque “Comece com a lista pronta do chá”. Lista com itens: vira uma linha discreta no resumo (“Completar a lista do chá”), sem cartão próprio |
 | Fraldas | Uma lista única, uma linha por tamanho (selo do tamanho, produto, stepper, “Atualizar quantidade”). Erro, “versão mais recente” e sucesso ficam na própria linha |
 | Mimos | Uma lista única, uma linha por mimo (nome e, se for o caso, o selo “Fora do catálogo”). O texto “sem limite” aparece uma vez no topo da lista, e não em cada item |
 | Catálogo | Busca igual; resultados em lista (nome, selos, pacotes/“Adicionar” ou “Já na lista”), no lugar da grade de cartões |
 | A11 | O erro exibido pertence à categoria e à página atuais; ao trocar de categoria, a tela mostra “Carregando a lista…” até a resposta |
 | A12 | Página com falha: o erro aparece no lugar dos itens e a paginação continua visível, para voltar à página anterior |
-| A13 | Falha na reconsulta do evento aparece como aviso no topo da aba (“Não foi possível atualizar…”, com “Tentar novamente”), mantendo os dados da última consulta |
+| A13 | Falha na reconsulta do evento aparece como aviso no topo da aba (“Não foi possível conferir se o evento continua aberto…”, com “Conferir de novo”), mantendo os dados da última consulta |
 | Regras | Nada muda no comportamento de salvar: versão, limite 1–10 000, recusa de repetição pelo banco, reconsulta depois de salvar (regras 6 e 7 do `AGENTS.md`) |
 
 ## Fora deste gate

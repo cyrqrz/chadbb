@@ -496,6 +496,139 @@ test('A12 · erro de página com a paginação cabe em 320 px com texto a 200% e
   await expectAccessible(page)
 })
 
+// G4b.2 · resumo no topo da lista e lista pronta compacta.
+test.describe('G4b.2 · resumo da lista', () => {
+  // Estado do servidor simulado: a lista e a conferência leem as mesmas linhas.
+  function summaryBackend(page: Page, { status = 'published' }: { status?: string } = {}) {
+    const rows = [
+      { ...listItem(1), diaper_size: 'P', quantity_requested: 6, product: { ...product(1, 'P') } },
+      { ...listItem(2), diaper_size: 'M', quantity_requested: 19, product: { ...product(2, 'M') } },
+      { ...listItem(3), diaper_size: 'G', quantity_requested: 12, product: { ...product(3, 'G') } },
+      ...[1, 2, 3].map(n => ({ ...listItem(20 + n), category: 'mimo', diaper_size: null, quantity_requested: null,
+        product: { ...product(4, 'P'), id: `82000000-0000-4000-8000-00000000000${n}`, title: `Mimo fictício ${n}`, category: 'mimo', diaper_size: null } })),
+    ]
+    return backend(page, () => ({ status: 200, json: full }), () => ({ status: 200, json: [{ ...event, status }] }), {
+      '/rest/v1/event_items': ({ url }) => {
+        const category = url.searchParams.get('category')?.replace('eq.', '')
+        const json = !isListQuery(url) ? rows.map(({ product_id, diaper_size, category, quantity_requested }) => ({ product_id, diaper_size, category, quantity_requested }))
+          : rows.filter(row => !category || row.category === category)
+        return { status: 200, json, headers: { 'content-range': `0-${Math.max(json.length - 1, 0)}/${json.length}` } }
+      },
+      '/rest/v1/products': none,
+      '/rest/v1/rpc/set_event_item_quantity': ({ body }) => {
+        const row = rows.find(r => r.id === body.p_item_id)!
+        Object.assign(row, { quantity_requested: body.p_quantity, version: row.version + 1 })
+        return { status: 200, json: row }
+      },
+    })
+  }
+  const summary = (page: Page) => page.getByRole('region', { name: 'Lista do chá' })
+
+  test('mostra os pacotes pedidos por tamanho, o total e os mimos', async ({ page }) => {
+    await summaryBackend(page)
+    await page.goto(`/eventos/${eventId}/presentes`)
+    const box = summary(page)
+    await expect(box).toContainText('3 mimos na lista')
+    // Sem total somado no front (regra 6): ele depende de summary.diapers do servidor.
+    await expect(box).not.toContainText('37')
+    const sizes = box.getByRole('list', { name: 'Pacotes pedidos por tamanho' }).getByRole('listitem')
+    await expect(sizes).toHaveText(['P 6 pacotes', 'M 19 pacotes', 'G 12 pacotes', 'XG fora da lista'])
+    await expectAccessible(page)
+  })
+
+  test('com itens, a lista pronta vira uma ação dentro do resumo, sem cartão próprio', async ({ page }) => {
+    await summaryBackend(page)
+    await page.goto(`/eventos/${eventId}/presentes`)
+    await expect(summary(page).getByRole('button', { name: 'Completar a lista do chá' })).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Lista pronta do chá' })).toHaveCount(0)
+    await expect(page.getByText('Recomendado')).toHaveCount(0)
+  })
+
+  test('lista vazia continua com o destaque da lista pronta e sem resumo', async ({ page }) => {
+    await backend(page, () => ({ status: 200, json: full }), undefined, { '/rest/v1/event_items': none, '/rest/v1/products': none })
+    await page.goto(`/eventos/${eventId}/presentes`)
+    await expect(page.getByRole('button', { name: 'Preparar lista do chá' })).toBeVisible()
+    await expect(summary(page)).toHaveCount(0)
+  })
+
+  test('evento encerrado mostra o resumo sem a ação de completar', async ({ page }) => {
+    await summaryBackend(page, { status: 'closed' })
+    await page.goto(`/eventos/${eventId}/presentes`)
+    await expect(summary(page)).toContainText('M 19 pacotes')
+    await expect(summary(page).getByRole('button')).toHaveCount(0)
+  })
+
+  test('salvar uma quantidade atualiza o resumo com a resposta do servidor', async ({ page }) => {
+    await summaryBackend(page)
+    await page.goto(`/eventos/${eventId}/presentes`)
+    await expect(summary(page)).toContainText('M 19 pacotes')
+    const card = page.getByRole('region', { name: 'Fraldas na lista' }).getByRole('article').filter({ hasText: 'Fraldas tamanho M' })
+    await card.getByRole('button', { name: 'Aumentar pacotes' }).click()
+    await card.getByRole('button', { name: 'Atualizar quantidade' }).click()
+    await expect(card.getByRole('status').filter({ hasText: 'Quantidade atualizada.' })).toBeVisible()
+    await expect(summary(page).getByRole('list', { name: 'Pacotes pedidos por tamanho' })).toContainText('M 20 pacotes')
+  })
+
+  // QA G4b.2: o botão "Preparar" some quando a lista passa a ter itens.
+  test('QA · preparar a lista vazia não perde o foco e anuncia o resultado', async ({ page }) => {
+    let prepared = false
+    const rows = [{ product_id: '81000000-0000-4000-8000-000000000001', diaper_size: 'P', category: 'fralda', quantity_requested: 6 }]
+    await backend(page, () => ({ status: 200, json: full }), undefined, {
+      '/rest/v1/event_items': ({ url }) => {
+        const json = prepared && !isListQuery(url) ? rows : []
+        return { status: 200, json, headers: { 'content-range': json.length ? '0-0/1' : '*/0' } }
+      },
+      '/rest/v1/products': none,
+      '/rest/v1/rpc/prepare_family_list': () => { prepared = true; return { status: 200, json: 1 } },
+    })
+    await page.goto(`/eventos/${eventId}/presentes`)
+    await page.getByRole('button', { name: 'Preparar lista do chá' }).click()
+    await expect(summary(page)).toContainText('Lista do chá preparada.')
+    expect(await page.evaluate(() => document.activeElement?.tagName)).not.toBe('BODY')
+  })
+
+  test('QA · enquanto confere a lista, não oferece "Completar" a quem ainda não tem itens', async ({ page }) => {
+    await backend(page, () => ({ status: 200, json: full }), undefined, { '/rest/v1/event_items': none, '/rest/v1/products': none })
+    let release = () => {}
+    const held = new Promise<void>(resolve => { release = resolve })
+    await page.route('https://e2e.supabase.co/rest/v1/event_items**', async route => {
+      if (isListQuery(new URL(route.request().url()))) return route.fallback()
+      await held
+      await route.fallback()
+    })
+    await page.goto(`/eventos/${eventId}/presentes`)
+    await expect(page.getByText('Carregando evento…')).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: 'Lista de presentes' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Completar a lista do chá' })).toHaveCount(0)
+    release()
+    await expect(page.getByRole('button', { name: 'Preparar lista do chá' })).toBeVisible()
+  })
+
+  test('QA · resumo cabe em 320 px com texto a 200% e o botão tem 44 px', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 740 })
+    await summaryBackend(page)
+    await page.goto(`/eventos/${eventId}/presentes`)
+    await expect(summary(page)).toContainText('M 19 pacotes')
+    await page.addStyleTag({ content: 'html { font-size: 200% !important; }' })
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBe(0)
+    const box = await summary(page).getByRole('button', { name: 'Completar a lista do chá' }).boundingBox()
+    expect(box!.height).toBeGreaterThanOrEqual(44)
+    expect(box!.x + box!.width).toBeLessThanOrEqual(320)
+  })
+
+  test('QA · uma unidade aparece no singular', async ({ page }) => {
+    const rows = [{ product_id: '81000000-0000-4000-8000-000000000004', diaper_size: 'XG', category: 'fralda', quantity_requested: 1 }]
+    await backend(page, () => ({ status: 200, json: full }), undefined, {
+      '/rest/v1/event_items': ({ url }) => isListQuery(url) ? { status: 200, json: [], headers: { 'content-range': '*/0' } } : { status: 200, json: rows, headers: { 'content-range': '0-0/1' } },
+      '/rest/v1/products': none,
+    })
+    await page.goto(`/eventos/${eventId}/presentes`)
+    await expect(summary(page).getByRole('list', { name: 'Pacotes pedidos por tamanho' })).toContainText('XG 1 pacote')
+    await expect(summary(page).getByRole('list', { name: 'Pacotes pedidos por tamanho' })).not.toContainText('1 pacotes')
+    await expect(summary(page)).toContainText('0 mimos na lista')
+  })
+})
+
 test.describe('G2.1 · card de convidado', () => {
   test.beforeEach(async ({ page }) => {
     await backend(page, () => ({ status: 200, json: full }))
