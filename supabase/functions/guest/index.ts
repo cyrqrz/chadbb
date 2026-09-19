@@ -57,12 +57,15 @@ Deno.serve(async request => {
   try {
     // A cota global só é consumida por pedidos que passaram nas cotas de origem e credencial.
     // No IP or token is persisted in cleartext.
-    for (const bucket of [`ip:${clientAddress(request)}`, `token:${token}`, 'global']) {
-      const rate = await rpc('check_guest_rate', { p_key: bucket })
-      if (!rate.ok) return reply(503, { error: 'TEMPORARILY_UNAVAILABLE' })
-      if (rate.data !== true) return reply(429, { error: 'RATE_LIMITED' })
-    }
+    // Uma única ida para as três cotas, na mesma ordem (T-B5).
+    const started = performance.now()
+    const rate = await rpc('check_guest_rates', { p_keys: [`ip:${clientAddress(request)}`, `token:${token}`, 'global'] })
+    const rateMs = Math.round(performance.now() - started)
+    if (!rate.ok) return reply(503, { error: 'TEMPORARILY_UNAVAILABLE' })
+    if ((rate.data as unknown) !== true) return reply(429, { error: 'RATE_LIMITED' })
     const result = await rpc('guest_action', { p_token: token, p_action: body.action, p_payload: body.payload ?? {} })
+    // Só tempos e ação, sem token, IP ou dados do convite.
+    console.log(JSON.stringify({ timing: 'guest', action: body.action, rate_ms: rateMs, action_ms: Math.round(performance.now() - started) - rateMs, status: result.ok ? 200 : 'error' }))
     if (result.ok) return reply(200, result.data)
     const message = result.data?.message ?? ''
     if (known.has(message)) return reply(message === 'GUEST_SESSION_INVALID' ? 401 : 409, { error: message })

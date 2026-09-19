@@ -79,6 +79,24 @@ Resultado local não comprova latência da produção; nenhuma meta remota foi
 declarada cumprida. G1 valida também a confiabilidade do instrumento, mesmo
 quando ele corretamente reprova uma medição.
 
+### Revalidação em 2026-09-17, depois do G3 e da PR #11
+
+- Primeiro ensaio: **reprovado na sincronização, sem nenhuma amostra**. O
+  runner procurava textos antigos da tela do convite ("pacotes disponíveis",
+  "Vou levar", "Você confirmou…"), que o G3.1 trocou. Nessa execução, a carga
+  não teve erros, mas o p95 local foi de **4846 ms** na leitura e **4822 ms**
+  na escrita. A limpeza zerou tudo. O resultado fica registrado.
+- Correção somente no runner: "N de 6 disponíveis", "Escolher presente" /
+  "Atualizar quantidade" e a reserva própria em "Sua reserva".
+- Novo ensaio: **225 leituras, p95 1205 ms; 25 escritas, p95 1205 ms**; zero
+  erros; sincronização **4838 / 5155 / 5053 ms**; duas leituras canceladas
+  esperadas; 363 POSTs guest; limpeza zerada. Critérios locais aprovados.
+- `performance-gates` 13/13 e isolamento (`event-performance.integration`) 3/3.
+- A variação local (711 → 4846 → 1205 ms) mostra a sensibilidade do ambiente
+  Docker/WSL. Não é evidência sobre a produção.
+- Cotas da produção: no máximo 420 POSTs, contra 1200/min por IP e 2400/min no
+  total. Os convidados reais continuam com pelo menos 1980/min no total.
+
 ## G2 — Aprovação e medição remota
 
 Apresentar evidências e dry-run ao titular antes da execução. Comando proposto:
@@ -92,5 +110,66 @@ Somente o projeto `chadbb-cha`, TLS com CA validada e frontend publicado
 O teste pode reprovar a meta: registrar todos os resultados e investigar a
 causa, sem repetir até obter aprovação nem aumentar limites para passar.
 
-**Ainda não executado nem aprovado remotamente.** A autorização anterior foi
-para a T-B4. Este gate é específico de carga e sincronização T-B5.
+### Execução remota em 2026-09-17 (aprovada pelo titular): **reprovada**
+
+- 225 leituras, **p95 4258 ms** (máx. 4347); 25 escritas, **p95 4044 ms**
+  (máx. 4276); **zero erros**. Sincronização **6008 / 4984 / 5482 ms**, dentro
+  de 7 s. 362 POSTs guest. Limpeza restrita zerada nas oito contagens.
+- Meta de 2 s **não cumprida**. O resultado não foi repetido.
+
+### Diagnóstico, só com leitura
+
+- Logs da Edge `guest` (379 POSTs): execução p50 **3160 ms**, p95 **4062 ms**,
+  mínimo **211 ms**. As primeiras requisições de cada onda levam cerca de 1,9 s,
+  e as seguintes, de 3,2 a 4,0 s. O tempo é gasto dentro da função, não na rede
+  até o cliente.
+- `pg_stat_statements`: `check_guest_rate` executa em média **2,9 ms** (3495
+  chamadas) e `guest_action`, **5,1 ms** (1158). O SQL não é o gargalo.
+- Plano **free**, `max_connections` 60, PostgREST com cerca de 11 conexões.
+  Cada POST faz **4 idas sequenciais** da Edge ao PostgREST (3 cotas e a ação).
+  Com 50 pedidos simultâneos, são cerca de 200 chamadas por onda, enfileiradas
+  entre a Edge e o PostgREST (e/ou limites de CPU da Edge no plano free).
+- O modelo de carga (50 pedidos no mesmo instante, a cada 5 s) é mais severo
+  que 50 convites consultando a cada 5 s de forma espalhada. Isso fica
+  registrado, mas **o critério não foi alterado** para passar.
+
+### Próximo passo proposto (G3, com aprovação)
+
+1. Local, com teste antes: reduzir as 4 chamadas por POST a 1. As cotas passam a
+   ser conferidas dentro de uma única RPC de servidor, sem mudar as regras nem
+   os limites. Comparar com a medição local de referência.
+2. Publicar a mudança (migration e Edge `guest`) com gates próprios e repetir o
+   ensaio remoto **uma vez**.
+3. Se continuar reprovando: avaliar compute maior (plano pago) ou conexão direta
+   da Edge ao Postgres pelo pooler, com decisão do titular.
+
+## G3.1 — Uma ida para as cotas (local, 2026-09-17)
+
+- A migration `20260917010000_guest_rates_batch.sql` cria
+  `public.check_guest_rates(text[])`, só para `service_role`. Ela confere as
+  cotas na mesma ordem (ip → credencial → global) e com a mesma regra de
+  `check_guest_rate`: para na primeira recusa, a contagem persiste e as cotas
+  seguintes não são consumidas.
+- A Edge `guest` passa de **4 para 2 idas** ao PostgREST por POST (cotas e ação).
+  A ação **continua em transação separada**. Juntá-la às cotas manteria a linha
+  global bloqueada durante toda a ação, criando uma fila entre os convidados, e
+  desfaria a contagem quando a ação falhasse.
+- A Edge registra no log só os tempos (`rate_ms`, `action_ms`), a ação e o
+  status, sem token, IP ou dados do convite, para diagnosticar a próxima
+  medição.
+- Testes: pgTAP `guest_rates.test.sql` falhou antes da migration (vermelho) e,
+  com ela, a suíte inteira passou (**115/115**); portátil 65/65; `test:api`
+  26/26. Na primeira rodada completa, os 2 testes de isolamento do T-B5
+  falharam; passaram isolados e na rodada completa seguinte, com a porta 5173
+  livre. A causa provável é a porta ocupada, **não confirmada**.
+- Ensaio local: leituras p95 **412 ms**, escritas p95 **375 ms**, zero erros;
+  sincronização **4996 / 4985 / 4991 ms**; limpeza zerada. É só indicativo,
+  pela variação do ambiente local.
+
+### G3.2 — Publicação e nova medição (aguardando aprovação)
+
+1. `db push` só com `20260917010000_guest_rates_batch.sql`, depois do dry-run.
+   A Edge atual continua funcionando: `check_guest_rate` não muda.
+2. Deploy só da Edge `guest`.
+3. Repetir o ensaio remoto **uma vez** e cruzar com os tempos registrados no log
+   da Edge.
