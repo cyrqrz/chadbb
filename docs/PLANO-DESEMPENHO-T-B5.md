@@ -210,3 +210,26 @@ Com o ganho estrutural já colhido, as opções que restam não são de código:
 
 A terceira não é afrouxar a meta: é decidir, com o número na mão, se a meta
 original descreve o uso real do chá.
+
+#### Decisão do titular em 2026-09-21: **aceitar os 2,2 s. T-B5 encerrada.**
+
+O titular decidiu aceitar o resultado medido e não investir em plano pago nem no
+pooler. O que sustenta a decisão, e fica registrado para quem reabrir isto:
+
+- O ensaio dispara **50 pedidos no mesmo instante**, cinco vezes. No chá real os
+  convidados abrem o convite espalhados ao longo de dias; o cenário medido é o
+  pior caso, não o caso típico.
+- **Zero erros** em 225 leituras e 25 escritas, nas duas medições remotas.
+- A sincronização entre sessões tem **1,5 s de folga** sobre o limite de 7 s.
+- O ganho estrutural já foi colhido: 4 → 2 idas ao PostgREST cortou 49% da
+  leitura e 42% da escrita. O que resta custa dinheiro ou reescrita.
+
+**A meta de 2 s não foi alterada** — ela continua escrita acima, e a medição
+continua registrada como reprovada por 187 ms na leitura e 328 ms na escrita. O
+que mudou foi a decisão de não agir sobre essa diferença.
+
+**O que ficou sem medir:** de onde vêm os ~2,2 s. O cruzamento com `rate_ms` e
+`action_ms` do log da Edge não foi feito (o CLI não tem `functions logs`; os
+números estão no painel). A atribuição ao teto de CPU do plano free é hipótese
+herdada do diagnóstico de 17/09, não medição de 21/09. Se o desempenho voltar a
+incomodar, **começar por aí** antes de comprar compute.

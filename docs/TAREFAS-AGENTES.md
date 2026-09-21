@@ -239,11 +239,14 @@ o ensaio familiar no celular continua pendente.
 - [x] **T-B4 · Validação pela API real (M2).** Criar, editar e publicar evento e
   lista, incluindo tentativa de outro usuário acessar ou alterar os dados.
   **Gate:** smoke test remoto.
-- [ ] **T-B5 · Metas no ambiente do evento.** p95 de até 2 s com 50 convidados;
-  mudança de outra sessão visível em até 7 s. **Gate:** execução remota.
-  _(2026-09-21: a Edge `guest` com `check_guest_rates` foi implantada no `chadbb-cha`
-  — de 4 para 2 idas ao PostgREST por pedido — e a migration está em produção. Falta
-  refazer a medição remota para ver se a meta passa.)_
+- [x] **T-B5 · Metas no ambiente do evento.** _(Encerrada em 2026-09-21 por decisão
+  do titular.)_ Medição remota final: leitura p95 **2187 ms** e escrita **2328 ms**
+  (meta 2000), **zero erros**, sincronização 5532/4971/5497 ms (limite 7000), 362
+  POSTs guest, limpeza zerada. A Edge com `check_guest_rates` cortou 49% da leitura
+  e 42% da escrita em relação a 17/09. O titular aceitou os 2,2 s: o ensaio dispara
+  50 pedidos no mesmo instante, cenário mais severo que o uso real. A meta não foi
+  alterada; o que se decidiu foi não agir sobre a diferença. Detalhes e o que ficou
+  sem medir em `PLANO-DESEMPENHO-T-B5.md`.
 - [ ] **T-B6 · Operação.** Acompanhar a sequência diária do backup; depois do
   conteúdo real, refazer a restauração com dados e Storage reais e medir o RTO
   (meta de 2 h); remover a integração órfã "Workers Builds" na Cloudflare.
