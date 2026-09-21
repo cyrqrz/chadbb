@@ -241,6 +241,9 @@ o ensaio familiar no celular continua pendente.
   **Gate:** smoke test remoto.
 - [ ] **T-B5 · Metas no ambiente do evento.** p95 de até 2 s com 50 convidados;
   mudança de outra sessão visível em até 7 s. **Gate:** execução remota.
+  _(2026-09-21: a Edge `guest` com `check_guest_rates` foi implantada no `chadbb-cha`
+  — de 4 para 2 idas ao PostgREST por pedido — e a migration está em produção. Falta
+  refazer a medição remota para ver se a meta passa.)_
 - [ ] **T-B6 · Operação.** Acompanhar a sequência diária do backup; depois do
   conteúdo real, refazer a restauração com dados e Storage reais e medir o RTO
   (meta de 2 h); remover a integração órfã "Workers Builds" na Cloudflare.
@@ -332,8 +335,10 @@ mantém o cálculo antigo só como transição, isolado em `src/features/guests/
   do back: `supabase/migrations/20260918000000_event_setup_steps.sql` (colunas
   `guests_done_at`/`gifts_done_at` em `events`, backfill dos eventos em uso e RPC
   `set_event_step`) e `supabase/tests/event_steps.test.sql`. Contrato em
-  `CONTRATOS-TRANSACIONAIS.md`. Pedido: revisar quando voltar e cuidar do `db push`
-  no `chadbb-cha` (só com aprovação do usuário), antes do merge do PR do front.
+  `CONTRATOS-TRANSACIONAIS.md`. Pedido: revisar quando voltar. **O `db push` já foi
+  feito** em 2026-09-21, com aprovação do titular: as três migrations de setembro
+  estão em produção e o `migration list` remoto ficou igual à branch (24 de cada
+  lado). Resta a revisão do código das duas migrations, que continua sendo do Codex.
   Na mesma leva, a pedido do usuário: `20260918010000_list_item_removal.sql`
   (`remove_event_item`, que recusa item com reserva ativa, e `add_custom_treat`,
   com o mimo próprio como produto `manual` preso ao evento por `products.event_id`;

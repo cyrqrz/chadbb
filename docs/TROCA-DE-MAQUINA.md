@@ -61,20 +61,25 @@ npm run check        # 51 unitários, lint, tipos e build
 npm run test:e2e     # porta 4173 livre; ~10 min
 ```
 
-### 4. Pendente — `db push` no `chadbb-cha` (gate remoto, aprovação manual)
+### 4. Concluído em 2026-09-21 — `db push` e deploy da Edge `guest`
 
-Obrigatório **antes do merge do PR** do front: sem as migrations, "Concluí…",
-"Remover da lista" e "Adicionar mimo" falham em produção.
+Feito com aprovação do titular, depois que a unificação das branches (`clone-main`)
+pôs as três migrations de setembro na mesma árvore:
 
-1. Confirmar a ordem com a `codex/back`: a migration `20260917010000_guest_rates_batch`
-   é anterior às de 18/09. Se ela já estiver no remoto, o push a partir deste clone
-   recusa; faça o push de uma branch que tenha as três (ex.: depois do merge da
-   `codex/back` na `main` e `git pull origin main` aqui).
-2. `db push --dry-run` com `--project-ref fcykqrlnofmdtmewlejr`, sem `supabase link`,
-   sem `--linked` e sem `--db-url` (regra 2 do `AGENTS.md`). A lista deve ter só as
-   migrations esperadas. Mostrar ao titular e esperar aprovação.
-3. `db push` e `migration list` remoto igual ao local.
-4. Abrir o PR `claude/front` → `main` com a CI verde.
+1. `db push --dry-run --project-ref fcykqrlnofmdtmewlejr` (sem `link`, sem `--linked`,
+   sem `--db-url`) listou só as três esperadas: `20260917010000_guest_rates_batch`,
+   `20260918000000_event_setup_steps`, `20260918010000_list_item_removal`.
+2. `db push` aplicou as três. `migration list` remoto e branch ficaram iguais:
+   **24 de cada lado, nenhuma sobrando**.
+3. `supabase functions deploy guest --project-ref …`: a Edge passou a usar
+   `check_guest_rates` (T-B5). A RPC já estava em produção — banco antes da função.
+4. `npm run health:remote` (somente leitura): **6/6**, com backup no R2 de 0,5 h.
+
+**Lição de ordem:** a `main` foi enviada antes do `db push`, e o Cloudflare Pages
+publica a partir dela. Isso abriu ~40 min com front novo e banco antigo, em que
+"Concluí…", "Remover da lista" e "Adicionar mimo" falhariam para o organizador
+(convite, presença e reserva do convidado não dependiam do que faltava). Na próxima
+leva, **empurrar o banco antes da branch que o Pages publica**.
 
 ## Retomada prioritária — 2026-09-16, Codex/back
 
