@@ -375,6 +375,43 @@ mantém o cálculo antigo só como transição, isolado em `src/features/guests/
 
 ## Concluídas
 
+- 2026-09-21 · Claude · Refatoração UI/UX da lista de presentes (Lista de mimos),
+  a partir de `PLANO-REFATORACAO-LISTA-DE-MIMOS.md`.
+  - G0: baseline em 320/375/768/1440 antes de mexer no código; a aba Mimos tinha
+    o nome numa linha e “Remover da lista” em outra, ~125 px por item.
+  - G1: cabeçalho da lista com título, contador do servidor (`count`, sem soma no
+    front) e atalho “Adicionar à lista”, que leva o foco para a seção de incluir.
+  - G2/G3: `.item-row` virou grade (nome à esquerda, ação à direita, faixas
+    abaixo para quantidade, confirmação e avisos); “Remover da lista” virou botão
+    de ícone de 44 px, neutro em repouso e destrutivo só no hover/foco, com o
+    mesmo nome acessível de antes. A confirmação na linha foi mantida: remover
+    apaga o mimo próprio e o servidor recusa item com reserva — não é reversível,
+    então não cabe “Desfazer” sem mudança no back.
+  - G4/G5: esqueleto no lugar do spinner ao carregar; vazio, erro e remoção
+    mantidos. `tests/e2e/gift-list.spec.ts` (novo) cobre contador, atalho,
+    anatomia da linha, confirmação, vazio e 320/375/768/1024/1440 com axe.
+  - Ordem do DOM mudou dentro da linha (remover antes dos avisos de quantidade),
+    para o Tab seguir a ordem da tela; os dois testes de foco em `panel.spec.ts`
+    foram atualizados.
+  - QA de UX (agente `qa-ux`) achou dois defeitos e escreveu
+    `tests/e2e/gift-list-qa.spec.ts` (11 testes × 2 projetos): (a) em container
+    menor que 38rem a linha de fralda punha o remover na primeira faixa e o
+    formulário na segunda, então o Tab subia de “Atualizar quantidade” de volta
+    para a lixeira (WCAG 2.4.3) — corrigido com `:has(.item-row-form)`, que faz o
+    remover descer junto com a quantidade; (b) `.item-rows > li:hover` grudava no
+    toque, como já documentado no `.step-card` — agora dentro de
+    `@media (hover: hover)`. Também ajustei o `title` do botão para repetir o nome
+    acessível (senão o leitor de tela lê nome e descrição em cada linha) e o
+    atalho deixou de empilhar `#adicionar` no histórico do celular.
+  - Aberto, pré-existente, para outra tarefa: com o PostgREST devolvendo 503, a
+    lista fica ~15,7 s em “Carregando a lista…” (três tentativas do
+    `postgrest-js` mais uma do TanStack). Com 500 leva ~2 s. O esqueleto novo
+    torna a espera mais enganosa; avaliar `retry: false` na leitura da lista.
+  - Fora do escopo, com motivo: a seção “Presentes” **não** virou accordion — no
+    chadbb ela é aba do evento, e o botão “Presentes” solto é o atalho da barra
+    de etapas pendentes (`SetupDock`), não um container. Busca/filtros não
+    entraram (lista pequena). Sem componentização em arquivos separados: o
+    padrão do repositório é um arquivo denso por feature.
 - 2026-09-17 · Codex · Exclusão de evento, PR #10 (merge `7293685`).
   - G1–G3: testes antes da implementação e migration `20260917000000_delete_event.sql`.
   - G4, local: `db:test` 99/99, `test:db:portable` 65/65, `test:api` 26/26 e
