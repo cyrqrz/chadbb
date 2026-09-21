@@ -1,8 +1,18 @@
 # Tarefas e combinados entre agentes
 
-Quadro compartilhado entre o Claude (front, `claude/front`) e o Codex (back,
-`codex/back`). Cada agente atualiza este arquivo na própria branch; as mudanças
-chegam ao outro pela `main`. Regras em `AGENTS.md`.
+Quadro compartilhado entre o Claude (front) e o Codex (back). **Desde 2026-09-21
+os dois trabalham na mesma branch, a `clone-main`** — as antigas `claude/front` e
+`codex/back` foram unificadas nela e apagadas, e o remoto tem só `main` e
+`clone-main`. O que separa os dois agora é a área de arquivo, não a branch: faça
+`git pull` antes de começar e `git pull --rebase` antes de commitar. Regras em
+`AGENTS.md`.
+
+A unificação juntou a G4b.3 do front com a T-B5 e a migration
+`20260917010000_guest_rates_batch` do back. Evidências na branch unificada:
+`npm run check` verde, pgTAP **8 arquivos / 153 testes**, `test:browser:local`
+**8/8** contra o Supabase local. Com as três migrations de setembro na mesma
+branch, o `db push` no `chadbb-cha` deixou de estar bloqueado pela ordem — ele
+continua sendo gate manual, com dry-run e aprovação do titular.
 
 Formato de pedido: `- [ ] AAAA-MM-DD · origem → destino · pedido (arquivos/contrato envolvidos)`
 

@@ -26,20 +26,28 @@ passo. Nada destrutivo ou remoto roda sem aprovação (ver Regras obrigatórias)
 
 ## Divisão de trabalho
 
-Cada agente trabalha no próprio clone e na própria branch. Nenhum dos dois altera
-a pasta `~/projetos/chadbb`, que fica na `main` e é só do usuário.
+**Desde 2026-09-21 existem só duas branches: `main` e `clone-main`.** As antigas
+`claude/front` e `codex/back` foram unificadas na `clone-main` e apagadas. Cada
+agente continua no próprio clone, mas os dois trabalham a partir da `clone-main`.
+Nenhum dos dois altera a pasta `~/projetos/chadbb`, que fica na `main` e é só do
+usuário.
 
 | Agente | Clone | Branch | Responsável por |
 |---|---|---|---|
-| **Claude** | `~/projetos/chadbb-claude` | `claude/front` | Front: `src/`, `public/`, `index.html`, estilos, acessibilidade, testes de navegador (`tests/browser`, e2e) |
-| **Codex** | `~/projetos/chadbb-codex` | `codex/back` | Back e tarefas mais difíceis: `supabase/` (migrations, functions, testes pgTAP), `functions/`, `scripts/`, `.github/workflows/`, testes de banco/API |
+| **Claude** | `~/projetos/chadbb-claude` | `clone-main` | Front: `src/`, `public/`, `index.html`, estilos, acessibilidade, testes de navegador (`tests/browser`, e2e) |
+| **Codex** | `~/projetos/chadbb-codex` | `clone-main` | Back e tarefas mais difíceis: `supabase/` (migrations, functions, testes pgTAP), `functions/`, `scripts/`, `.github/workflows/`, testes de banco/API |
 
-- Um agente não altera arquivos da área do outro. Se o front precisar mudar um
-  contrato (RPC, tabela, payload de função), registre o pedido em
-  `docs/TAREFAS-AGENTES.md`. O contrato vigente fica em `docs/CONTRATOS-TRANSACIONAIS.md`.
-- A integração é feita por PR para a `main`; quem faz o merge é o usuário. Para
-  receber o trabalho do outro agente depois do merge, rode `git pull origin main`
-  na sua branch.
+- A divisão por **área de arquivo continua valendo**, e agora é a única coisa que
+  separa os dois: um agente não altera arquivos da área do outro. Se o front
+  precisar mudar um contrato (RPC, tabela, payload de função), registre o pedido
+  em `docs/TAREFAS-AGENTES.md`. O contrato vigente fica em
+  `docs/CONTRATOS-TRANSACIONAIS.md`.
+- **Com uma branch só, os dois escrevem no mesmo lugar.** Antes de começar,
+  `git pull` na `clone-main`; antes de commitar, `git pull --rebase`. Commits
+  pequenos e por área reduzem o atrito. Um trabalho longo que mexa em muita coisa
+  merece uma branch temporária a partir da `clone-main`, avisada no quadro.
+- A integração com a `main` é feita por PR de `clone-main` → `main`; quem faz o
+  merge é o usuário.
 - Os agentes não se veem em tempo real. A comunicação entre eles passa por
   commits e por `docs/TAREFAS-AGENTES.md`.
 
