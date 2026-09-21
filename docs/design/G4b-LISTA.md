@@ -50,11 +50,34 @@ pôs a aba Presentes no cabeçalho comum (`G4-PAINEL.md`, “Fora deste gate”)
 | Gate | Entrega | Evidência exigida |
 |---|---|---|
 | G4b.0 | Este plano | — |
-| G4b.1 | A11, A12 e A13 | um teste e2e por achado, falhando antes e passando depois |
-| G4b.2 | Resumo no topo e lista pronta compacta | e2e do resumo (valores, lista vazia, encerrado); axe |
-| G4b.3 | Fraldas e mimos em lista, sem um cartão por item | e2e existentes da lista verdes (stepper, versão, erro no item, encerrado); 320 px com texto a 200% |
-| G4b.4 | Catálogo em lista | e2e existentes do catálogo verdes; teclado e foco |
+| G4b.1 | A11, A12 e A13 · **feito** (`19532db`) | um teste e2e por achado, falhando antes e passando depois |
+| G4b.2 | Resumo no topo e lista pronta compacta · **feito** (`b1b3d00`) | e2e do resumo (valores, lista vazia, encerrado); axe |
+| G4b.3 | Fraldas e mimos em lista, sem um cartão por item · **feito** | e2e existentes da lista verdes (stepper, versão, erro no item, encerrado); 320 px com texto a 200% |
+| G4b.4 | Catálogo em lista · **feito** junto com a lista editável (`85be675`) | e2e existentes do catálogo verdes; teclado e foco |
 | G4b.5 | QA de UX, `npm run check`, e2e completo, `test:browser:local`, capturas antes e depois | relatório do QA e página de revisão |
 | G4b.6 | Aprovação do usuário → commit, push e PR | diff revisado |
 
 Nenhum gate mexe em `supabase/`, `functions/` ou contratos.
+
+## Execução da G4b.3 (2026-09-21)
+
+- `ItemCard` virou `ItemRow`: `ul.card.item-rows` com uma `li` por item, no lugar
+  da grade de um `article.card` por tamanho de fralda e por mimo. Mesmo padrão já
+  usado no painel (`ul.card.progress-list`) e no catálogo (`.catalog-rows`).
+- O selo “Mimo” saiu de cada linha: na aba Mimos o título da seção já diz a
+  categoria. O “Sem limite de quantidade…” passou a aparecer **uma vez** no topo
+  da lista, e não em cada item.
+- Achado no caminho (**A20**, em `audit.md`): a 320 px com texto a 200% o campo do
+  stepper não encolhia. Como `.stepper` esconde o que transborda, o sintoma **não**
+  é rolagem lateral: quem cedia espaço eram o − e o +, que caíam para 36 px. O
+  catálogo e o **convite** já tinham o defeito antes desta gate — no catálogo com outro
+  sintoma: lá o campo passava da borda da linha (242 px numa linha de 224 px) e o + era
+  cortado. A correção é na raiz (`min-width: 0` no campo, para ele encolher; `flex-shrink: 0`
+  nos botões, para o alvo de toque não ser o que cede), e vale para as três telas.
+  Guardas (QA da G4b.3): “stepper: − e + mantêm 44 px a 320 px com texto a 200%”
+  em `panel.spec.ts` e “quantidade: − e + mantêm 44 px…” em `guest.spec.ts`. O teste
+  “lista: sem rolagem lateral a 320 px com texto a 200%” passa com e sem a correção:
+  ele guarda o layout da lista, não o A20.
+- O helper `sameAnatomy` dos testes passou a olhar `.card` em vez de
+  `article.card, li.card, a.card`: a lista deixou de ter um card por item, e a
+  regra que importa (`:is(article, li, a).card` sempre com `.card-stack`) continua.

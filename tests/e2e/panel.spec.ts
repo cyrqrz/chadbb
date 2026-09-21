@@ -502,6 +502,9 @@ test('A11 · voltar a uma categoria que falhou mostra carregando, não o erro an
   await expect(diapers.getByRole('alert')).toBeVisible({ timeout: 15_000 })
   await page.getByRole('button', { name: 'Mimos', exact: true }).click()
   await expect(page.getByRole('region', { name: 'Mimos na lista' }).getByText('Nenhum mimo na lista.')).toBeVisible()
+  // G4b.3: a regra "sem limite" passou do item para o topo da lista. Sem mimo nenhum,
+  // ela não faz sentido: quem chega aqui precisa do próximo passo, não da regra.
+  await expect(page.getByRole('region', { name: 'Mimos na lista' }).getByText('Sem limite de quantidade')).toHaveCount(0)
   // A nova tentativa de Fraldas demora: enquanto isso, a tela diz que está carregando.
   await page.route('**/rest/v1/event_items**', async route => {
     if (isListQuery(new URL(route.request().url()))) await new Promise(resolve => setTimeout(resolve, 1500))
@@ -826,9 +829,10 @@ test.describe('G2.1 · card de convidado', () => {
 
 // G3.1: os cards do organizador seguem a anatomia do card de fralda do convite.
 test.describe('G3.1 · cards do organizador', () => {
-  const itemCards = (page: Page) => page.locator('article.card, li.card, a.card')
+  // Guarda de sanidade: a tela tem card. Desde a G4b.3, a lista de presentes é um card
+  // com uma linha por item, e não um card por item — daí o seletor ser `.card`.
   async function sameAnatomy(page: Page) {
-    await expect(itemCards(page).first()).toBeVisible()
+    await expect(page.locator('.card').first()).toBeVisible()
     await expect(page.locator(':is(article, li, a).card:not(.card-stack)')).toHaveCount(0)
     // Sem caixa colorida dentro do card.
     await expect(page.locator('.card :is(.notice, .state-warning)')).toHaveCount(0)
@@ -876,7 +880,7 @@ test.describe('G3.1 · cards do organizador', () => {
   test('lista: fralda usa o stepper e só libera a ação quando a quantidade muda', async ({ page }) => {
     await giftList(page)
     const card = page.getByRole('region', { name: 'Fraldas na lista' }).getByRole('article')
-    await expect(card.getByRole('heading', { name: 'Fraldas tamanho G' })).toHaveClass(/card-title/)
+    await expect(card.getByRole('heading', { name: 'Fraldas tamanho G' })).toHaveClass(/item-row-title/)
     const field = card.getByRole('spinbutton', { name: 'Quantidade de Fraldas tamanho G' })
     await expect(field).toHaveValue('12')
     await expect(field).toHaveAttribute('max', '10000')
@@ -897,9 +901,87 @@ test.describe('G3.1 · cards do organizador', () => {
   test('lista: mimo sem caixa interna e produto fora do catálogo como selo', async ({ page }) => {
     await giftList(page)
     await page.getByRole('button', { name: 'Mimos', exact: true }).click()
-    const card = page.getByRole('region', { name: 'Mimos na lista' }).getByRole('article')
-    await expect(card).toContainText('Sem limite de quantidade')
+    const section = page.getByRole('region', { name: 'Mimos na lista' })
+    const card = section.getByRole('article')
+    // G4b.3: "sem limite" é regra da categoria e aparece uma vez no topo, não em cada linha.
+    await expect(section.getByText('Sem limite de quantidade')).toHaveCount(1)
+    await expect(card).not.toContainText('Sem limite de quantidade')
     await expect(card.locator('.badge-warning')).toHaveText('!Fora do catálogo')
+    await sameAnatomy(page)
+    await expectAccessible(page)
+  })
+
+  // G4b.3: a aba empilhava um cartão por tamanho de fralda e um por mimo. Agora é
+  // uma lista só, com um card em volta e uma linha por item.
+  test('lista: fraldas e mimos em linhas, sem um cartão por item', async ({ page }) => {
+    await giftList(page)
+    for (const [tab, region] of [['Fraldas', 'Fraldas na lista'], ['Mimos', 'Mimos na lista']] as const) {
+      await page.getByRole('button', { name: tab, exact: true }).click()
+      const section = page.getByRole('region', { name: region })
+      await expect(section.locator('.card')).toHaveCount(1)
+      await expect(section.locator('ul.item-rows > li')).toHaveCount(1)
+      // A linha é o próprio item: nenhum card dentro da lista.
+      await expect(section.locator('.item-rows .card')).toHaveCount(0)
+      await expect(section.getByRole('article')).toHaveClass(/item-row/)
+    }
+  })
+
+  // Com quatro tamanhos dentro de um card só, o que era isolado por cartão agora divide
+  // a mesma moldura: erro, confirmação e sucesso não podem vazar para a linha vizinha,
+  // e o Tab precisa andar linha a linha, sem pular de volta.
+  test('lista: com quatro tamanhos, cada linha guarda o próprio erro, confirmação e foco', async ({ page }) => {
+    const sizes = ['P', 'M', 'G', 'XG'] as const
+    const rows = sizes.map((size, i) => ({ id: `9000000${i}-0000-4000-8000-000000000009`, event_id: eventId, product_id: product(1, size).id,
+      quantity_requested: 6 + i, category: 'fralda', diaper_size: size, version: 1, product: { ...product(1, size), event_id: null } }))
+    await backend(page, () => ({ status: 200, json: full }), undefined, {
+      '/rest/v1/event_items': ({ url }) => {
+        const list = url.searchParams.get('category') === 'eq.mimo' ? [] : rows
+        return { status: 200, json: list, headers: { 'content-range': list.length ? `0-${list.length - 1}/${list.length}` : '*/0' } }
+      },
+      '/rest/v1/products': none,
+      '/rest/v1/rpc/set_event_item_quantity': () => ({ status: 503, json: { message: 'unavailable' } }),
+    })
+    await page.goto(`/eventos/${eventId}/presentes`)
+    const region = page.getByRole('region', { name: 'Fraldas na lista' })
+    const items = region.locator('ul.item-rows > li')
+    await expect(items).toHaveCount(4)
+    // Linha, e não cartão: a divisão entre itens é um filete, não uma borda de card.
+    expect(await items.nth(1).evaluate(li => getComputedStyle(li).borderTopWidth)).not.toBe('0px')
+    expect(await items.first().evaluate(li => getComputedStyle(li).borderTopWidth)).toBe('0px')
+
+    // Erro na linha do P; confirmação aberta na linha do M.
+    const p = region.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Fraldas tamanho P' }) })
+    const m = region.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Fraldas tamanho M' }) })
+    await p.getByRole('button', { name: 'Aumentar pacotes' }).click()
+    await p.getByRole('button', { name: 'Atualizar quantidade' }).click()
+    await expect(p.getByRole('alert')).toBeVisible()
+    await m.getByRole('button', { name: 'Remover da lista: Fraldas tamanho M' }).click()
+    await expect(m.getByText('Remover “Fraldas tamanho M” da lista?')).toBeFocused()
+    // Nada vazou: o erro é só do P e a pergunta é só do M.
+    await expect(m.getByRole('alert')).toHaveCount(0)
+    await expect(p.getByText('Remover “')).toHaveCount(0)
+    await expect(region.getByRole('alert')).toHaveCount(1)
+    // E cada bloco fica dentro do retângulo da própria linha, sem invadir a de baixo.
+    for (const [index, node] of [[0, p.getByRole('alert')], [1, m.getByText('Remover “Fraldas tamanho M” da lista?')]] as const) {
+      const inside = await node.evaluate((el, i) => {
+        const li = document.querySelectorAll('ul.item-rows > li')[i].getBoundingClientRect()
+        const box = el.getBoundingClientRect()
+        return box.top >= li.top - 0.5 && box.bottom <= li.bottom + 0.5
+      }, index)
+      expect(inside, `bloco da linha ${index + 1}`).toBe(true)
+    }
+
+    // Tab anda dentro da linha e só então passa para a próxima.
+    await p.getByRole('button', { name: 'Diminuir pacotes' }).focus()
+    const order: string[] = []
+    for (let i = 0; i < 6; i++) {
+      order.push(await page.evaluate(() => {
+        const el = document.activeElement as HTMLElement
+        return el.tagName === 'INPUT' ? 'campo de quantidade' : el.getAttribute('aria-label') ?? el.textContent?.trim().slice(0, 40) ?? ''
+      }))
+      await page.keyboard.press('Tab')
+    }
+    expect(order).toEqual(['Diminuir pacotes', 'campo de quantidade', 'Aumentar pacotes', 'Atualizar quantidade', 'Recarregar quantidade', 'Remover da lista: Fraldas tamanho P'])
     await sameAnatomy(page)
     await expectAccessible(page)
   })
@@ -959,6 +1041,25 @@ test.describe('G3.1 · cards do organizador', () => {
         const box = (await button.boundingBox())!
         expect(Math.min(box.width, box.height)).toBeGreaterThanOrEqual(44)
       }
+    }
+  })
+
+  // A20: a 320 px com texto a 200% o campo do stepper não encolhia. Como `.stepper`
+  // tem `overflow: hidden`, o sintoma não é rolagem lateral (o documento continua com
+  // overflow 0): quem encolhia era o − e o +, que caíam para 36 px. O teste mede o
+  // alvo de toque no tamanho em que ele quebrava, na lista e no catálogo.
+  test('stepper: − e + mantêm 44 px a 320 px com texto a 200%', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 740 })
+    await giftListWith(page)
+    await expect(listCard(page).getByRole('spinbutton')).toBeVisible()
+    await page.addStyleTag({ content: 'html { font-size: 200% !important; }' })
+    for (const [card, where] of [[listCard(page), 'lista'], [catalogCard(page), 'catálogo']] as const) {
+      for (const name of ['Diminuir pacotes', 'Aumentar pacotes']) {
+        const box = (await card.getByRole('button', { name, exact: true }).boundingBox())!
+        expect(Math.min(box.width, box.height), `${where}: ${name}`).toBeGreaterThanOrEqual(44)
+      }
+      // O campo também continua legível: ele encolhe, mas não some.
+      expect((await card.getByRole('spinbutton').boundingBox())!.width, where).toBeGreaterThanOrEqual(44)
     }
   })
 
@@ -1039,6 +1140,61 @@ test.describe('G3.1 · cards do organizador', () => {
     await expect(card.getByRole('alert')).toHaveCount(0)
   })
 
+  // Decisão da G4b.3: o aviso de "versão mais recente" fica na própria linha. Cenário:
+  // o organizador está digitando aqui e, em outra aba, alguém salva outra quantidade;
+  // a consulta periódica traz a versão nova. Regra 7: o que está sendo digitado não
+  // pode ser sobrescrito, e o aviso precisa dizer que existe algo mais novo.
+  test('lista: alteração em outra aba avisa na linha sem apagar o que está sendo digitado', async ({ page }) => {
+    let bumped = false
+    await backend(page, () => ({ status: 200, json: full }), undefined, {
+      '/rest/v1/event_items': ({ url }) => {
+        const rows = url.searchParams.get('category') === 'eq.mimo' ? [] : [bumped ? { ...listedG, quantity_requested: 30, version: 5 } : listedG]
+        return { status: 200, json: rows, headers: { 'content-range': rows.length ? '0-0/1' : '*/0' } }
+      },
+      '/rest/v1/products': none,
+    })
+    await page.goto(`/eventos/${eventId}/presentes`)
+    const card = listCard(page)
+    const field = card.getByRole('spinbutton', { name: 'Quantidade de Fraldas tamanho G' })
+    await expect(field).toHaveValue('12')
+    await field.fill('8')
+    bumped = true
+    const warning = card.getByText('Existe uma versão mais recente desta quantidade.')
+    await expect(warning).toBeVisible({ timeout: 15_000 })
+    // O que a pessoa digitou continua lá; o aviso e a saída estão na mesma linha.
+    await expect(field).toHaveValue('8')
+    await expect(card.getByRole('button', { name: 'Recarregar quantidade' })).toBeVisible()
+    await expectAccessible(page)
+    page.once('dialog', dialog => void dialog.accept())
+    await card.getByRole('button', { name: 'Recarregar quantidade' }).focus()
+    await page.keyboard.press('Enter')
+    await expect(field).toHaveValue('30')
+    const done = card.getByRole('status').filter({ hasText: 'Quantidade recarregada.' })
+    await expect(done).toBeFocused()
+    await expect(warning).toHaveCount(0)
+  })
+
+  // O "Recarregar quantidade" é o único jeito de sair do erro, e ele mesmo some ao ser
+  // usado. Pelo teclado o foco caía no <body>: o próximo Tab voltava para "Pular para o
+  // conteúdo", no topo da página, e a pessoa perdia a linha em que estava.
+  test('lista: "Recarregar quantidade" não deixa o foco cair no vazio', async ({ page }) => {
+    await giftListWith(page, { write: () => ({ status: 503, json: { message: 'unavailable' } }) })
+    const card = listCard(page)
+    const field = card.getByRole('spinbutton', { name: 'Quantidade de Fraldas tamanho G' })
+    await field.fill('14')
+    await card.getByRole('button', { name: 'Atualizar quantidade' }).click()
+    await expect(card.getByRole('alert')).toBeVisible()
+    page.once('dialog', dialog => void dialog.accept())
+    await card.getByRole('button', { name: 'Recarregar quantidade' }).focus()
+    await page.keyboard.press('Enter')
+    const done = card.getByRole('status').filter({ hasText: 'Quantidade recarregada.' })
+    await expect(done).toBeVisible()
+    // O foco fica no resultado, dentro da linha: o próximo Tab continua dali.
+    await expect(done).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(card.getByRole('button', { name: 'Remover da lista: Fraldas tamanho G' })).toBeFocused()
+  })
+
   test('catálogo: erro fica na linha do produto e o sucesso vira aviso com foco', async ({ page }) => {
     let fail = true
     const calls = await giftListWith(page, { write: () => fail ? { status: 500, json: { message: 'boom' } } : { status: 200, json: { id: 'x' } } })
@@ -1070,6 +1226,12 @@ test.describe('G3.1 · cards do organizador', () => {
     await expect(card.getByRole('button', { name: 'Atualizar quantidade' })).toHaveCount(0)
     await expect(page.getByRole('region', { name: 'Adicionar à lista' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: /Lista pronta|Preparar|Completar/ })).toHaveCount(0)
+    // A regra dos mimos está no presente ("cada convidado informa quantos vai levar"):
+    // num chá que já aconteceu ela contradiz o aviso de encerrado logo acima.
+    await page.getByRole('button', { name: 'Mimos', exact: true }).click()
+    const treats = page.getByRole('region', { name: 'Mimos na lista' })
+    await expect(treats.getByRole('article')).toBeVisible()
+    await expect(treats.getByText('Sem limite de quantidade')).toHaveCount(0)
     await expectAccessible(page)
   })
 

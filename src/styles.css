@@ -294,9 +294,26 @@
   /* Base de 16rem: sem espaço para o título e o formulário lado a lado, o formulário desce
      para a linha de baixo em vez de espremer o nome do produto a uma palavra por linha. */
   .catalog-row-text { flex: 1 1 16rem; min-width: 0; }
-  .catalog-row-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.75rem; }
+  .catalog-row-form { display: flex; min-width: 0; flex-wrap: wrap; align-items: flex-end; gap: 0.75rem; }
+  .catalog-row-form > .field { min-width: 0; }
   .catalog-row > .state { flex-basis: 100%; }
   .product-listed { border-style: dashed; background: var(--color-surface-soft); box-shadow: none; }
+
+  /* G4b.3: fraldas e mimos numa lista única, uma linha por item, dentro de um só card. */
+  .item-rows > li + li { border-top: 1px solid var(--divider-color); }
+  .item-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.25rem; padding-block: 0.875rem; }
+  /* Mesma base de 16rem do catálogo: sem espaço ao lado, o formulário desce em vez de
+     espremer o nome do produto a uma palavra por linha. */
+  .item-row-text { display: flex; flex: 1 1 16rem; min-width: 0; flex-direction: column; gap: 4px; }
+  .item-row-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+  .item-row-title { font-weight: 650; }
+  .item-row-description { font-size: var(--text-body-sm); color: var(--color-muted); }
+  .item-row-form { display: flex; min-width: 0; flex-wrap: wrap; align-items: flex-end; gap: 0.75rem; }
+  .item-row-form > .field { min-width: 0; }
+  /* Aviso, erro e confirmação ocupam a linha inteira, abaixo do item. */
+  .item-row-notes, .item-row-actions { display: flex; flex-basis: 100%; flex-direction: column; align-items: flex-start; gap: var(--action-gap); }
+  /* Como em .card-actions: o recuo do botão-texto nunca passa da borda do card (o padding encolhe em telas estreitas). */
+  .item-row-actions > .btn-ghost { justify-content: flex-start; margin-inline-start: calc(-1 * min(0.5rem, var(--card-padding) - 2px)); padding-inline: 0.5rem; }
 
   /* Cabeçalho e abas do evento (G4). */
   .event-header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 1rem 1.5rem; margin-top: 1.25rem; }
@@ -367,8 +384,12 @@
   .availability-text { font-weight: 650; font-variant-numeric: tabular-nums; }
   .stepper { display: inline-flex; align-self: flex-start; max-width: 100%; align-items: stretch; overflow: hidden; border: 1.5px solid var(--color-border); border-radius: var(--control-radius); background: var(--color-surface); }
   .stepper:focus-within { border-color: var(--color-brand); box-shadow: var(--ring); }
-  .stepper .btn-icon { min-height: var(--control-height-md); width: var(--control-height-md); border: 0; border-radius: 0; font-size: 1.25rem; }
-  .field .stepper input { width: 4.5rem; min-height: var(--control-height-md); border: 0; border-inline: 1px solid var(--divider-color); border-radius: 0; box-shadow: none; text-align: center; font-variant-numeric: tabular-nums; }
+  /* flex-shrink: 0 — quem encolhe é o campo, nunca o alvo de toque dos botões. */
+  .stepper .btn-icon { min-height: var(--control-height-md); width: var(--control-height-md); flex-shrink: 0; border: 0; border-radius: 0; font-size: 1.25rem; }
+  /* min-width: 0 faz valer o max-width: 100% do stepper: sem ele o campo não encolhe, e a
+     320 px com texto a 200% ou o campo passa da borda da linha (catálogo) ou são os botões
+     que cedem espaço (lista e convite). A largura ideal continua sendo 4.5rem. */
+  .field .stepper input { width: 4.5rem; min-width: 0; min-height: var(--control-height-md); border: 0; border-inline: 1px solid var(--divider-color); border-radius: 0; box-shadow: none; text-align: center; font-variant-numeric: tabular-nums; }
   .field .stepper input:focus { box-shadow: none; }
   .stepper .btn-icon:focus-visible { outline-offset: -3px; }
 

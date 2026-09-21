@@ -254,6 +254,23 @@ test.describe('G3 · convite', () => {
     for (const button of [less, more]) expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44)
   })
 
+  // A20: no celular estreito com texto a 200%, o campo do stepper não encolhia e quem
+  // cedia espaço eram o − e o + (36 px). Como o stepper esconde o que transborda, nem
+  // a rolagem lateral nem o recorte denunciavam: o que quebra é o alvo de toque.
+  test('quantidade: − e + mantêm 44 px a 320 px com texto a 200%', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 740 })
+    await backend(page)
+    await page.goto(`/convite#${token}`)
+    await page.getByRole('button', { name: 'Fraldas', exact: true }).click()
+    await expect(page.getByRole('spinbutton')).toBeVisible()
+    await page.addStyleTag({ content: 'html { font-size: 200% !important; }' })
+    for (const name of ['Diminuir pacotes', 'Aumentar pacotes']) {
+      const box = (await page.getByRole('button', { name, exact: true }).boundingBox())!
+      expect(Math.min(box.width, box.height), name).toBeGreaterThanOrEqual(44)
+    }
+    expect((await page.getByRole('spinbutton').boundingBox())!.width).toBeGreaterThanOrEqual(44)
+  })
+
   test('local com mapa embutido e rota em nova aba', async ({ page }) => {
     await backend(page)
     await page.goto(`/convite#${token}`)

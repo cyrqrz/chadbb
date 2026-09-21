@@ -103,6 +103,7 @@ Problemas:
 | A17 | baixa | Confirmação de encerramento na própria tela, sem diálogo | QA de UX (G2.1) | UX | G4 (`ConfirmDialog`) |
 | A18 | baixa | No convite, se outro convidado esgota o tamanho enquanto a pessoa digita a quantidade, o formulário some sem explicação | QA de UX (G3) | UX, regra 7 do AGENTS.md | G5 (contrato de atualização) |
 | A19 | baixa | Quantidade acima do máximo só mostra a mensagem nativa do navegador; falta dica visível do limite | QA de UX (G3) | UX | G5 |
+| A20 | média | A 320 px com texto a 200%, o campo do stepper não encolhia. Onde o campo era forçado a caber (convite e lista), quem cedia espaço eram o − e o +, que caíam para 36 px, porque `.stepper` esconde o que transborda; no catálogo, onde nada forçava, o próprio campo passava da borda da linha (medido: 242 px numa linha de 224 px) e o + era cortado por um ancestral. Preexistente nas duas telas do convidado e do catálogo | medição no Playwright (QA da G4b.3): botões de 36 px a 320 px com texto a 200%, no convite e na lista; o documento continua com rolagem lateral zero, e por isso nenhum teste de 320 px pegava a falha | WCAG 2.5.5 / 2.5.8 (alvo de toque) | **corrigido** na G4b.3 (`min-width: 0` no campo, `flex-shrink: 0` nos botões); guardas: e2e “stepper: − e + mantêm 44 px a 320 px com texto a 200%” (`panel.spec.ts`) e “quantidade: − e + mantêm 44 px a 320 px com texto a 200%” (`guest.spec.ts`) |
 
 Sem problema, medido:
 

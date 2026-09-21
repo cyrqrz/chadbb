@@ -95,7 +95,9 @@ function GiftList({ eventId, closed, eventStatus, step }: { eventId: string; clo
         <RefreshStatus fetching={query.isFetching} failed={query.isError} onRetry={() => void query.refetch()} retryLabel="Recarregar lista" label={`${query.data.count} ${query.data.count === 1 ? 'item' : 'itens'} · atualizando…`} />
         {removed.title && <p ref={removedNotice} tabIndex={-1} role="status" className="state state-success mt-3">“{removed.title}” saiu da lista.</p>}
         {!query.data.count ? <div className="mt-3"><EmptyState title={category === 'fralda' ? 'Nenhum tamanho de fralda na lista.' : 'Nenhum mimo na lista.'}>{closed ? 'Nenhum presente foi incluído nesta categoria.' : 'Use a lista pronta do chá acima ou inclua um item pelo catálogo abaixo.'}</EmptyState></div> : <>
-          <div className="stagger mt-3 grid gap-5 md:grid-cols-2">{query.data.items.map(item => <ItemCard key={item.id} item={item} closed={closed} onRemoved={onRemoved} />)}</div>
+          {/* G4b.3: "sem limite" é regra da categoria, e aparece uma vez no topo — não em cada linha. */}
+          {category === 'mimo' && !closed && <p className="mt-3 text-muted">Sem limite de quantidade. Cada convidado informa quantos vai levar.</p>}
+          <ul className="card item-rows stagger mt-3">{query.data.items.map(item => <li key={item.id}><ItemRow item={item} closed={closed} onRemoved={onRemoved} /></li>)}</ul>
         </>}
       </>}
       {/* Fora dos ramos de estado: a paginação continua montada ao carregar e na falha, e o foco não cai. */}
@@ -126,12 +128,19 @@ function ListSummary({ listed, failed, focus, children }: { listed?: ListedItem[
     {children}
   </section>
 }
-function ItemCard({ item, closed, onRemoved }: { item: EventItem; closed: boolean; onRemoved: (title: string) => void }) {
+// G4b.3: uma linha por item, sem um cartão por tamanho de fralda nem por mimo.
+function ItemRow({ item, closed, onRemoved }: { item: EventItem; closed: boolean; onRemoved: (title: string) => void }) {
+  const titleId = useId()
   const [baseline, setBaseline] = useState(item)
   const [quantity, setValue] = useState(String(item.quantity_requested ?? ''))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState('')
+  // "Recarregar quantidade" é o único jeito de sair do erro e some ao ser usado:
+  // sem isso o foco cairia no <body> e o próximo Tab voltaria ao topo da página.
+  const [reloaded, setReloaded] = useState(0)
+  const reloadNotice = useRef<HTMLParagraphElement>(null)
+  useEffect(() => { if (reloaded) reloadNotice.current?.focus() }, [reloaded])
   const cache = useQueryClient()
   const unchanged = quantity === String(baseline.quantity_requested ?? '')
   async function save(e: FormEvent) {
@@ -156,32 +165,37 @@ function ItemCard({ item, closed, onRemoved }: { item: EventItem; closed: boolea
   // Maior, e não diferente: uma resposta antiga da consulta periódica que chegue
   // depois de salvar não deve ser anunciada como alteração de outra sessão.
   const outdated = item.version > baseline.version
-  return <article className="card card-stack">
-    <header className="card-header">
-      <div className="card-badges">
-        <StatusBadge tone="neutral">{item.category === 'fralda' ? `Tamanho ${item.diaper_size}` : 'Mimo'}</StatusBadge>
+  const notes = outdated || error || message
+  return <article className="item-row" aria-labelledby={titleId}>
+    <div className="item-row-text">
+      <div className="item-row-head">
+        {/* O selo do tamanho identifica a linha; na aba Mimos o próprio título da seção já diz a categoria. */}
+        {item.category === 'fralda' && <StatusBadge tone="neutral">Tamanho {item.diaper_size}</StatusBadge>}
+        <h3 id={titleId} className="item-row-title">{item.product.title}</h3>
         {item.product.event_id ? <StatusBadge tone="brand">Criado por você</StatusBadge> : !item.product.active && <StatusBadge tone="warning">Fora do catálogo</StatusBadge>}
       </div>
-      <h3 className="card-title">{item.product.title}</h3>
-      {item.product.event_id && item.product.description && <p className="card-description whitespace-pre-line break-words">{item.product.description}</p>}
-      {!item.product.event_id && !item.product.active && <p className="card-description">Este produto saiu do catálogo. Ele continua na sua lista.</p>}
-    </header>
-    {item.category === 'mimo' ? <p className="availability-text">Sem limite de quantidade. Cada convidado informa quantos vai levar.</p> : <form onSubmit={save} className="flex flex-col gap-3">
+      {item.product.event_id && item.product.description && <p className="item-row-description whitespace-pre-line break-words">{item.product.description}</p>}
+      {!item.product.event_id && !item.product.active && <p className="item-row-description">Este produto saiu do catálogo. Ele continua na sua lista.</p>}
+    </div>
+    {item.category === 'fralda' && <form onSubmit={save} className="item-row-form">
       <QuantityField context={item.product.title} unit="pacotes" value={quantity} max={10000} disabled={busy || closed} onChange={text => { setValue(text); setMessage('') }} />
       {/* busy (aria-disabled) em vez de disabled: o foco fica no botão durante e depois do envio. */}
-      {!closed && <Button type="submit" variant="secondary" className="self-start" busy={busy || unchanged}>{busy ? 'Salvando…' : 'Atualizar quantidade'}</Button>}
+      {!closed && <Button type="submit" variant="secondary" size="sm" busy={busy || unchanged}>{busy ? 'Salvando…' : 'Atualizar quantidade'}</Button>}
     </form>}
-    {outdated && <p role="status" className="text-sm">Existe uma versão mais recente desta quantidade.</p>}
-    {error && <ErrorState message={error} />}
-    {(error || outdated) && <Button variant="ghost" size="sm" className="self-start" disabled={busy} onClick={() => {
-      if (!unchanged && !window.confirm('Descartar a quantidade digitada e carregar a versão salva?')) return
-      setBaseline(item); setValue(String(item.quantity_requested ?? '')); setError(null); setMessage('Quantidade recarregada.')
-    }}>Recarregar quantidade</Button>}
-    {message && <SuccessMessage>{message}</SuccessMessage>}
+    {notes && <div className="item-row-notes">
+      {outdated && <p role="status" className="text-sm">Existe uma versão mais recente desta quantidade.</p>}
+      {error && <ErrorState message={error} />}
+      {(error || outdated) && <Button variant="ghost" size="sm" className="self-start" disabled={busy} onClick={() => {
+        if (!unchanged && !window.confirm('Descartar a quantidade digitada e carregar a versão salva?')) return
+        setBaseline(item); setValue(String(item.quantity_requested ?? '')); setError(null); setMessage('Quantidade recarregada.'); setReloaded(count => count + 1)
+      }}>Recarregar quantidade</Button>}
+      {/* O foco só vem para cá depois do "Recarregar": salvar mantém o foco no botão. */}
+      {message && <p ref={reloadNotice} tabIndex={-1} role="status" className="state state-success">{message}</p>}
+    </div>}
     {!closed && <RemoveItem item={item} disabled={busy} onRemoved={onRemoved} />}
   </article>
 }
-// Remover pede confirmação no próprio cartão. Com reserva ativa o servidor recusa,
+// Remover pede confirmação na própria linha. Com reserva ativa o servidor recusa,
 // e o motivo aparece aqui; a lista é reconsultada para mostrar o estado real.
 function RemoveItem({ item, disabled, onRemoved }: { item: EventItem; disabled: boolean; onRemoved: (title: string) => void }) {
   const [confirming, setConfirming] = useState(false)
@@ -215,7 +229,7 @@ function RemoveItem({ item, disabled, onRemoved }: { item: EventItem; disabled: 
       await cache.invalidateQueries({ queryKey: giftKeys.items(item.event_id) })
     } finally { sending.current = false; setBusy(false) }
   }
-  return <div className="card-actions">
+  return <div className="item-row-actions">
     <button ref={trigger} type="button" className="btn-ghost btn-sm self-start" disabled={disabled} aria-expanded={confirming} aria-controls={panelId}
       aria-label={`Remover da lista: ${item.product.title}`} onClick={() => confirming ? cancel() : setConfirming(true)}>Remover da lista</button>
     {confirming && <div id={panelId} className="card-disclosure">
