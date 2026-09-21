@@ -176,16 +176,17 @@ try {
   const article = page => page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Fraldas tamanho P', exact: true }) })
   for (const page of pages) {
     assert.equal(await page.evaluate(() => globalThis.document.visibilityState), 'visible')
-    await expect(article(page).getByText('6 de 6 pacotes disponíveis', { exact: true })).toBeVisible()
+    await expect(article(page).getByText('6 de 6 disponíveis', { exact: true })).toBeVisible()
   }
   for (let qty = 1; qty <= 3; qty++) {
     await article(pages[0]).getByRole('spinbutton').fill(String(qty))
     // Início antes do clique: limite conservador, inclui envio/commit e renderização.
     const start = performance.now()
-    await article(pages[0]).getByRole('button', { name: qty === 1 ? 'Vou levar' : 'Atualizar minha escolha', exact: true }).click()
-    await expect(article(pages[1]).getByText(`${6 - qty} de 6 pacotes disponíveis`, { exact: true })).toBeVisible({ timeout: 10000 })
+    await article(pages[0]).getByRole('button', { name: qty === 1 ? 'Escolher presente' : 'Atualizar quantidade', exact: true }).click()
+    await expect(article(pages[1]).getByText(`${6 - qty} de 6 disponíveis`, { exact: true })).toBeVisible({ timeout: 10000 })
     sync.push(Math.ceil(performance.now() - start))
-    await expect(article(pages[0]).getByText(`Você confirmou ${qty} pacote(s).`, { exact: true })).toBeVisible()
+    // Textos do cartão do G3.1: reserva própria em "Sua reserva".
+    await expect(article(pages[0]).getByText(`${qty} ${qty === 1 ? 'pacote' : 'pacotes'}`, { exact: true })).toBeVisible()
   }
   phase = 'critérios de aceite'
   assert.ok(passesCriteria({ readP95: stats('read').p95_ms, writeP95: stats('reserve').p95_ms, syncMs: sync,

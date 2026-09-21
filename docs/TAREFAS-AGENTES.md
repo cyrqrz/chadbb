@@ -81,6 +81,76 @@ o ensaio familiar no celular continua pendente.
   - Testes: `tests/local/email-code.test.mjs` já cobre o back (código em outro
     cliente, código errado e reúso). Se o texto do botão mudar, ajustar
     `tests/local/email-login.test.mjs`. Limite local: 2 e-mails por hora.
+- [ ] **2026-09-17 · Usuário → Claude · Refazer o visual do convite (prioridade alta).**
+  Pedido do titular, com capturas de 17/09. Vale para `GuestPage.tsx`,
+  `styles.css` e componentes de `src/components/ui`. Nada aqui muda contrato:
+  todos os dados já vêm de `snapshot` (`guest_action`).
+  - **Cabeçalho.** Dar mais evidência ao nome do convidado: hoje ele aparece
+    dentro de uma frase, em corpo de texto. Promovê-lo na hierarquia (ex.:
+    saudação com o nome em destaque acima ou abaixo do título do evento),
+    sem perder o título. Reorganizar "Quando" e "Onde" com ritmo e alinhamento
+    mais claros; hoje ficam soltos abaixo do texto.
+  - **Cartão de data ao lado.** Onde hoje há o bloco "01 / Novembro", entregar
+    um cartão de calendário de verdade: dia da semana, dia, mês, horário e
+    **"Adicionar ao calendário"**. Gerar um `.ics` no próprio navegador
+    (`Blob` + `URL.createObjectURL`, sem servidor e sem CSP nova) e, opcional,
+    link para Google Agenda. Usar `starts_at`/`ends_at` do snapshot, fuso
+    `America/Sao_Paulo`; não recalcular prazos. Quando houver capa, ela
+    continua no lugar do cartão.
+  - **Local com mapa.** Em "Local e instruções", mostrar um mapa. Ver as
+    ressalvas do Codex abaixo antes de escolher a solução; manter sempre o
+    botão "Abrir no mapa" e o endereço em texto.
+  - **Presença, presentes e mimos.** Aplicar o mesmo sistema de cartões:
+    hierarquia igual entre os cartões, espaçamento consistente, estados
+    (reservado, completo, compra informada) legíveis sem depender só de cor.
+    Hoje os cartões de fralda variam de altura e as ações secundárias
+    ("Trocar tamanho", "Já comprei", "Cancelar reserva") competem com a ação
+    principal.
+  - **Movimento.** Animações discretas no hover/focus dos cartões e botões
+    (elevação e borda, 120–200 ms). Respeitar `prefers-reduced-motion` e nunca
+    animar layout que cause deslocamento ao ler. Foco visível continua igual.
+  - **Acessibilidade e responsivo (não regredir):** 320 px com texto a 200%,
+    alvos de 44 px, contraste AA, teclado e leitor de tela. Conferir no iPhone,
+    onde os campos de data hoje cortam (pedido separado).
+  - **Testes:** ampliar os e2e do convite e rodar `npm run check` antes do PR.
+
+  **Mapa: decisão do titular em 2026-09-17 — carregar só depois do clique.**
+  O endereço é dado privado do convite, então nada sai para terceiros sem ação
+  do convidado.
+  - Estado inicial: endereço em texto, o botão "Abrir no mapa" que já existe e
+    um botão novo, "Ver o mapa aqui", com aviso curto de que isso abre um
+    serviço externo (ex.: "carrega o OpenStreetMap com este endereço").
+  - Só no clique, inserir o iframe. Preferir **OpenStreetMap**
+    (`https://www.openstreetmap.org/export/embed.html?...`), com
+    `loading="lazy"`, `referrerpolicy="no-referrer"`, `title` descritivo e
+    altura fixa para não deslocar a página. Sem cookies nem scripts de terceiro.
+  - Nada de carregar o mapa automaticamente, nem prefetch, nem `<link rel>`
+    para o serviço antes do clique.
+  - CSP em `public/_headers`, revisada pelo Codex: acrescentar
+    `frame-src https://www.openstreetmap.org;` mantendo o resto igual,
+    inclusive `frame-ancestors 'none'`. Se a escolha mudar para o Google,
+    a regra passa a ser `frame-src https://www.google.com https://maps.google.com`.
+    Alterar só essa diretiva; qualquer outra mudança na CSP volta ao Codex.
+  - Registrar na tela que o endereço é do convite e não deve ser repassado.
+- [ ] **2026-09-17 · Codex → Claude · Erro de envio do link aparece como "conexão".**
+  Se o Auth não consegue enviar o e-mail, `/auth/v1/otp` responde **500**
+  `unexpected_failure` ("Error sending confirmation email"). Hoje isso acontece
+  com qualquer endereço que não seja o da conta Resend, porque o remetente é o
+  de testes `resend.dev`. `errorMessage` cai no texto genérico "Confira sua
+  conexão". Mapear esse caso em `/entrar` para algo como "Não conseguimos
+  enviar o e-mail para este endereço. Confira o e-mail ou fale com a
+  organização.". Visto nos logs em 17/09, 15:24–17:12 UTC.
+- [ ] **2026-09-17 · Codex → Claude · Voltar à página pedida depois do login.**
+  `RequireAuth` manda para `/entrar` e, depois do login, `AuthCallback` vai
+  sempre para `/eventos`. Guardar o destino (caminho interno, só do mesmo
+  site, nunca uma URL externa) antes de pedir o link e voltar para ele no
+  retorno. Exemplo: `/eventos/:id/convites` aberto sem sessão.
+- [ ] **2026-09-17 · Codex → Claude · Fonte bloqueada pela CSP.**
+  Console em `/entrar`: `font-src` bloqueia `data:font/woff2;base64,…`. O Vite
+  embute trechos pequenos das fontes Manrope/Fraunces como `data:`, e
+  `public/_headers` só tem `default-src 'self'`. Acrescentar
+  `font-src 'self' data:` à CSP (ou impedir que o build embuta fontes) e
+  conferir no console da produção que o aviso sumiu.
 - [ ] **2026-09-17 · Usuário → Claude · Campos de data cortados no iPhone.**
   No Safari do iOS, "Data e horário" e "Término" (`EventPage.tsx:108-109`,
   `type="datetime-local"`) passam da margem direita da tela (captura do titular,
@@ -139,10 +209,10 @@ o ensaio familiar no celular continua pendente.
   leitura; o valor 2 bloqueou o login após dois pedidos. Mantido o
   intervalo de 60 s por e-mail (`smtp_max_frequency`).
 - [x] **2026-09-17 · Exclusão de evento (`delete_event` + Edge `delete-event`).**
-  G1–G6 concluídos (detalhes em "Concluídas"). Falta só o teste pelo botão na
-  produção, depois do merge da PR #11, com um evento de rascunho criado só para
-  isso; em seguida o Codex confere, só com leitura, o registro em
-  `private.event_deletions`. **Não liberar o preview**
+  G1–G6 concluídos (detalhes em "Concluídas"). Testado pelo botão na produção
+  em 2026-09-17: dois eventos excluídos (um encerrado e um rascunho). Os registros
+  em `private.event_deletions`, conferidos só com leitura, trazem as contagens e
+  a limpeza do Storage concluída, sem falhas. **Não liberar o preview**
   (`claude-front.chadbb.pages.dev`) em `GUEST_ALLOWED_ORIGINS`: ele usa o banco
   de produção e viraria uma segunda porta para os convites reais.
   Códigos: `AUTH_REQUIRED`, `EVENT_NOT_FOUND`, `EVENT_VERSION_CONFLICT`,
@@ -283,7 +353,7 @@ mantém o cálculo antigo só como transição, isolado em `src/features/guests/
 | Agente | Tarefa | Branch | Situação |
 |---|---|---|---|
 | Claude | PR #11 (convite e “Excluir evento”) mergeada em 17/09, depois do G5/G6. Próximos: pedidos urgentes de 17/09 (código no login, botão de envio, campos de data no iPhone); depois T-F7 · G4 (26–30/09) — ver `docs/design/RETOMADA-CLAUDE.md` | `claude/front` | pedidos de 17/09 |
-| Codex | Exclusão de evento publicada; aguarda o teste pelo botão (PR #11). T-B5 pausada (plano em PLANO-DESEMPENHO-T-B5.md, remoto não autorizado) | `codex/back` | livre para a próxima tarefa |
+| Codex | T-B5: G2 remoto reprovado em 17/09 (p95 ~4,2 s, zero erros, sync ok); G3.1 local concluído (2 chamadas por POST); G3.2 (publicar e medir de novo) aguardando aprovação. Exclusão de evento concluída e testada em produção (plano em PLANO-DESEMPENHO-T-B5.md, remoto não autorizado) | `codex/back` | livre para a próxima tarefa |
 
 ## Concluídas
 
