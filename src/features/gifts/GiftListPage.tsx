@@ -8,7 +8,7 @@ import { errorMessage } from '../../lib/errors'
 import { failedLast, live } from '../../lib/query'
 import { useLastError } from '../../lib/useLastError'
 import { EmptyState, ErrorState, LoadingState, RefreshStatus, SuccessMessage } from '../../components/States'
-import { Button, Pagination, QuantityField, StatusBadge } from '../../components/ui'
+import { Button, Pagination, QuantityField, Skeleton, StatusBadge } from '../../components/ui'
 import { EventNotFound } from '../events/EventLayout'
 import { StepCompletion } from '../events/SetupDock'
 import { addCustomTreat, addItem, CATALOG_LIMIT, giftKeys, listedProducts, listItems, listProducts, PAGE_SIZE, prepareList, removeItem, setQuantity } from './api'
@@ -60,6 +60,8 @@ function GiftList({ eventId, closed, eventStatus, step }: { eventId: string; clo
     if (page > 0 && query.data?.items.length === 1) setPage(page - 1)
     setRemoved(current => ({ title, count: current.count + 1 }))
   }
+  // Contagem desta categoria, como o servidor devolveu (regra 6: o front não soma).
+  const count = query.data?.count ?? 0
   // Sem dado anterior, a nova tentativa volta a consulta para "pending" e zera isError;
   // comparar as datas mantém o aviso na tela durante a tentativa.
   return <div className="tab-panel">
@@ -90,11 +92,23 @@ function GiftList({ eventId, closed, eventStatus, step }: { eventId: string; clo
     {closed && <p className="notice mt-6">Evento encerrado. A lista está disponível apenas para consulta.</p>}
     <nav aria-label="Categorias de presentes" className="mt-10"><div className="segmented">{(['fralda', 'mimo'] as Category[]).map(value => <button key={value} aria-pressed={category === value} onClick={() => { setCategory(value); setPage(0); setTotal(null); setRemoved({ title: '', count: 0 }) }}>{categoryLabels[value]}</button>)}</div></nav>
     <section key={`list-${category}`} aria-labelledby="list-title" className="fade-swap mt-6">
-      <h2 id="list-title" className="text-2xl font-bold">{categoryLabels[category]} na lista</h2>
-      {query.isPending && !(failedLast(query) && listError) ? <LoadingState>Carregando a lista…</LoadingState> : !query.data ? <div className="mt-5"><ErrorState message={errorMessage(listError)} busy={query.isFetching} onRetry={() => void query.refetch()} retryLabel="Recarregar lista" /></div> : <>
-        <RefreshStatus fetching={query.isFetching} failed={query.isError} onRetry={() => void query.refetch()} retryLabel="Recarregar lista" label={`${query.data.count} ${query.data.count === 1 ? 'item' : 'itens'} · atualizando…`} />
+      {/* Cabeçalho da área: o título vem primeiro, o contador diz o tamanho da lista e
+          o atalho de incluir tem mais peso que qualquer remoção. */}
+      <div className="list-toolbar">
+        <h2 id="list-title" className="text-2xl font-bold">{categoryLabels[category]} na lista</h2>
+        {/* Some enquanto carrega e na lista vazia: lá o próprio estado vazio já diz o que há. */}
+        {count > 0 && <span className="badge badge-neutral list-count">{count} {count === 1 ? 'item' : 'itens'}</span>}
+        {!closed && <a className="secondary btn-sm list-toolbar-cta" href="#adicionar" onClick={event => {
+          const target = document.getElementById('adicionar')
+          if (!target) return
+          // Sem entrada no histórico: no celular o primeiro "voltar" só tiraria o `#adicionar`.
+          event.preventDefault(); target.scrollIntoView({ block: 'start' }); target.focus()
+        }}><span aria-hidden="true">+</span>Adicionar à lista</a>}
+      </div>
+      {query.isPending && !(failedLast(query) && listError) ? <><LoadingState>Carregando a lista…</LoadingState><ListSkeleton /></> : !query.data ? <div className="mt-5"><ErrorState message={errorMessage(listError)} busy={query.isFetching} onRetry={() => void query.refetch()} retryLabel="Recarregar lista" /></div> : <>
+        <RefreshStatus fetching={query.isFetching} failed={query.isError} onRetry={() => void query.refetch()} retryLabel="Recarregar lista" label="Atualizando…" />
         {removed.title && <p ref={removedNotice} tabIndex={-1} role="status" className="state state-success mt-3">“{removed.title}” saiu da lista.</p>}
-        {!query.data.count ? <div className="mt-3"><EmptyState title={category === 'fralda' ? 'Nenhum tamanho de fralda na lista.' : 'Nenhum mimo na lista.'}>{closed ? 'Nenhum presente foi incluído nesta categoria.' : 'Use a lista pronta do chá acima ou inclua um item pelo catálogo abaixo.'}</EmptyState></div> : <>
+        {!query.data.count ? <div className="mt-3"><EmptyState title={category === 'fralda' ? 'Nenhum tamanho de fralda na lista.' : 'Nenhum mimo na lista.'}>{closed ? 'Nenhum presente foi incluído nesta categoria.' : 'Use a lista pronta do chá acima ou o atalho “Adicionar à lista”.'}</EmptyState></div> : <>
           {/* G4b.3: "sem limite" é regra da categoria, e aparece uma vez no topo — não em cada linha. */}
           {category === 'mimo' && !closed && <p className="mt-3 text-muted">Sem limite de quantidade. Cada convidado informa quantos vai levar.</p>}
           <ul className="card item-rows stagger mt-3">{query.data.items.map(item => <li key={item.id}><ItemRow item={item} closed={closed} onRemoved={onRemoved} /></li>)}</ul>
@@ -105,6 +119,15 @@ function GiftList({ eventId, closed, eventStatus, step }: { eventId: string; clo
     </section>
     {!closed && <Catalog key={category} eventId={eventId} category={category} listed={listed.data} listedFailed={listed.errorUpdatedAt > listed.dataUpdatedAt} listedFetching={listed.isFetching} retryListed={() => void listed.refetch()} />}
   </div>
+}
+// §10: enquanto a lista carrega, o espaço reservado tem a forma das linhas. O anúncio
+// fica com o LoadingState ao lado; aqui é só desenho.
+function ListSkeleton() {
+  return <ul className="card item-rows mt-3" aria-hidden="true">{[70, 52, 84].map((width, index) =>
+    <li key={index}><div className="item-row">
+      <div className="item-row-text"><Skeleton width={`${width}%`} height="1.25rem" /></div>
+      <span className="item-row-remove"><Skeleton width="1.25rem" height="1.25rem" /></span>
+    </div></li>)}</ul>
 }
 // G4b.2: pacotes pedidos por tamanho e mimos na lista. Só apresentação do que a
 // consulta devolveu; reservas e progresso ficam no Painel.
@@ -182,6 +205,8 @@ function ItemRow({ item, closed, onRemoved }: { item: EventItem; closed: boolean
       {/* busy (aria-disabled) em vez de disabled: o foco fica no botão durante e depois do envio. */}
       {!closed && <Button type="submit" variant="secondary" size="sm" busy={busy || unchanged}>{busy ? 'Salvando…' : 'Atualizar quantidade'}</Button>}
     </form>}
+    {/* Remover vem antes dos avisos: o botão fica na primeira linha, e o Tab segue a ordem da tela. */}
+    {!closed && <RemoveItem item={item} disabled={busy} onRemoved={onRemoved} />}
     {notes && <div className="item-row-notes">
       {outdated && <p role="status" className="text-sm">Existe uma versão mais recente desta quantidade.</p>}
       {error && <ErrorState message={error} />}
@@ -192,7 +217,6 @@ function ItemRow({ item, closed, onRemoved }: { item: EventItem; closed: boolean
       {/* O foco só vem para cá depois do "Recarregar": salvar mantém o foco no botão. */}
       {message && <p ref={reloadNotice} tabIndex={-1} role="status" className="state state-success">{message}</p>}
     </div>}
-    {!closed && <RemoveItem item={item} disabled={busy} onRemoved={onRemoved} />}
   </article>
 }
 // Remover pede confirmação na própria linha. Com reserva ativa o servidor recusa,
@@ -229,10 +253,14 @@ function RemoveItem({ item, disabled, onRemoved }: { item: EventItem; disabled: 
       await cache.invalidateQueries({ queryKey: giftKeys.items(item.event_id) })
     } finally { sending.current = false; setBusy(false) }
   }
-  return <div className="item-row-actions">
-    <button ref={trigger} type="button" className="btn-ghost btn-sm self-start" disabled={disabled} aria-expanded={confirming} aria-controls={panelId}
-      aria-label={`Remover da lista: ${item.product.title}`} onClick={() => confirming ? cancel() : setConfirming(true)}>Remover da lista</button>
-    {confirming && <div id={panelId} className="card-disclosure">
+  // §5.2: ícone em repouso neutro, com o tom destrutivo só no hover/foco. O `title` dá
+  // o rótulo a quem usa mouse e repete o nome acessível de propósito: com textos
+  // diferentes, o leitor de tela lê o nome e depois a descrição, em cada linha da lista.
+  const removeLabel = `Remover da lista: ${item.product.title}`
+  return <>
+    <button ref={trigger} type="button" className="btn-icon item-row-remove" disabled={disabled} aria-expanded={confirming} aria-controls={panelId}
+      aria-label={removeLabel} title={removeLabel} onClick={() => confirming ? cancel() : setConfirming(true)}>{trashIcon}</button>
+    {confirming && <div id={panelId} className="card-disclosure item-row-confirm">
       <p ref={question} tabIndex={-1}>Remover “{item.product.title}” da lista? Os convidados deixam de ver este presente.{item.product.event_id ? ' Este mimo foi criado por você e será apagado.' : ''}</p>
       <div className="flex flex-wrap gap-3">
         {!blocked && <Button variant="danger" busy={busy} onClick={() => void remove()}>{busy ? 'Removendo…' : 'Remover'}</Button>}
@@ -240,8 +268,13 @@ function RemoveItem({ item, disabled, onRemoved }: { item: EventItem; disabled: 
       </div>
       {error && <p ref={errorText} tabIndex={-1} role="alert" className="error">{error}</p>}
     </div>}
-  </div>
+  </>
 }
+// Lixeira decorativa: quem lê a tela pelo teclado ou por leitor recebe o aria-label do botão.
+const trashIcon = <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <path d="M4 7h16" /><path d="M10 11.5v5.5" /><path d="M14 11.5v5.5" />
+  <path d="M6.5 7l.8 11.2A2 2 0 0 0 9.3 20h5.4a2 2 0 0 0 2-1.8L17.5 7" /><path d="M9.5 7V5.5A1.5 1.5 0 0 1 11 4h2a1.5 1.5 0 0 1 1.5 1.5V7" />
+</svg>
 // Mimo que não está no catálogo: só nome e descrição, sem limite, só para este evento.
 function CustomTreatForm({ eventId }: { eventId: string }) {
   const [title, setTitle] = useState('')
@@ -299,7 +332,9 @@ function Catalog({ eventId, category, listed, listedFailed, listedFetching, retr
   // Sem saber o que já está na lista (falha), mostra tudo: o banco recusa repetição.
   const suggestions = query.data?.products.filter(product => listedFailed || !isListed(product)) ?? []
   const noun = category === 'fralda' ? 'tamanhos de fralda' : 'mimos'
-  return <section aria-labelledby="catalog-title" className="mt-14 border-t border-stone-300 pt-10">
+  // `tabIndex` no alvo do atalho: o “Adicionar à lista” do cabeçalho leva o foco para cá,
+  // e não só a rolagem — quem usa teclado continua de onde a página parou.
+  return <section id="adicionar" tabIndex={-1} aria-labelledby="catalog-title" className="mt-14 border-t border-stone-300 pt-10">
     <h2 id="catalog-title" className="text-2xl font-bold">Adicionar à lista</h2>
     {category === 'mimo' && <CustomTreatForm eventId={eventId} />}
     <section aria-labelledby="catalog-suggestions" className="mt-8">

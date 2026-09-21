@@ -981,7 +981,9 @@ test.describe('G3.1 · cards do organizador', () => {
       }))
       await page.keyboard.press('Tab')
     }
-    expect(order).toEqual(['Diminuir pacotes', 'campo de quantidade', 'Aumentar pacotes', 'Atualizar quantidade', 'Recarregar quantidade', 'Remover da lista: Fraldas tamanho P'])
+    // Remover fica na primeira linha, à direita do nome; o aviso de erro e o "Recarregar"
+    // vêm abaixo. O Tab segue essa ordem da tela.
+    expect(order).toEqual(['Diminuir pacotes', 'campo de quantidade', 'Aumentar pacotes', 'Atualizar quantidade', 'Remover da lista: Fraldas tamanho P', 'Recarregar quantidade'])
     await sameAnatomy(page)
     await expectAccessible(page)
   })
@@ -1191,8 +1193,16 @@ test.describe('G3.1 · cards do organizador', () => {
     await expect(done).toBeVisible()
     // O foco fica no resultado, dentro da linha: o próximo Tab continua dali.
     await expect(done).toBeFocused()
-    await page.keyboard.press('Tab')
+    // E o "Remover" da mesma linha continua a um Shift+Tab de distância, acima do aviso.
+    await page.keyboard.press('Shift+Tab')
     await expect(card.getByRole('button', { name: 'Remover da lista: Fraldas tamanho G' })).toBeFocused()
+    await done.focus()
+    await page.keyboard.press('Tab')
+    // Para frente o foco segue na página, e não volta para o topo nem cai no <body>.
+    expect(await done.evaluate(node => {
+      const next = document.activeElement
+      return next !== null && next !== document.body && Boolean(node.compareDocumentPosition(next) & Node.DOCUMENT_POSITION_FOLLOWING)
+    })).toBe(true)
   })
 
   test('catálogo: erro fica na linha do produto e o sucesso vira aviso com foco', async ({ page }) => {

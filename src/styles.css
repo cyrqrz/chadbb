@@ -299,21 +299,52 @@
   .catalog-row > .state { flex-basis: 100%; }
   .product-listed { border-style: dashed; background: var(--color-surface-soft); box-shadow: none; }
 
-  /* G4b.3: fraldas e mimos numa lista única, uma linha por item, dentro de um só card. */
+  /* Cabeçalho da lista: título, contador e o atalho de incluir na mesma faixa. */
+  .list-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; }
+  .list-toolbar > h2 { margin-inline-end: auto; }
+  .list-count { font-variant-numeric: tabular-nums; }
+  .list-toolbar-cta { flex-shrink: 0; }
+
+  /* G4b.3: fraldas e mimos numa lista única, uma linha por item, dentro de um só card.
+     A linha é uma grade: nome à esquerda, ação à direita, e o que for da linha inteira
+     (quantidade em tela estreita, confirmação, avisos) em faixas abaixo. */
+  .item-rows { container: item-list / inline-size; }
+  .item-rows > li { border-radius: var(--control-radius); transition: background-color var(--duration-fast); }
   .item-rows > li + li { border-top: 1px solid var(--divider-color); }
-  .item-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.25rem; padding-block: 0.875rem; }
-  /* Mesma base de 16rem do catálogo: sem espaço ao lado, o formulário desce em vez de
-     espremer o nome do produto a uma palavra por linha. */
-  .item-row-text { display: flex; flex: 1 1 16rem; min-width: 0; flex-direction: column; gap: 4px; }
+  /* Como no .step-card: só onde há mouse. No toque o :hover gruda depois do toque, e a
+     linha ficaria destacada como se estivesse selecionada — sem nada para selecionar. */
+  @media (hover: hover) { .item-rows > li:hover { background: var(--color-surface-subtle); } }
+  .item-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; min-height: 56px; column-gap: 0.75rem; row-gap: 0.5rem; padding-block: 0.5rem; }
+  .item-row-text { grid-column: 1; display: flex; min-width: 0; flex-direction: column; gap: 4px; }
   .item-row-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
   .item-row-title { font-weight: 650; }
   .item-row-description { font-size: var(--text-body-sm); color: var(--color-muted); }
-  .item-row-form { display: flex; min-width: 0; flex-wrap: wrap; align-items: flex-end; gap: 0.75rem; }
+  .item-row-form { grid-column: 1 / -1; display: flex; min-width: 0; flex-wrap: wrap; align-items: flex-end; gap: 0.75rem; }
   .item-row-form > .field { min-width: 0; }
-  /* Aviso, erro e confirmação ocupam a linha inteira, abaixo do item. */
-  .item-row-notes, .item-row-actions { display: flex; flex-basis: 100%; flex-direction: column; align-items: flex-start; gap: var(--action-gap); }
+  /* Remover: baixa ênfase em repouso; o tom destrutivo só aparece no hover e no foco. */
+  .item-row-remove { grid-column: 2; grid-row: 1; justify-self: end; align-self: start; display: inline-grid; place-items: center; }
+  /* Fralda em tela estreita: a quantidade desce para a segunda faixa, e o remover desce
+     com ela, no fim da linha. Se ficasse ao lado do nome, o Tab sairia de "Atualizar
+     quantidade" e subiria de volta — ordem de foco diferente da ordem da tela. */
+  .item-row:has(.item-row-form) .item-row-form { grid-column: 1; }
+  .item-row:has(.item-row-form) .item-row-remove { grid-row: 1 / span 2; align-self: end; }
+  button.item-row-remove { color: var(--color-text-muted); }
+  button.item-row-remove:hover:not(:disabled, [aria-disabled="true"]), button.item-row-remove:focus-visible { background: var(--color-danger-soft); color: var(--color-danger); }
+  /* Confirmação e avisos ocupam a linha inteira, abaixo do item. */
+  .item-row-confirm { grid-column: 1 / -1; }
+  .item-row-notes { grid-column: 1 / -1; display: flex; flex-direction: column; align-items: flex-start; gap: var(--action-gap); }
   /* Como em .card-actions: o recuo do botão-texto nunca passa da borda do card (o padding encolhe em telas estreitas). */
-  .item-row-actions > .btn-ghost { justify-content: flex-start; margin-inline-start: calc(-1 * min(0.5rem, var(--card-padding) - 2px)); padding-inline: 0.5rem; }
+  .item-row-notes > .btn-ghost { justify-content: flex-start; margin-inline-start: calc(-1 * min(0.5rem, var(--card-padding) - 2px)); padding-inline: 0.5rem; }
+  /* Com espaço, a quantidade da fralda volta para a primeira linha, entre o nome e o remover. */
+  @container item-list (min-width: 38rem) {
+    .item-row { grid-template-columns: minmax(0, 1fr) auto auto; }
+    .item-row-form { grid-column: 2; grid-row: 1; }
+    .item-row-remove { grid-column: 3; align-self: center; }
+    /* Com tudo na mesma faixa, o remover volta para o fim dela. Regras separadas: um
+       navegador sem :has() ignora só estas duas, e não a faixa larga inteira. */
+    .item-row:has(.item-row-form) .item-row-form { grid-column: 2; }
+    .item-row:has(.item-row-form) .item-row-remove { grid-row: 1; align-self: center; }
+  }
 
   /* Cabeçalho e abas do evento (G4). */
   .event-header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 1rem 1.5rem; margin-top: 1.25rem; }
