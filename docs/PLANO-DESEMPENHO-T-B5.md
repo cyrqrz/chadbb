@@ -166,10 +166,47 @@ causa, sem repetir até obter aprovação nem aumentar limites para passar.
   sincronização **4996 / 4985 / 4991 ms**; limpeza zerada. É só indicativo,
   pela variação do ambiente local.
 
-### G3.2 — Publicação e nova medição (aguardando aprovação)
+### G3.2 — Publicação e nova medição (executado em 2026-09-21)
 
-1. `db push` só com `20260917010000_guest_rates_batch.sql`, depois do dry-run.
-   A Edge atual continua funcionando: `check_guest_rate` não muda.
-2. Deploy só da Edge `guest`.
-3. Repetir o ensaio remoto **uma vez** e cruzar com os tempos registrados no log
-   da Edge.
+Aprovado pelo titular. Os três passos foram feitos nesta ordem:
+
+1. `db push` com as três migrations de setembro (a de cotas veio junto das de
+   18/09, que a unificação das branches trouxe para a mesma árvore). `migration
+   list` remoto ficou igual à branch: 24 de cada lado.
+2. Deploy só da Edge `guest`, depois de a RPC já estar em produção.
+3. Ensaio remoto **uma vez**.
+
+#### Resultado: **reprovado**, com queda de cerca de metade
+
+| Métrica | 2026-09-17 | 2026-09-21 | Meta |
+|---|---|---|---|
+| Leitura p95 (225 req) | 4258 ms | **2187 ms** (máx. 2359) | ≤ 2000 ms |
+| Escrita p95 (25 req) | 4044 ms | **2328 ms** (máx. 2357) | ≤ 2000 ms |
+| Erros | 0 | **0** | 0 |
+| Sincronização | 6008 / 4984 / 5482 ms | **5532 / 4971 / 5497 ms** | ≤ 7000 ms |
+| POSTs guest | 362 | 362 | ≤ 420 |
+
+Zero erros e zero leituras canceladas pela UI. Limpeza restrita zerada nas oito
+contagens. **O ensaio não foi repetido** e nenhum limite foi afrouxado.
+
+Leitura do resultado: passar de 4 para 2 idas ao PostgREST cortou 49% da leitura
+e 42% da escrita — o diagnóstico de 17/09 estava certo sobre o gargalo. O que
+sobra (187 ms na leitura, 328 ms na escrita) é consistente com as 2 idas que
+restaram mais o teto de CPU da Edge no plano free, mas isso **não foi medido**:
+o cruzamento com `rate_ms`/`action_ms` do log da Edge ficou pendente porque o
+CLI desta versão não tem `functions logs`; os tempos estão no painel do projeto.
+
+#### Decisão do titular, conforme o passo 3 do G3
+
+Com o ganho estrutural já colhido, as opções que restam não são de código:
+
+1. **Compute maior** (plano pago) — ataca diretamente o teto de CPU da Edge e o
+   `max_connections` 60 do free.
+2. **Conexão direta da Edge ao Postgres pelo pooler**, eliminando o PostgREST do
+   caminho das cotas.
+3. **Aceitar o número medido**, registrando que o modelo de carga (50 pedidos no
+   mesmo instante a cada 5 s) é mais severo que 50 convidados reais consultando
+   de forma espalhada, e que a sincronização tem folga de 1,5 s.
+
+A terceira não é afrouxar a meta: é decidir, com o número na mão, se a meta
+original descreve o uso real do chá.
