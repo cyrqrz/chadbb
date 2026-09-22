@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Link, useLocation, useParams } from 'react-router-dom'
+import { Link, useLocation, useOutletContext, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { coverUrl, eventKeys, getEvent, saveEvent, transitionEvent, uploadCover } from './api'
 import { toDraft, validateDraft, validateImage } from './model'
@@ -12,6 +12,7 @@ import { useAuth } from '../auth/context'
 import { ErrorState, LoadingState, RefreshStatus, SlowRefresh, SuccessMessage } from '../../components/States'
 import { Button } from '../../components/ui'
 import { EventNotFound } from './EventLayout'
+import type { EventLayoutContext } from './EventLayout'
 
 export function EventPage() {
   const { id = '' } = useParams()
@@ -49,6 +50,12 @@ function EventEditor({ server, created, refreshing, refreshFailed, retry }: { se
   // ordem depois de salvar não deve ser anunciada como alteração de outra sessão.
   const outdated = server.version > record.version
   const dirty = JSON.stringify(draft) !== JSON.stringify(toDraft(record)) || imageFile !== null
+  // Avisa o cabeçalho (EventLayout) para confirmar antes de navegar para fora da
+  // edição; ao desmontar (salvar, trocar de evento, sair), limpa para não deixar
+  // dirty residual bloqueando o próximo evento.
+  const { setDirty } = useOutletContext<EventLayoutContext>()
+  useEffect(() => { setDirty(dirty) }, [dirty, setDirty])
+  useEffect(() => () => setDirty(false), [setDirty])
   const update = (name: keyof EventDraft, value: string) => { setDraft(current => ({ ...current, [name]: value })); setMessage('') }
   async function accept(event: EventRecord) {
     setRecord(event); setDraft(toDraft(event)); setImageFile(null); setPublicConsent(false)

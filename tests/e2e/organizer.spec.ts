@@ -195,6 +195,40 @@ test('prévia: publicação já feita em outra aba mostra o evento publicado, n�
   await expect(page.getByRole('link', { name: 'Seguir para convidados e presença' })).toBeVisible()
 })
 
+test('cabeçalho: alteração pendente exige confirmação para sair da edição', async ({ page }) => {
+  const mock = await backend(page, true)
+  mock.seed({ guests_done_at: '2026-01-02T00:00:00Z', gifts_done_at: '2026-01-02T00:00:00Z' })
+  await page.goto(`/eventos/${eventId}/dados`)
+  await expect(page.getByRole('navigation', { name: 'Áreas do evento' })).toBeVisible()
+  await page.getByLabel('Nome do evento').fill('Rascunho não salvo')
+
+  // Cancelar no diálogo: permanece na tela e o rascunho continua intacto.
+  page.once('dialog', dialog => void dialog.dismiss())
+  await page.getByRole('navigation', { name: 'Áreas do evento' }).getByRole('link', { name: 'Painel' }).click()
+  await expect(page).toHaveURL(new RegExp(`/eventos/${eventId}/dados$`))
+  await expect(page.getByLabel('Nome do evento')).toHaveValue('Rascunho não salvo')
+
+  // A prévia do cabeçalho pede a mesma confirmação.
+  page.once('dialog', dialog => void dialog.dismiss())
+  await page.getByRole('link', { name: 'Ver como o convidado vê' }).click()
+  await expect(page).toHaveURL(new RegExp(`/eventos/${eventId}/dados$`))
+  await expect(page.getByLabel('Nome do evento')).toHaveValue('Rascunho não salvo')
+
+  // Confirmar no diálogo: a navegação segue normalmente.
+  page.once('dialog', dialog => void dialog.accept())
+  await page.getByRole('link', { name: 'Ver como o convidado vê' }).click()
+  await expect(page).toHaveURL(new RegExp(`/eventos/${eventId}/previa$`))
+  expect(mock.getRecord()?.title).not.toBe('Rascunho não salvo')
+})
+
+test('cabeçalho: sem alteração pendente navega sem pedir confirmação', async ({ page }) => {
+  const mock = await backend(page, true)
+  mock.seed({ guests_done_at: '2026-01-02T00:00:00Z', gifts_done_at: '2026-01-02T00:00:00Z' })
+  await page.goto(`/eventos/${eventId}/dados`)
+  await page.getByRole('navigation', { name: 'Áreas do evento' }).getByRole('link', { name: 'Painel' }).click()
+  await expect(page).toHaveURL(new RegExp(`/eventos/${eventId}$`))
+})
+
 test('etapa concluída em outra aba: sem erro para tentar de novo', async ({ page }) => {
   const mock = await backend(page, true)
   mock.seed({})

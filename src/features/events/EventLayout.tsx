@@ -1,4 +1,5 @@
-import { Suspense } from 'react'
+import { Suspense, useState } from 'react'
+import type { MouseEvent } from 'react'
 import { Link, NavLink, Navigate, Outlet, useMatch, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { eventKeys, getEvent } from './api'
@@ -10,6 +11,11 @@ import { BackLink, StatusBadge } from '../../components/ui'
 import { LoadingState } from '../../components/States'
 
 const tabs = [['', 'Painel'], ['presentes', 'Presentes'], ['dados', 'Dados do evento']] as const
+
+// A edição (em `EventPage`) avisa aqui se há rascunho não salvo, para o cabeçalho
+// confirmar antes de navegar para fora da tela. Consumido via `useOutletContext`
+// por qualquer descendente de `Outlet`, sem precisar de um contexto próprio.
+export type EventLayoutContext = { setDirty: (dirty: boolean) => void }
 
 function countdown(days: number | null) {
   if (days === null || days < 0) return null
@@ -23,6 +29,11 @@ export function EventLayout() {
   const { session } = useAuth()
   const query = useQuery({ queryKey: [...eventKeys.detail(id), session?.user.id], queryFn: () => getEvent(id), retry: false, ...live })
   const event = query.data
+  // Rascunho não salvo em `EventPage`: bloqueia a navegação por este cabeçalho.
+  const [dirty, setDirty] = useState(false)
+  function guard(e: MouseEvent) {
+    if (dirty && !window.confirm('Descartar as alterações e sair sem salvar?')) e.preventDefault()
+  }
   const when = event?.starts_at ? new Date(event.starts_at).toLocaleString('pt-BR', { dateStyle: 'long', timeStyle: 'short', timeZone: 'America/Sao_Paulo' }) : null
   const left = event && event.status !== 'closed' ? countdown(daysUntil(event.starts_at)) : null
   // Na configuração (rascunho ou etapa pendente), a tela de dados fica sem abas:
@@ -39,14 +50,14 @@ export function EventLayout() {
         <h1 className="page-title break-words">{event ? event.title || 'Evento sem título' : 'Seu evento'}</h1>
         {event && <p className="text-muted">{when ?? 'Data a definir'}</p>}
       </div>
-      {event !== null && <Link className="secondary self-start" to={`/eventos/${id}/previa`}>Ver como o convidado vê</Link>}
+      {event !== null && <Link className="secondary self-start" to={`/eventos/${id}/previa`} onClick={guard}>Ver como o convidado vê</Link>}
     </header>
     {/* Evento inexistente: a aba mostra “Evento não encontrado”; abas e prévia não levariam a nada. */}
     {showTabs && <nav aria-label="Áreas do evento" className="event-tabs">
-      {tabs.map(([path, label]) => <NavLink key={label} end to={`/eventos/${id}${path ? `/${path}` : ''}`}>{label}</NavLink>)}
+      {tabs.map(([path, label]) => <NavLink key={label} end to={`/eventos/${id}${path ? `/${path}` : ''}`} onClick={guard}>{label}</NavLink>)}
     </nav>}
     {/* A troca de aba carrega só o conteúdo; o cabeçalho fica. */}
-    <Suspense fallback={<LoadingState>Carregando…</LoadingState>}><Outlet /></Suspense>
+    <Suspense fallback={<LoadingState>Carregando…</LoadingState>}><Outlet context={{ setDirty } satisfies EventLayoutContext} /></Suspense>
     {event && <SetupDock event={event} />}
   </section>
 }
