@@ -222,6 +222,31 @@ o ensaio familiar no celular continua pendente.
   `chadbb.pages.dev` sem erros de console. Por cima do G5, o último pedaço do
   pedido de 17/09 (cartão de calendário com `.ics`) também saiu e foi publicado
   junto. Congelamento a partir de 05/10 segue valendo: só correções até 01/11.
+- [x] **2026-09-22 · Claude · Corrigida a instabilidade de `gift-list-qa.spec.ts:264`.**
+  `o realce da linha é só para quem usa mouse` falhava no projeto `desktop`.
+  Primeiro diagnóstico ERRADO, registrado aqui para não se repetir: chamei de
+  falha determinística porque falhou três vezes seguidas, inclusive isolada no
+  HEAD `abc71b9` limpo. Uma quarta rodada passou — eram três amostras de uma
+  falha frequente, não prova de determinismo.
+  Causa real, medida pelo `console.log` do próprio teste: na rodada que falha o
+  fundo sai `rgba(0, 0, 0, 0)` em repouso **e** sob o ponteiro; nas que passam
+  vira `rgb(248, 238, 241)`. O repouso transparente descarta a hipótese de o
+  ponteiro já estar sobre a linha. O que corre é a leitura: o navegador aplica
+  o `:hover` no hit-test do quadro seguinte ao movimento, e o teste lia o estilo
+  computado uma vez só, logo depois do `hover()`. Sob carga o quadro atrasa e a
+  leitura pega a cor de repouso. O CSS (`.item-rows > li:hover` dentro de
+  `@media (hover: hover)`) está correto e não foi tocado.
+  Correção no teste: o ramo com mouse espera o realce com `expect.poll`; o sem
+  mouse dá dois quadros de folga antes de afirmar que o realce não veio.
+  Conferido com teste de mutação — removendo a regra de realce do `styles.css`,
+  o `desktop` volta a falhar e o `mobile` continua passando, então a asserção
+  não ficou vazia.
+- [ ] **2026-09-22 · Claude · Observar `gift-list.spec.ts:142` no `mobile`.**
+  `lista de mimos cabe em 320 px sem rolagem horizontal` falhou uma vez, na
+  suíte completa, e passou 3/3 isolada depois. Só uma amostra e a evidência do
+  Playwright foi apagada pela rodada seguinte, então não afirmo causa nenhuma —
+  fica anotado para olhar se reaparecer. Não tem relação com a T-F2: o arquivo
+  e a tela não foram tocados.
 - [ ] **T-F6 · Testes.** Ampliar os testes e2e para o que mudar; `npm run check`
   antes de cada PR.
 
@@ -458,7 +483,7 @@ ver `AGENTS.md`. A tabela abaixo reflete o fim do dia de 22/09.)_
 
 | Agente | Tarefa | Situação |
 |---|---|---|
-| Claude | T-F7 e T-F2 completas. T-F2 fechada em 22/09: fallbacks removidos, campos obrigatórios, selo por `invitation_id`. Próximos: os itens de 17/09 ainda abertos — mensagem de "conexão" no envio do link e voltar à página pedida depois do login | livre para a próxima tarefa |
+| Claude | T-F7 e T-F2 completas. T-F2 fechada em 22/09: fallbacks removidos, campos obrigatórios, selo por `invitation_id`. Depois dela, corrigida a instabilidade de `gift-list-qa.spec.ts:264` (corrida de leitura do `:hover`, não bug de CSS). Próximos: os itens de 17/09 ainda abertos — mensagem de "conexão" no envio do link e voltar à página pedida depois do login | livre para a próxima tarefa |
 | Codex | R2/R3 e T-B7 publicados em produção (22/09, com aprovação do titular). Livre para a próxima — candidatos no quadro: T-B6 (operação/backup), login por código no e-mail (falta a tela do front, já é item do Claude), ou os pedidos urgentes de 17/09 que são do back | livre para a próxima tarefa |
 
 ## Concluídas

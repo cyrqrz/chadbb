@@ -266,13 +266,20 @@ test('o realce da linha é só para quem usa mouse', async ({ page }) => {
   await page.getByRole('button', { name: 'Mimos', exact: true }).click()
   const row = page.getByRole('region', { name: 'Mimos na lista' }).locator('ul.item-rows > li').first()
   await expect(row).toBeVisible()
-  const rest = await row.evaluate(node => getComputedStyle(node).backgroundColor)
-  await row.hover()
-  const hovered = await row.evaluate(node => getComputedStyle(node).backgroundColor)
+  const background = () => row.evaluate(node => getComputedStyle(node).backgroundColor)
   const mouse = await page.evaluate(() => matchMedia('(hover: hover)').matches)
-  console.log(`hover: hover = ${mouse} · repouso ${rest} · sob o ponteiro ${hovered}`)
-  if (mouse) expect(hovered).not.toBe(rest)
-  else expect(hovered).toBe(rest)
+  const rest = await background()
+  await row.hover()
+  // O navegador só aplica o :hover no hit-test do quadro seguinte ao movimento do
+  // ponteiro. Ler o estilo logo depois do hover() corre com esse recálculo e, sob
+  // carga, pega a cor de repouso — daí esperar em vez de medir uma vez só.
+  if (mouse) await expect.poll(background, { timeout: 5000 }).not.toBe(rest)
+  else {
+    // Sem mouse não há o que esperar, mas o realce também não pode aparecer num
+    // quadro seguinte: dá dois quadros de folga antes de afirmar que não veio.
+    await row.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(() => done(null)))))
+    expect(await background()).toBe(rest)
+  }
   // Nada de clicável na linha além do botão: ela não é link nem tem onClick.
   expect(await row.evaluate(node => node.querySelector('a,[role="button"],[onclick]') !== null)).toBe(false)
 })
