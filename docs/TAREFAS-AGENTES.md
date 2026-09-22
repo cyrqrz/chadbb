@@ -63,7 +63,9 @@ o ensaio familiar no celular continua pendente.
   responde `ORIGIN_DENIED` de propósito, porque só `https://chadbb.pages.dev` é
   liberado. Use o backend simulado nos e2e. Contrato completo em
   `CONTRATOS-TRANSACIONAIS.md`, seção "Exclusão de evento".
-- [ ] **2026-09-17 · Codex → Claude · Entrar com código do e-mail (urgente).**
+- [x] **2026-09-17 · Codex → Claude · Entrar com código do e-mail (urgente).**
+  _(Já implementado: `src/features/auth/LoginPage.tsx` tem o campo "Código de
+  8 dígitos" com `verifyOtp`. Esta linha estava desatualizada.)_
   O titular não conseguiu entrar: pediu o link num navegador e o abriu em outro
   (o Safari do iPhone). O PKCE só funciona no navegador do pedido. Nos logs do
   Auth, o `/verify` deu 303 e nenhum `/token` foi chamado. O e-mail passa a
@@ -158,13 +160,17 @@ o ensaio familiar no celular continua pendente.
   sempre para `/eventos`. Guardar o destino (caminho interno, só do mesmo
   site, nunca uma URL externa) antes de pedir o link e voltar para ele no
   retorno. Exemplo: `/eventos/:id/convites` aberto sem sessão.
-- [ ] **2026-09-17 · Codex → Claude · Fonte bloqueada pela CSP.**
+- [x] **2026-09-17 · Codex → Claude · Fonte bloqueada pela CSP.**
+  _(Já corrigido: `public/_headers` tem `font-src 'self' data:`. Esta linha
+  estava desatualizada.)_
   Console em `/entrar`: `font-src` bloqueia `data:font/woff2;base64,…`. O Vite
   embute trechos pequenos das fontes Manrope/Fraunces como `data:`, e
   `public/_headers` só tem `default-src 'self'`. Acrescentar
   `font-src 'self' data:` à CSP (ou impedir que o build embuta fontes) e
   conferir no console da produção que o aviso sumiu.
-- [ ] **2026-09-17 · Usuário → Claude · Campos de data cortados no iPhone.**
+- [x] **2026-09-17 · Usuário → Claude · Campos de data cortados no iPhone.**
+  _(Já corrigido: a regra sugerida está em `src/styles.css`. Esta linha
+  estava desatualizada.)_
   No Safari do iOS, "Data e horário" e "Término" (`EventPage.tsx:108-109`,
   `type="datetime-local"`) passam da margem direita da tela (captura do titular,
   2026-09-17). Com a aparência nativa, o WebKit ignora `width: 100%`. Correção
@@ -180,47 +186,49 @@ o ensaio familiar no celular continua pendente.
   "Escolher presente", "Cancelar reserva"); explicar que "Já comprei" é só uma
   declaração do convidado.
 - [ ] **T-F2 · Painel do organizador.** _(2026-09-16: resumo, fraldas, mimos e
-  escolhas separados; aguardando T-B7 para remover o cálculo provisório.)_ Conferir se o `InvitationsPage` mostra
+  escolhas separados. 2026-09-22: T-B7 publicado em produção — `summary`,
+  `available` e `invitation_id` já existem de verdade. Falta só a limpeza:
+  remover `panelSummary`/`availableOf` (cálculo de transição em
+  `src/features/guests/api.ts`), tipar os campos como obrigatórios e trocar o
+  vínculo do selo "Vai enviar presente" de nome para `invitation_id`. Não é
+  urgente — o front funciona igual com o fallback — mas fica mais simples sem
+  código morto.)_ Conferir se o `InvitationsPage` mostra
   convites respondidos separados de pessoas confirmadas, fraldas comprometidas e
   disponíveis por tamanho (P 6 / M 19 / G 19 / XG 6) e mimos em separado. Se
   faltar dado, registrar um pedido para o Codex abaixo; não calcular no front.
-- [ ] **T-F3 · Acessibilidade (M5).** Teclado e foco (visível, previsível, retorno
+- [x] **T-F3 · Acessibilidade (M5).** _(Substancialmente coberto pelo G5:
+  `test:e2e` roda axe em convidado, organizador e `/amostras`; G5.4 corrigiu
+  A14/A16/A18; A19 já estava coberto desde o G3.1. Teclado/foco, 320 px a
+  200%, alvos de 44 px e movimento reduzido são guardados por testes em quase
+  toda tela. Não reabrir sem achado novo.)_ Teclado e foco (visível, previsível, retorno
   após diálogos); 320 px com texto a 200%; áreas de toque de 44 px; movimento
-  reduzido; avisos ao leitor de tela sem repetir tudo a cada atualização. Levar o
-  axe, que hoje só cobre as áreas do convidado, às telas do organizador.
-- [ ] **T-F4 · Contrato de atualização no front (M2).** Distinguir "salvo" de
-  "painel ainda não atualizado"; mostrar perda de conexão; nunca sobrescrever o
-  que está sendo digitado em nenhum formulário, inclusive na edição de convite.
+  reduzido; avisos ao leitor de tela sem repetir tudo a cada atualização.
+- [x] **T-F4 · Contrato de atualização no front (M2).** _(G5.3: estado sem
+  conexão com banner global e aviso antes de tentar salvar nos quatro pontos
+  de gravação principais — ver `docs/design/G5-ESTADOS.md`. "Salvo" vs. "painel
+  ainda não atualizado" já era coberto por `RefreshStatus`/`SlowRefresh`
+  desde antes do G5; nunca sobrescrever o que está sendo digitado é a regra 7
+  do `AGENTS.md`, já respeitada em todos os formulários, inclusive a edição
+  de convite.)_
 - [x] **T-F5 · Prévia do link no WhatsApp.** _(2026-09-16, G3: tags `og:` e imagem
   genérica `public/og-image.png`; prévia por evento fica para depois do MVP.)_ Prévia genérica bem apresentada
   (meta tags em `index.html`). Prévia personalizada por evento é opcional.
-- [ ] **T-F7 · Refatoração visual (plano em `docs/design/PLANO-VISUAL.md`).**
-  Gates G0–G5 até o ensaio; congelamento a partir de 05/10. Absorve T-F3, T-F4
-  e T-F5 nos gates indicados no plano. G0 e G1 mergeados (PR #7, 2026-09-16);
-  G2 e G2.1 (foundation, forma e hierarquia de ações; fontes Manrope + Fraunces
-  aprovadas) mergeados (PR #8). G3 (convite, página inicial e prévia) e G3.1 (sistema de cards,
-  `docs/design/CARDS.md`) mergeados (PR #9, 2026-09-17). G4 (painel, abas,
-  prévia, `docs/design/G4-PAINEL.md`) e G4b (lista de presentes com menos
-  caixas, `docs/design/G4b-LISTA.md`) **já estavam prontos** ao retomar em
-  2026-09-22 — esta linha estava desatualizada dizendo "Próximo: G4". G5.1
-  (`ConfirmDialog` no lugar do `window.confirm`, `docs/design/G5-ESTADOS.md`)
-  G5.2 (skeleton no painel, em "Seus eventos" e no convite; achado A17
-  decidido sem migração; `ActionMenu` adiado por falta de caso de uso), G5.3
-  (estado sem conexão, T-F4: banner global e aviso antes de tentar salvar nos
-  quatro pontos de gravação principais), G5.4 (achados A14, A16, A18 do
-  `audit.md` corrigidos; A19 revisado, já coberto desde o G3.1) e G5.5 (QA
-  final: `test:e2e` completo 479/482, `test:browser:local` **8/8 contra o
-  Supabase local de verdade** pela primeira vez no G5, build medido) feitos
-  em 2026-09-22. **O G5 do plano visual está pronto.** Falta só o G5.6:
-  decisão do titular sobre publicar em `main` (Cloudflare Pages) — hoje
-  `main` é fast-forward puro de `clone-main`, mas isso bota o G5 inteiro no
-  ar. Ver `docs/design/G5-ESTADOS.md`.
+- [x] **T-F7 · Refatoração visual (plano em `docs/design/PLANO-VISUAL.md`).**
+  **Completo e publicado.** Gates G0–G5.6, todos feitos: G0/G1 (PR #7), G2/G2.1
+  (PR #8), G3/G3.1 (PR #9), G4/G4-b (painel e lista), G5.1–G5.5 (`ConfirmDialog`,
+  skeleton, estado sem conexão, acessibilidade A14/A16/A18, QA final — detalhes
+  em `docs/design/G5-ESTADOS.md`). G5.6: `main` publicado em 2026-09-22
+  (fast-forward de `clone-main`, commit `8f8e9ab`), site conferido no ar em
+  `chadbb.pages.dev` sem erros de console. Por cima do G5, o último pedaço do
+  pedido de 17/09 (cartão de calendário com `.ics`) também saiu e foi publicado
+  junto. Congelamento a partir de 05/10 segue valendo: só correções até 01/11.
 - [ ] **T-F6 · Testes.** Ampliar os testes e2e para o que mudar; `npm run check`
   antes de cada PR.
 
 ## Codex — back e tarefas difíceis
 
-- [ ] **2026-09-17 · Login por código no e-mail.** G1 local concluído:
+- [x] **2026-09-17 · Login por código no e-mail.** _(G3, a tela do front, já
+  está implementada — esta linha estava desatualizada.)_ G1 local concluído:
   - modelo `supabase/templates/acesso.html` e `config.toml` com código de 8
     dígitos, igual à produção;
   - `tests/local/email-code.test.mjs` passou antes em vermelho e depois em verde;
@@ -268,8 +276,10 @@ o ensaio familiar no celular continua pendente.
 - [ ] **T-B6 · Operação.** Acompanhar a sequência diária do backup; depois do
   conteúdo real, refazer a restauração com dados e Storage reais e medir o RTO
   (meta de 2 h); remover a integração órfã "Workers Builds" na Cloudflare.
-- [ ] **T-B7 · Pedidos do front.** Atender o que for registrado abaixo (ex.:
-  dados agregados para o painel).
+- [x] **T-B7 · Pedidos do front.** _(Publicado em produção em 2026-09-22 — ver
+  "Pedidos do front para o back" abaixo. `summary`, `available` e
+  `invitation_id` já respondem de verdade; falta só o Claude limpar o cálculo
+  de transição do front, registrado em T-F2.)_
 
 ## Usuário
 
@@ -281,50 +291,43 @@ o ensaio familiar no celular continua pendente.
 
 ## Pedidos do front para o back
 
-**Entrega local T-B7 em 22/09:** os cinco pedidos de dados abaixo estão
-implementados em `20260922010000_dashboard_server_summary.sql`, aguardando
-revisão e publicação. Reservas ganham `id`/`invitation_id`; painel ganha
-`summary` (convites, pessoas e fraldas); painel e snapshot ganham `available`.
-Revogação/expiração preservam respostas e escolhas, portanto continuam nas
-contagens, com revogados informados separadamente. Contrato detalhado em
-`CONTRATOS-TRANSACIONAIS.md`; evidências em [T-B7](reviews/2026-09-22-t-b7.md).
-Claude: depois de publicar o banco, remover os fallbacks `panelSummary` e
-`availableOf`, tipar `summary.diapers`/`invitation_id` e trocar vínculo por nome
-pelo identificador. Nenhum arquivo do front foi alterado nesta entrega.
+**T-B7 publicado em produção em 2026-09-22** (`db push` aprovado pelo titular;
+`migration list` remoto igual ao local, 26/26). Os cinco pedidos abaixo estão
+todos respondidos de verdade pelo banco, não mais por dry-run:
+`organizer_invitations` devolve `summary` (convites, pessoas e
+`diapers: {committed, limit}`), `available` em cada item (painel e snapshot do
+convidado) e `id`/`invitation_id` em cada reserva. Revogação/expiração
+preservam respostas e escolhas, portanto continuam nas contagens, com
+revogados informados separadamente. Contrato em `CONTRATOS-TRANSACIONAIS.md`;
+evidências em [T-B7](reviews/2026-09-22-t-b7.md).
+**Pendente do lado do front (T-F2):** remover os fallbacks `panelSummary` e
+`availableOf` (`src/features/guests/api.ts`), tipar os campos como
+obrigatórios e trocar o vínculo do selo “Vai enviar presente” de nome para
+`invitation_id`. Não implementado ainda nesta sessão.
 
-- [ ] 2026-09-17 · Claude → Codex · **`invitation_id` nas reservas do painel.**
-  O painel agora marca quem respondeu “não poderá ir” e mesmo assim tem
-  presente reservado, com o selo “Vai enviar presente”. O vínculo é feito pelo
-  **nome** do convidado, porque `organizer_invitations` devolve as reservas só
-  com `name`. Havendo dois convites com o mesmo nome, o selo **fica de fora**
-  nos dois, para não marcar a pessoa errada — a escolha continua visível em
-  “Escolhas dos convidados”, onde é só fato.
-  Pedido: incluir `invitation_id` em cada item de `reservations`. Sem isso o
-  selo continua aproximado; com ele, o front passa a casar por identificador.
+- [x] 2026-09-17 · Claude → Codex · **`invitation_id` nas reservas do painel.**
+  _(Publicado em produção em 22/09, ver nota acima.)_ O painel marcava quem
+  respondeu “não poderá ir” e mesmo assim tinha presente reservado só pelo
+  **nome** do convidado, porque `organizer_invitations` devolvia as reservas
+  sem identificador. Com dois convites de mesmo nome, o selo ficava de fora
+  nos dois. Front ainda não trocou o vínculo por `invitation_id` (T-F2).
 
-- [ ] 2026-09-16 · Claude → Codex · **Resumo do painel calculado no servidor (T-F2).**
-  Hoje o `InvitationsPage` soma `attending` e conta respostas no navegador, e
-  também conta convites revogados. Pedido: em `organizer_invitations` (ação
-  `list`), incluir
+- [x] 2026-09-16 · Claude → Codex · **Resumo do painel calculado no servidor (T-F2).**
+  _(Publicado em produção em 22/09.)_ `organizer_invitations` (ação `list`)
+  agora inclui
   `summary: { invitations: { total, answered, yes, no, maybe, pending, revoked }, people_confirmed }`,
-  com a regra (ex.: se convite revogado conta) definida só no banco.
-  Registrar em `docs/CONTRATOS-TRANSACIONAIS.md`.
-- [ ] 2026-09-16 · Claude → Codex · **Saldo por item vindo do servidor (T-F2).**
-  O front calcula `limit - committed` no painel e no convite (seletor de troca de
-  tamanho). Pedido: `available` (inteiro ≥ 0; `null` para mimos) em cada item de
-  `organizer_invitations.items` e de `snapshot.items` da função `guest`.
-- [ ] 2026-09-16 · Claude → Codex · **`id` nas reservas do painel.** `reservations`
-  não traz identificador, e o front usa o índice como chave da lista. Pedido:
-  incluir `id` (da reserva) em cada item.
+  com a regra definida só no banco. Registrado em `docs/CONTRATOS-TRANSACIONAIS.md`.
+- [x] 2026-09-16 · Claude → Codex · **Saldo por item vindo do servidor (T-F2).**
+  _(Publicado em produção em 22/09.)_ `available` (inteiro ≥ 0; `null` para
+  mimos) em cada item de `organizer_invitations.items` e de `snapshot.items`
+  da função `guest`. Front ainda não removeu o cálculo de transição (T-F2).
+- [x] 2026-09-16 · Claude → Codex · **`id` nas reservas do painel.**
+  _(Publicado em produção em 22/09.)_ `reservations` agora traz `id` da
+  reserva em cada item.
 
-- [ ] 2026-09-16 · Claude → Codex · **Progresso geral das fraldas (T-F7).** No
-  mesmo `summary`, incluir `diapers: { committed, limit }` (soma de todos os
-  tamanhos), para o resumo “X de Y pacotes”. Sem esse campo, o número não
-  aparece no painel.
-
-Enquanto os campos não chegam, o front usa `summary`/`available` quando existem e
-mantém o cálculo antigo só como transição, isolado em `src/features/guests/api.ts`
-(`panelSummary` e `availableOf`). Depois da entrega, o Claude remove o cálculo.
+- [x] 2026-09-16 · Claude → Codex · **Progresso geral das fraldas (T-F7).**
+  _(Publicado em produção em 22/09.)_ `summary.diapers: { committed, limit }`
+  (soma de todos os tamanhos) já aparece no painel.
 
 - [ ] 2026-09-16 · Claude → Codex · **Deadlock intermitente no teste de navegador.**
   Em `npm run test:browser:local` (PR #7, commit `7746e9c`), o teste “M5: outro
@@ -431,32 +434,31 @@ mantém o cálculo antigo só como transição, isolado em `src/features/guests/
 
 ## Pendências encontradas na revisão de 22/09
 
-- [ ] **Codex · R2: identidade de mimos na inclusão pelo catálogo.** Mimo próprio
-  seguido de produto homônimo do catálogo duplica o nome; a ordem inversa é
-  recusada. Reproduzido em PostgreSQL descartável. Rever `add_event_item` e a
-  lista pronta, em migration nova.
-  **22/09: correção local pronta**, em `20260922000000_list_identity_and_lock_order.sql`:
-  regra única de nomes nos três caminhos, lista pronta pula homônimo e replay
-  preservado inclusive em listas com duplicatas legadas. Publicação pendente.
-- [ ] **Codex · R3: ordem dos locks de produto/item.** Inclusão e remoção do mesmo
-  mimo próprio por RPC podem entrar em deadlock (`40P01` reproduzido com duas
-  conexões). Uniformizar locks e cobrir concorrência; o front atual não oferece
-  reinclusão de produto próprio pelo catálogo.
-  **22/09: correção local pronta**, na mesma migration: inclusão e remoção
-  bloqueiam o evento `FOR UPDATE` antes de produto/item. Regressão reproduziu
-  `40P01` antes da correção; concorrência nas duas ordens e reserva versus remoção
-  aprovadas depois. Publicação pendente.
+- [x] **Codex · R2: identidade de mimos na inclusão pelo catálogo.** Mimo próprio
+  seguido de produto homônimo do catálogo duplicava o nome; a ordem inversa era
+  recusada. **Publicado em produção em 22/09**, em
+  `20260922000000_list_identity_and_lock_order.sql`: regra única de nomes nos
+  três caminhos, lista pronta pula homônimo e replay preservado inclusive em
+  listas com duplicatas legadas.
+- [x] **Codex · R3: ordem dos locks de produto/item.** Inclusão e remoção do mesmo
+  mimo próprio por RPC podiam entrar em deadlock (`40P01` reproduzido com duas
+  conexões). **Publicado em produção em 22/09**, na mesma migration: inclusão e
+  remoção bloqueiam o evento `FOR UPDATE` antes de produto/item.
 
 Detalhes, escopo e limites em [revisão de 22/09](reviews/2026-09-22-retomada.md).
-As duas migrations de 18/09 permanecem intactas. Evidências das correções locais
-em [R2/R3](reviews/2026-09-22-r2-r3.md). Nenhuma alteração remota foi feita.
+As duas migrations de 18/09 permanecem intactas. Evidências das correções em
+[R2/R3](reviews/2026-09-22-r2-r3.md). `db push` aplicado com aprovação do
+titular; `migration list` remoto igual ao local (26/26).
 
 ## Em andamento
 
-| Agente | Tarefa | Branch | Situação |
-|---|---|---|---|
-| Claude | PR #11 (convite e “Excluir evento”) mergeada em 17/09, depois do G5/G6. Próximos: pedidos urgentes de 17/09 (código no login, botão de envio, campos de data no iPhone); depois T-F7 · G4 (26–30/09) — ver `docs/design/RETOMADA-CLAUDE.md` | `claude/front` | pedidos de 17/09 |
-| Codex | T-B5: G2 remoto reprovado em 17/09 (p95 ~4,2 s, zero erros, sync ok); G3.1 local concluído (2 chamadas por POST); G3.2 (publicar e medir de novo) aguardando aprovação. Exclusão de evento concluída e testada em produção (plano em PLANO-DESEMPENHO-T-B5.md, remoto não autorizado) | `codex/back` | livre para a próxima tarefa |
+_(Desde 2026-09-22 os dois trabalham na mesma pasta, sem clone por agente —
+ver `AGENTS.md`. A tabela abaixo reflete o fim do dia de 22/09.)_
+
+| Agente | Tarefa | Situação |
+|---|---|---|
+| Claude | T-F7 completo e publicado (G0–G5.6 + cartão de calendário). Próximo natural: T-F2 (remover `panelSummary`/`availableOf`, tipar campos, trocar vínculo por `invitation_id`) — pequeno, sem pressa. Depois, itens urgentes ainda abertos de 17/09: código de e-mail no login, mensagem de "conexão" no envio de link, voltar à página pedida após login, fonte bloqueada pela CSP, campos de data no iPhone | livre para a próxima tarefa |
+| Codex | R2/R3 e T-B7 publicados em produção (22/09, com aprovação do titular). Livre para a próxima — candidatos no quadro: T-B6 (operação/backup), login por código no e-mail (falta a tela do front, já é item do Claude), ou os pedidos urgentes de 17/09 que são do back | livre para a próxima tarefa |
 
 ## Concluídas
 
@@ -483,6 +485,9 @@ em [R2/R3](reviews/2026-09-22-r2-r3.md). Nenhuma alteração remota foi feita.
     antes da mudança, não com zero.
   - `npm run check` e `npm run test:e2e` completo: **485 passed, 3 skipped**,
     sem regressão.
+
+- 2026-09-22 · Claude · G5.5: QA final do plano visual — **o G5 está pronto**
+  (`docs/design/G5-ESTADOS.md`).
   - `npm run check` verde; `npm run test:e2e` completo: 479 passed, 3
     skipped (duas falhas numa rodada anterior confirmadas como a
     instabilidade já conhecida de "reconsulta sem tremida" sob carga, não
@@ -495,13 +500,28 @@ em [R2/R3](reviews/2026-09-22-r2-r3.md). Nenhuma alteração remota foi feita.
     todos os subconjuntos de fonte, dos quais só os do português chegam ao
     navegador real).
   - Revisei também as duas migrations que o Codex deixou commitadas
-    localmente nesta pasta compartilhada (R2/R3 e T-B7): lock do evento
-    antes de produto/item, identidade de mimo por título normalizado,
-    `summary.diapers`/`available`/`invitation_id` — sem achado, evidência
-    própria em `docs/reviews/2026-09-22-r2-r3.md` e
-    `2026-09-22-t-b7.md`. Sem `db push`; publicação remota é gate separado.
-  - Falta só o G5.6 (decisão do titular sobre publicar `main`, que hoje é
-    fast-forward puro de `clone-main` — mas isso coloca o G5 inteiro no ar).
+    localmente nesta pasta compartilhada (R2/R3 e T-B7): sem achado,
+    evidência própria em `docs/reviews/2026-09-22-r2-r3.md` e
+    `2026-09-22-t-b7.md`. Sem `db push` ainda nesta entrada — publicação
+    remota aconteceu depois, ver G5.6 abaixo.
+
+- 2026-09-22 · Claude · G5.6: publicação em `main` + `db push` de R2/R3/T-B7 —
+  **o plano visual e as entregas do back desta sessão estão todos no ar.**
+  - `main` avançado por fast-forward puro de `clone-main` (sem merge, sem
+    conflito: `origin/main` era ancestral direto, zero commits exclusivos),
+    commit `8f8e9ab`. Cloudflare Pages publicou automaticamente.
+  - Site conferido no ar com um navegador real (`chadbb.pages.dev`): `/` e
+    `/entrar` carregam sem erro de console, visual consistente com o G5.
+  - `db push --skip-vault --project-ref fcykqrlnofmdtmewlejr` aplicado com
+    aprovação do titular, depois de mostrar o `--dry-run`. `migration list`
+    remoto igual ao local (26/26). As duas migrations do Codex (R2/R3, T-B7)
+    estão em produção — ver entradas próprias acima.
+  - Revisão das duas migrations antes da publicação: lock do evento antes de
+    produto/item, identidade de mimo por título normalizado,
+    `summary.diapers`/`available`/`invitation_id` — sem achado, evidência em
+    `docs/reviews/2026-09-22-r2-r3.md` e `2026-09-22-t-b7.md`.
+  - Pendente do lado do front, sem pressa: T-F2 (remover os fallbacks
+    `panelSummary`/`availableOf` agora que o servidor responde de verdade).
 
 - 2026-09-22 · Claude · G5.4: acabamentos de acessibilidade A14, A16, A18, A19
   (`docs/design/G5-ESTADOS.md`).
