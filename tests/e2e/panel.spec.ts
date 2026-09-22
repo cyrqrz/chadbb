@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import type { EventRecord } from '../../src/features/events/model'
-import type { Dashboard, Invitation } from '../../src/features/guests/api'
+import type { Dashboard, DashboardReservation, Invitation } from '../../src/features/guests/api'
 import { session, userId } from './session'
 
 // O convite carrega o mapa do Google em iframe: nos testes ele é simulado, sem rede externa.
@@ -20,9 +20,15 @@ function invitation(n: number, fields: Partial<Invitation>): Invitation {
     attending: 0, version: 1, revoked: false, expires_at: '2035-09-17T17:30:00Z', ...fields }
 }
 const diaper = (n: number, size: 'P' | 'M' | 'G' | 'XG', limit: number, committed: number) =>
-  ({ id: `40000000-0000-4000-8000-00000000000${n}`, title: `Fraldas tamanho ${size}`, category: 'fralda' as const, diaper_size: size, limit, committed })
+  ({ id: `40000000-0000-4000-8000-00000000000${n}`, title: `Fraldas tamanho ${size}`, category: 'fralda' as const, diaper_size: size,
+    limit, committed, available: Math.max(0, limit - committed) })
+// Mimo não tem cota: `available` é `null`, como em `private.item_available`.
 const treat = (n: number, title: string, committed: number) =>
-  ({ id: `50000000-0000-4000-8000-00000000000${n}`, title, category: 'mimo' as const, diaper_size: null, limit: null, committed })
+  ({ id: `50000000-0000-4000-8000-00000000000${n}`, title, category: 'mimo' as const, diaper_size: null, limit: null, committed, available: null })
+// Reserva do painel: o servidor manda `id` e `invitation_id` (T-B7).
+const reservation = (n: number, invitation: number, fields: Omit<DashboardReservation, 'id' | 'invitation_id' | 'name'> & { name?: string }): DashboardReservation =>
+  ({ id: `60000000-0000-4000-8000-00000000000${n}`, invitation_id: `30000000-0000-4000-8000-00000000000${invitation}`,
+    name: `Convidado fictício ${invitation}`, ...fields })
 const full: Dashboard = {
   invitations: [
     invitation(1, { response: 'yes', attending: 3 }),
@@ -33,9 +39,11 @@ const full: Dashboard = {
   ],
   items: [diaper(1, 'P', 6, 6), diaper(2, 'M', 19, 4), diaper(3, 'G', 19, 0), diaper(4, 'XG', 6, 1), treat(1, 'Mamadeira fictícia', 2), treat(2, 'Pomada fictícia', 0)],
   reservations: [
-    { name: 'Convidado fictício 1', title: 'Fraldas tamanho P', category: 'fralda', diaper_size: 'P', quantity: 6, status: 'reserved' },
-    { name: 'Convidado fictício 1', title: 'Mamadeira fictícia', category: 'mimo', diaper_size: null, quantity: 2, status: 'purchase_declared' },
+    reservation(1, 1, { title: 'Fraldas tamanho P', category: 'fralda', diaper_size: 'P', quantity: 6, status: 'reserved' }),
+    reservation(2, 1, { title: 'Mamadeira fictícia', category: 'mimo', diaper_size: null, quantity: 2, status: 'purchase_declared' }),
   ],
+  // Contagens conferidas com os convites acima; o front só exibe o que chega.
+  summary: { invitations: { total: 5, answered: 4, yes: 2, no: 1, maybe: 1, pending: 1, revoked: 1 }, people_confirmed: 5 },
 }
 
 type Reply = (request: { url: URL; body: Record<string, unknown> }) => { status: number; json: unknown; headers?: Record<string, string> }
@@ -105,7 +113,8 @@ test('painel usa o resumo e o saldo enviados pelo servidor', async ({ page }) =>
 })
 
 test('painel vazio orienta o próximo passo', async ({ page }) => {
-  await backend(page, () => ({ status: 200, json: { invitations: [], items: [], reservations: [] } }))
+  await backend(page, () => ({ status: 200, json: { invitations: [], items: [], reservations: [],
+    summary: { invitations: { total: 0, answered: 0, yes: 0, no: 0, maybe: 0, pending: 0, revoked: 0 }, people_confirmed: 0 } } }))
   await page.goto(`/eventos/${eventId}/convites`)
   await expect(page.getByRole('article', { name: 'Pessoas' })).toContainText('0pessoas confirmadas')
   await expect(page.getByText('Nenhum tamanho de fralda na lista.')).toBeVisible()
@@ -1828,7 +1837,7 @@ test.describe('reconsulta sem tremida', () => {
 // Convidado que não vai mas reservou presente: a organização precisa entender o número.
 test.describe('painel: quem não vai e mesmo assim reservou', () => {
   const withGift = { ...full, reservations: [...full.reservations,
-    { name: 'Convidado fictício 2', title: 'Fraldas tamanho M', category: 'fralda' as const, diaper_size: 'M' as const, quantity: 2, status: 'reserved' }] }
+    reservation(3, 2, { title: 'Fraldas tamanho M', category: 'fralda', diaper_size: 'M', quantity: 2, status: 'reserved' })] }
   const card = (page: Page, name: string) => page.getByRole('listitem').filter({ has: page.getByRole('heading', { name }) })
 
   test('painel marca quem não vai e mesmo assim vai enviar presente', async ({ page }) => {
@@ -1858,7 +1867,7 @@ test.describe('painel: quem não vai e mesmo assim reservou', () => {
   // essa pessoa (o aviso do convite só aparece para quem respondeu que não vai).
   test('quem ainda não respondeu não é anunciado como ausente que manda presente', async ({ page }) => {
     const noAnswerGift = { ...full, reservations: [...full.reservations,
-      { name: 'Convidado fictício 5', title: 'Fraldas tamanho G', category: 'fralda' as const, diaper_size: 'G' as const, quantity: 1, status: 'reserved' }] }
+      reservation(4, 5, { title: 'Fraldas tamanho G', category: 'fralda', diaper_size: 'G', quantity: 1, status: 'reserved' })] }
     await backend(page, () => ({ status: 200, json: noAnswerGift }))
     await page.goto(`/eventos/${eventId}/convites`)
     const waiting = card(page, 'Convidado fictício 5')
@@ -1868,19 +1877,23 @@ test.describe('painel: quem não vai e mesmo assim reservou', () => {
     await expect(page.getByRole('region', { name: 'Escolhas dos convidados' })).toContainText('Convidado fictício 5')
   })
 
-  // O selo casa reserva com convite pelo nome (o back ainda não manda
-  // `invitation_id`). Com dois convites de mesmo nome não há como saber de quem
-  // é a reserva: melhor não afirmar nada do que marcar a pessoa errada.
-  test('dois convites de mesmo nome não recebem o selo por adivinhação', async ({ page }) => {
+  // O selo casa reserva com convite por `invitation_id` (T-B7), não por nome: com
+  // dois convites homônimos o selo cai no dono certo da reserva. Os dois cards
+  // são distinguidos aqui pelo tipo do convite, já que o nome é o mesmo.
+  test('entre dois convites de mesmo nome, o selo fica no dono da reserva', async ({ page }) => {
     const twins: Dashboard = { ...full,
-      invitations: [...full.invitations, invitation(6, { name: 'Convidado fictício 2', response: 'no', kind: 'individual', capacity: 1 })],
+      invitations: [...full.invitations, invitation(6, { name: 'Convidado fictício 2', response: 'no' })],
       reservations: [...full.reservations,
-        { name: 'Convidado fictício 2', title: 'Fraldas tamanho M', category: 'fralda' as const, diaper_size: 'M' as const, quantity: 2, status: 'reserved' }] }
+        reservation(3, 6, { name: 'Convidado fictício 2', title: 'Fraldas tamanho M', category: 'fralda', diaper_size: 'M', quantity: 2, status: 'reserved' })] }
     await backend(page, () => ({ status: 200, json: twins }))
     await page.goto(`/eventos/${eventId}/convites`)
     const homonyms = page.getByRole('listitem').filter({ has: page.getByRole('heading', { name: 'Convidado fictício 2' }) })
     await expect(homonyms).toHaveCount(2)
-    await expect(homonyms.locator('.badge', { hasText: 'Vai enviar presente' })).toHaveCount(0)
+    const badge = homonyms.locator('.badge', { hasText: 'Vai enviar presente' })
+    await expect(badge).toHaveCount(1)
+    // O convite 6 é família; o 2, individual. Só o dono da reserva recebe o selo.
+    await expect(homonyms.filter({ hasText: 'Família · até 4 pessoas' }).locator('.badge', { hasText: 'Vai enviar presente' })).toBeVisible()
+    await expect(homonyms.filter({ hasText: 'Individual' }).locator('.badge', { hasText: 'Vai enviar presente' })).toHaveCount(0)
     await expect(page.getByRole('region', { name: 'Escolhas dos convidados' })).toContainText('Convidado fictício 2')
   })
 })

@@ -20,7 +20,13 @@ function snapshot(items: GuestItem[]): Snapshot {
   }
 }
 const diaper: GuestItem = { id: '70000000-0000-4000-8000-000000000007', title: 'Fraldas tamanho P', description: 'Pacote fictício.',
-  category: 'fralda', diaper_size: 'P', limit: 6, committed: 0, own: null }
+  category: 'fralda', diaper_size: 'P', limit: 6, committed: 0, available: 6, own: null }
+
+// O servidor recalcula o saldo a cada resposta, com fonte única em
+// `private.item_available`. O simulador faz o mesmo na saída, para nenhuma tela
+// receber um `available` incoerente com o `committed` que a fixture montou.
+const priced = (snap: Snapshot): Snapshot => ({ ...snap,
+  items: snap.items.map(item => ({ ...item, available: item.limit === null ? null : Math.max(0, item.limit - item.committed) })) })
 
 async function backend(page: Page, options: { items?: GuestItem[]; failReads?: () => boolean; event?: Partial<Snapshot['event']>; invitation?: Partial<Snapshot['invitation']>; refuseExchange?: boolean } = {}) {
   let current = snapshot(options.items ?? [diaper])
@@ -29,12 +35,12 @@ async function backend(page: Page, options: { items?: GuestItem[]; failReads?: (
     const body = route.request().postDataJSON()
     const reply = (status: number, json: unknown) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(json) })
     if (body.action === 'exchange' && options.refuseExchange) return reply(401, { error: 'GUEST_SESSION_INVALID' })
-    if (body.action === 'exchange') return reply(200, { session_token: 'fake-guest-session', snapshot: current })
-    if (body.action === 'read') return options.failReads?.() ? reply(503, { error: 'TEMPORARILY_UNAVAILABLE' }) : reply(200, { snapshot: current })
+    if (body.action === 'exchange') return reply(200, { session_token: 'fake-guest-session', snapshot: priced(current) })
+    if (body.action === 'read') return options.failReads?.() ? reply(503, { error: 'TEMPORARILY_UNAVAILABLE' }) : reply(200, { snapshot: priced(current) })
     if (body.action === 'rsvp') {
       const { response, attending } = body.payload
       current = { ...current, invitation: { ...current.invitation, response, attending, version: current.invitation.version + 1 } }
-      return reply(200, { snapshot: current })
+      return reply(200, { snapshot: priced(current) })
     }
     const { item_id: id, quantity } = body.payload
     const change = (item: GuestItem): GuestItem => {
@@ -45,7 +51,7 @@ async function backend(page: Page, options: { items?: GuestItem[]; failReads?: (
       return { ...item, committed: item.committed - mine, own: { ...item.own!, version: 3, status: 'cancelled' } }
     }
     current = { ...current, items: current.items.map(change) }
-    return reply(200, { snapshot: current })
+    return reply(200, { snapshot: priced(current) })
   })
 }
 async function expectAccessible(page: Page) {
@@ -640,7 +646,7 @@ test.describe('ausência com presente reservado', () => {
 
   const presenceOf = (page: import('@playwright/test').Page) => page.getByRole('region', { name: 'Podemos contar com você?' })
   const treat: GuestItem = { id: '70000000-0000-4000-8000-00000000000a', title: 'Mamadeira fictícia', description: 'Mimo fictício.',
-    category: 'mimo', diaper_size: null, limit: null, committed: 0, own: null }
+    category: 'mimo', diaper_size: null, limit: null, committed: 0, available: null, own: null }
 
   // Um anúncio só, na ordem certa: a confirmação da resposta já diz que o
   // presente continua reservado, em vez de duas regiões vivas disputando.
@@ -947,7 +953,7 @@ test('tamanho completa enquanto a pessoa digita explica que o formulário sumiu'
   await page.route('https://e2e.supabase.co/functions/v1/guest', async route => {
     const body = route.request().postDataJSON()
     calls.push(String(body.action))
-    const item: GuestItem = { ...diaper, committed: full ? 6 : 0 }
+    const item: GuestItem = { ...diaper, committed: full ? 6 : 0, available: full ? 0 : 6 }
     const snap = snapshot([item])
     if (body.action === 'exchange') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ session_token: 'fake', snapshot: snap }) })
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ snapshot: snap }) })

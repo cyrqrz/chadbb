@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import type { ReactNode, RefObject } from 'react'
 import type { FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { availableOf, guestCall, GuestError, guestMessage, responseLabels } from './api'
+import { guestCall, GuestError, guestMessage, responseLabels } from './api'
 import type { GuestItem, ResponseChoice, Snapshot } from './api'
 import { live } from '../../lib/query'
 import { buildIcs, googleCalendarUrl } from '../../lib/ics'
@@ -208,7 +208,7 @@ const successMessages: Record<string, string> = {
 function withCompletion(text: string, action: string, payload: Record<string, unknown>, snapshot: Snapshot) {
   if (action !== 'reserve' && action !== 'swap') return text
   const item = snapshot.items.find(candidate => candidate.id === payload.item_id)
-  return item?.category === 'fralda' && availableOf(item) === 0 ? `${text} Tamanho ${item.diaper_size} completo.` : text
+  return item?.category === 'fralda' && item.available === 0 ? `${text} Tamanho ${item.diaper_size} completo.` : text
 }
 
 type Save = (action: string, payload: Record<string, unknown>, success?: string, where?: string) => Promise<boolean>
@@ -294,7 +294,7 @@ function GuestGift({ item, alternatives, busy, closed, save, feedback }: { item:
   const swapTargets = alternatives.filter(candidate => candidate.own?.status !== 'purchase_declared')
   const canSwap = active && !purchased && diaper && !closed && swapTargets.length > 0
   const quantity = draft?.text ?? String(active ? own.quantity : 1)
-  const available = availableOf(item)
+  const available = item.available
   const full = available === 0 && !active
   const purchaseHint = useId()
   async function submit(event: FormEvent) {
@@ -336,7 +336,7 @@ function GuestGift({ item, alternatives, busy, closed, save, feedback }: { item:
     {active && <div className="card-actions">
       {canSwap && <button type="button" className="btn-ghost btn-sm" aria-expanded={swapOpen} aria-controls={swapId} onClick={() => setSwapOpen(!swapOpen)}>Trocar tamanho <span aria-hidden="true">{swapOpen ? '˄' : '›'}</span></button>}
       {canSwap && swapOpen && <div id={swapId} className="card-disclosure">
-        <label className="field">Novo tamanho<select ref={swapSelect} disabled={busy} value={destination} onChange={e => setDestination(e.target.value)}><option value="">Escolha outro tamanho</option>{swapTargets.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.diaper_size} · {availableOf(candidate) ?? 0} disponíveis</option>)}</select></label>
+        <label className="field">Novo tamanho<select ref={swapSelect} disabled={busy} value={destination} onChange={e => setDestination(e.target.value)}><option value="">Escolha outro tamanho</option>{swapTargets.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.diaper_size} · {candidate.available ?? 0} disponíveis</option>)}</select></label>
         <Button variant="secondary" size="sm" className="self-start" busy={busy} disabled={!destination} onClick={swap}>Confirmar troca</Button>
       </div>}
       {!purchased && <Button variant="ghost" size="sm" disabled={busy} aria-describedby={purchaseHint} onClick={() => void save('purchase', { item_id: item.id, version: own.version })}>Já comprei</Button>}

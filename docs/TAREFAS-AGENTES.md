@@ -185,14 +185,14 @@ o ensaio familiar no celular continua pendente.
   o mesmo acabamento; uma ação principal por etapa ("Confirmar presença",
   "Escolher presente", "Cancelar reserva"); explicar que "Já comprei" é só uma
   declaração do convidado.
-- [ ] **T-F2 · Painel do organizador.** _(2026-09-16: resumo, fraldas, mimos e
+- [x] **T-F2 · Painel do organizador.** _(2026-09-16: resumo, fraldas, mimos e
   escolhas separados. 2026-09-22: T-B7 publicado em produção — `summary`,
-  `available` e `invitation_id` já existem de verdade. Falta só a limpeza:
-  remover `panelSummary`/`availableOf` (cálculo de transição em
-  `src/features/guests/api.ts`), tipar os campos como obrigatórios e trocar o
-  vínculo do selo "Vai enviar presente" de nome para `invitation_id`. Não é
-  urgente — o front funciona igual com o fallback — mas fica mais simples sem
-  código morto.)_ Conferir se o `InvitationsPage` mostra
+  `available` e `invitation_id` já existem de verdade. Limpeza concluída em
+  2026-09-22: `panelSummary` e `availableOf` removidos de
+  `src/features/guests/api.ts`, `summary`/`available`/`id`/`invitation_id`
+  tipados como obrigatórios e o selo "Vai enviar presente" agora casa reserva
+  com convite por `invitation_id`, não mais por nome. O front deixou de ter
+  qualquer cálculo próprio desses números.)_ Conferir se o `InvitationsPage` mostra
   convites respondidos separados de pessoas confirmadas, fraldas comprometidas e
   disponíveis por tamanho (P 6 / M 19 / G 19 / XG 6) e mimos em separado. Se
   faltar dado, registrar um pedido para o Codex abaixo; não calcular no front.
@@ -300,10 +300,11 @@ convidado) e `id`/`invitation_id` em cada reserva. Revogação/expiração
 preservam respostas e escolhas, portanto continuam nas contagens, com
 revogados informados separadamente. Contrato em `CONTRATOS-TRANSACIONAIS.md`;
 evidências em [T-B7](reviews/2026-09-22-t-b7.md).
-**Pendente do lado do front (T-F2):** remover os fallbacks `panelSummary` e
-`availableOf` (`src/features/guests/api.ts`), tipar os campos como
-obrigatórios e trocar o vínculo do selo “Vai enviar presente” de nome para
-`invitation_id`. Não implementado ainda nesta sessão.
+**Lado do front (T-F2): feito em 2026-09-22.** Os fallbacks `panelSummary` e
+`availableOf` saíram de `src/features/guests/api.ts`, os campos do contrato
+viraram obrigatórios no tipo e o selo “Vai enviar presente” passou a casar
+reserva com convite por `invitation_id`. Com isso o painel distingue homônimos
+em vez de omitir o selo, e nenhuma tela recalcula saldo ou resumo.
 
 - [x] 2026-09-17 · Claude → Codex · **`invitation_id` nas reservas do painel.**
   _(Publicado em produção em 22/09, ver nota acima.)_ O painel marcava quem
@@ -457,7 +458,7 @@ ver `AGENTS.md`. A tabela abaixo reflete o fim do dia de 22/09.)_
 
 | Agente | Tarefa | Situação |
 |---|---|---|
-| Claude | T-F7 completo e publicado (G0–G5.6 + cartão de calendário). Próximo natural: T-F2 (remover `panelSummary`/`availableOf`, tipar campos, trocar vínculo por `invitation_id`) — pequeno, sem pressa. Depois, itens urgentes ainda abertos de 17/09: código de e-mail no login, mensagem de "conexão" no envio de link, voltar à página pedida após login, fonte bloqueada pela CSP, campos de data no iPhone | livre para a próxima tarefa |
+| Claude | T-F7 e T-F2 completas. T-F2 fechada em 22/09: fallbacks removidos, campos obrigatórios, selo por `invitation_id`. Próximos: os itens de 17/09 ainda abertos — mensagem de "conexão" no envio do link e voltar à página pedida depois do login | livre para a próxima tarefa |
 | Codex | R2/R3 e T-B7 publicados em produção (22/09, com aprovação do titular). Livre para a próxima — candidatos no quadro: T-B6 (operação/backup), login por código no e-mail (falta a tela do front, já é item do Claude), ou os pedidos urgentes de 17/09 que são do back | livre para a próxima tarefa |
 
 ## Concluídas

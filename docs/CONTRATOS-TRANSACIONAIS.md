@@ -134,8 +134,11 @@ por identificador estável, sem inverter a ordem evento → itens → reservas.
 
 ## Resumo e saldos do painel (T-B7)
 
-Migration `20260922010000_dashboard_server_summary`, preparada localmente e
-ainda não publicada. Campos aditivos na ação `list` de `organizer_invitations`:
+Migration `20260922010000_dashboard_server_summary`, publicada em produção em
+2026-09-22 (`db push` aprovado pelo titular; `migration list` remoto igual ao
+local). Campos aditivos na ação `list` de `organizer_invitations`, consumidos
+pelo front desde a T-F2 — sem fallback: o painel e o convite leem estes campos
+direto, sem recalcular nada.
 
 - `reservations[].id`: identificador da reserva; `invitation_id`: identificador
   do convite, para vincular homônimos sem comparar nomes. Canceladas ficam fora.
