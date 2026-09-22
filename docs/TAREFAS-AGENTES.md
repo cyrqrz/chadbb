@@ -375,6 +375,32 @@ mantém o cálculo antigo só como transição, isolado em `src/features/guests/
 
 ## Concluídas
 
+- 2026-09-22 · Claude · Espera de ~15,7 s quando o PostgREST devolve 503
+  (pendência aberta pelo QA da lista de mimos).
+  - Causa: o `postgrest-js` 2.116 repete GET/HEAD/OPTIONS em **503 e 520** por
+    conta própria — até 3 vezes, com recuo de 1 s + 2 s + 4 s, e honrando
+    `Retry-After`. Isso não passa pela interface: nada acende “Atualizando…” nem
+    mexe em `isFetching`. Com a repetição do TanStack por cima (`retry: 1`), um
+    503 custava ~7 s + 1 s + ~7 s ≈ 15,7 s antes de o erro aparecer. Num 500,
+    que não está na lista de repetíveis da biblioteca, o mesmo caminho leva ~2 s.
+  - Correção em `src/lib/supabase.ts`: `db: { retry: false }` no `createClient`.
+    A repetição passa a ser só a visível do TanStack (`retry` e o recuo de
+    `liveInterval`), que já move `isFetching`, o `RefreshStatus` e o botão
+    “Recarregar lista”. O erro agora aparece em ~2,4 s, como no 500.
+  - Vale para todos os GETs do front, e não só a lista: as telas de eventos,
+    convites e convidado tinham a mesma espera silenciosa.
+  - Regressão: `tests/e2e/gift-list.spec.ts` · “lista indisponível (503) mostra
+    o erro sem prender o esqueleto” — serve 503 só na leitura paginada de
+    `event_items`, exige o estado de erro em menos de 8 s e no máximo 4
+    chamadas (com a repetição da biblioteca ligada seriam 8, aos ~15 s).
+    Conferido RED sem a correção e GREEN com ela; `npm run check` verde.
+  - Não mexi em `retry` no TanStack: a repetição dele é a que a tela mostra, e
+    o back continua podendo sinalizar 503 transitório sem o usuário ficar parado.
+  - De quebra, um teste intermitente no mesmo arquivo (“cada mimo é uma linha
+    compacta”, falhou 1 em 15 na suíte cheia): ele lia `getComputedStyle(…).color`
+    uma vez logo depois do `hover()`, e a transição de `color` do `.btn-icon`
+    ainda estava correndo. Virou `expect(...).not.toHaveCSS('color', rest)`, que
+    repete a leitura. Nada a ver com o 503; 40/40 com `--repeat-each=2`.
 - 2026-09-21 · Claude · Refatoração UI/UX da lista de presentes (Lista de mimos),
   a partir de `PLANO-REFATORACAO-LISTA-DE-MIMOS.md`.
   - G0: baseline em 320/375/768/1440 antes de mexer no código; a aba Mimos tinha
@@ -407,6 +433,7 @@ mantém o cálculo antigo só como transição, isolado em `src/features/guests/
     lista fica ~15,7 s em “Carregando a lista…” (três tentativas do
     `postgrest-js` mais uma do TanStack). Com 500 leva ~2 s. O esqueleto novo
     torna a espera mais enganosa; avaliar `retry: false` na leitura da lista.
+    _(Corrigido em 2026-09-22 — ver a entrada abaixo.)_
   - Fora do escopo, com motivo: a seção “Presentes” **não** virou accordion — no
     chadbb ela é aba do evento, e o botão “Presentes” solto é o atalho da barra
     de etapas pendentes (`SetupDock`), não um container. Busca/filtros não

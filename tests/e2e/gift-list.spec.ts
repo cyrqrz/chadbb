@@ -83,9 +83,11 @@ test('cada mimo é uma linha compacta: nome à esquerda, remover discreto à dir
   expect(Math.min(removeBox.width, removeBox.height)).toBeGreaterThanOrEqual(44)
 
   // Em repouso a ação destrutiva não é vermelha; o destaque vem no hover.
+  // `color` tem transição (`--duration-fast`), então a leitura precisa repetir:
+  // uma só, logo depois do hover, às vezes pega a cor de repouso ainda.
   const rest = await remove.evaluate(el => getComputedStyle(el).color)
   await remove.hover()
-  expect(await remove.evaluate(el => getComputedStyle(el).color)).not.toBe(rest)
+  await expect(remove).not.toHaveCSS('color', rest)
 })
 
 test('remover continua pedindo confirmação na própria linha', async ({ page }) => {
@@ -102,6 +104,38 @@ test('lista de mimos vazia ensina o próximo passo', async ({ page }) => {
   await expect(list.getByText('Nenhum mimo na lista.')).toBeVisible()
   await expect(list.getByRole('link', { name: 'Adicionar à lista' })).toHaveCount(1)
   await expect(list.locator('.list-count')).toHaveCount(0)
+})
+
+test('lista indisponível (503) mostra o erro sem prender o esqueleto', async ({ page }) => {
+  // O postgrest-js repetia GET em 503 por conta própria (1 s + 2 s + 4 s) antes de
+  // devolver o erro, e com a repetição do TanStack por cima a tela ficava ~15,7 s
+  // em "Carregando a lista…". Com `db.retry: false` a única repetição é a visível.
+  const attempts: number[] = []
+  await page.addInitScript(value => localStorage.setItem('sb-e2e-auth-token', JSON.stringify(value)), session())
+  await page.route('https://e2e.supabase.co/**', async route => {
+    const url = new URL(route.request().url())
+    const path = url.pathname
+    if (path === '/auth/v1/user') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(session().user) })
+    if (path === '/rest/v1/events') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([event]) })
+    // Só a leitura paginada da lista; `listedProducts` pede outras colunas.
+    if (path === '/rest/v1/event_items' && url.searchParams.get('select')?.includes('product:products')) {
+      attempts.push(Date.now())
+      return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: 'no schema cache' }) })
+    }
+    await route.fulfill({ status: 200, contentType: 'application/json', body: '[]',
+      headers: { 'access-control-expose-headers': 'content-range', 'content-range': '*/0' } })
+  })
+
+  const start = Date.now()
+  await page.goto(`/eventos/${eventId}/presentes`)
+  await page.getByRole('button', { name: 'Mimos', exact: true }).click()
+  const list = page.getByRole('region', { name: 'Mimos na lista' })
+  await expect(list.getByRole('button', { name: 'Recarregar lista' })).toBeVisible({ timeout: 8_000 })
+  expect(Date.now() - start).toBeLessThan(8_000)
+  await expect(list.getByText('Carregando a lista…')).toHaveCount(0)
+  // Cada tentativa do TanStack custa uma chamada, e não as quatro do postgrest-js:
+  // com a repetição da biblioteca ligada seriam 8 antes do erro aparecer.
+  expect(attempts.length).toBeLessThanOrEqual(4)
 })
 
 for (const width of [320, 375, 768, 1024, 1440]) {
