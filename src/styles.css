@@ -437,11 +437,18 @@
     .guest-card .card-actions > .btn-danger { margin-inline-start: auto; }
   }
 
+  /* Diálogo de confirmação (G5.1): `<dialog>` nativo, sem dependência nova. */
+  /* O preflight do Tailwind zera a margem do `<dialog>`, que por padrão o centraliza; `margin: auto` devolve a centralização. */
+  .confirm-dialog { margin: auto; max-width: min(26rem, calc(100vw - 2rem)); border: 1px solid var(--color-border-subtle); border-radius: var(--radius-panel); background: var(--color-surface); padding: clamp(1.25rem, 4vw, 1.75rem); box-shadow: var(--shadow-md); animation: rise var(--duration-normal) var(--ease-emphasized) both; }
+  .confirm-dialog::backdrop { background: rgb(41 35 38 / 0.4); animation: fade var(--duration-fast) var(--ease-standard) both; }
+  .confirm-dialog-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--action-gap); }
+
   /* Página de amostras (só em desenvolvimento) */
   .specimen-swatch { display: flex; flex-direction: column; border: 1px solid var(--color-border-subtle); border-radius: var(--radius-surface); background: var(--color-surface); padding: 0.5rem; font-size: var(--text-caption); }
 }
 
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
@@ -459,7 +466,7 @@
   .meter { border: 1px solid CanvasText; }
   .meter > span { background: Highlight; }
   .notice { border: 1px solid CanvasText; }
-  .setup-dock-inner, .step-card, .venue-map, .guest-notice { border-color: CanvasText; }
+  .setup-dock-inner, .step-card, .venue-map, .guest-notice, .confirm-dialog { border-color: CanvasText; }
   :focus-visible { outline-color: Highlight; }
 }
 

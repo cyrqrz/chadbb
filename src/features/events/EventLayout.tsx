@@ -1,13 +1,13 @@
 import { Suspense, useState } from 'react'
 import type { MouseEvent } from 'react'
-import { Link, NavLink, Navigate, Outlet, useMatch, useParams } from 'react-router-dom'
+import { Link, NavLink, Navigate, Outlet, useMatch, useNavigate, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { eventKeys, getEvent } from './api'
 import { daysUntil, inSetup, pendingSteps, statusLabels } from './model'
 import { SetupDock } from './SetupDock'
 import { live } from '../../lib/query'
 import { useAuth } from '../auth/context'
-import { BackLink, StatusBadge } from '../../components/ui'
+import { BackLink, ConfirmDialog, StatusBadge } from '../../components/ui'
 import { LoadingState } from '../../components/States'
 
 const tabs = [['', 'Painel'], ['presentes', 'Presentes'], ['dados', 'Dados do evento']] as const
@@ -27,12 +27,17 @@ function countdown(days: number | null) {
 export function EventLayout() {
   const { id = '' } = useParams()
   const { session } = useAuth()
+  const navigate = useNavigate()
   const query = useQuery({ queryKey: [...eventKeys.detail(id), session?.user.id], queryFn: () => getEvent(id), retry: false, ...live })
   const event = query.data
   // Rascunho não salvo em `EventPage`: bloqueia a navegação por este cabeçalho.
   const [dirty, setDirty] = useState(false)
-  function guard(e: MouseEvent) {
-    if (dirty && !window.confirm('Descartar as alterações e sair sem salvar?')) e.preventDefault()
+  // G5.1: o clique fica pendente até a confirmação, para poder navegar depois.
+  const [pendingHref, setPendingHref] = useState<string | null>(null)
+  function guard(e: MouseEvent<HTMLAnchorElement>) {
+    if (!dirty) return
+    e.preventDefault()
+    setPendingHref(e.currentTarget.getAttribute('href'))
   }
   const when = event?.starts_at ? new Date(event.starts_at).toLocaleString('pt-BR', { dateStyle: 'long', timeStyle: 'short', timeZone: 'America/Sao_Paulo' }) : null
   const left = event && event.status !== 'closed' ? countdown(daysUntil(event.starts_at)) : null
@@ -59,6 +64,10 @@ export function EventLayout() {
     {/* A troca de aba carrega só o conteúdo; o cabeçalho fica. */}
     <Suspense fallback={<LoadingState>Carregando…</LoadingState>}><Outlet context={{ setDirty } satisfies EventLayoutContext} /></Suspense>
     {event && <SetupDock event={event} />}
+    <ConfirmDialog open={pendingHref !== null} title="Descartar alterações e sair sem salvar?"
+      description="O que você digitou nesta tela ainda não foi salvo." confirmLabel="Sair sem salvar" tone="danger"
+      onCancel={() => setPendingHref(null)}
+      onConfirm={() => { const href = pendingHref; setPendingHref(null); if (href) navigate(href) }} />
   </section>
 }
 

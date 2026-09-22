@@ -341,8 +341,9 @@ async function openEdit(page: Page) {
     list: page.getByRole('region', { name: 'Convidados' }).locator('.guests-feedback') }
 }
 async function confirmAnd(page: Page, invitation: string, action: string) {
-  page.once('dialog', dialog => void dialog.accept())
   await page.getByRole('listitem').filter({ hasText: invitation }).getByRole('button', { name: action }).click()
+  const confirmLabel = action === 'Reemitir link' ? 'Gerar novo link' : action
+  await page.getByRole('dialog').getByRole('button', { name: confirmLabel }).click()
 }
 
 test('reemitir link com edição aberta mostra o aviso junto do link novo', async ({ page }) => {
@@ -1135,8 +1136,8 @@ test.describe('G3.1 · cards do organizador', () => {
     await expect(card.getByRole('alert')).not.toContainText(/unavailable|503/)
     await expect(field).toHaveValue('14')
     await expectAccessible(page)
-    page.once('dialog', dialog => void dialog.accept())
     await card.getByRole('button', { name: 'Recarregar quantidade' }).click()
+    await page.getByRole('dialog').getByRole('button', { name: 'Descartar e recarregar' }).click()
     await expect(field).toHaveValue('12')
     await expect(card.getByRole('status')).toHaveText('Quantidade recarregada.')
     await expect(card.getByRole('alert')).toHaveCount(0)
@@ -1167,8 +1168,9 @@ test.describe('G3.1 · cards do organizador', () => {
     await expect(field).toHaveValue('8')
     await expect(card.getByRole('button', { name: 'Recarregar quantidade' })).toBeVisible()
     await expectAccessible(page)
-    page.once('dialog', dialog => void dialog.accept())
     await card.getByRole('button', { name: 'Recarregar quantidade' }).focus()
+    await page.keyboard.press('Enter')
+    await page.getByRole('dialog').getByRole('button', { name: 'Descartar e recarregar' }).focus()
     await page.keyboard.press('Enter')
     await expect(field).toHaveValue('30')
     const done = card.getByRole('status').filter({ hasText: 'Quantidade recarregada.' })
@@ -1186,8 +1188,9 @@ test.describe('G3.1 · cards do organizador', () => {
     await field.fill('14')
     await card.getByRole('button', { name: 'Atualizar quantidade' }).click()
     await expect(card.getByRole('alert')).toBeVisible()
-    page.once('dialog', dialog => void dialog.accept())
     await card.getByRole('button', { name: 'Recarregar quantidade' }).focus()
+    await page.keyboard.press('Enter')
+    await page.getByRole('dialog').getByRole('button', { name: 'Descartar e recarregar' }).focus()
     await page.keyboard.press('Enter')
     const done = card.getByRole('status').filter({ hasText: 'Quantidade recarregada.' })
     await expect(done).toBeVisible()
@@ -1657,16 +1660,16 @@ test.describe('G4 · painel do evento', () => {
     await form.getByLabel('Nome da pessoa ou família').fill('Convidado fictício 9')
     await form.getByRole('button', { name: 'Criar convite' }).click()
     await expect(form.getByLabel('Link para compartilhar')).toHaveValue(/token-ficticio/)
-    const dialogs: string[] = []
-    page.on('dialog', dialog => { dialogs.push(dialog.message()); void dialog.dismiss() })
     await form.getByRole('button', { name: 'Fechar' }).click()
-    expect(dialogs).toHaveLength(1)
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toContainText('O link deste convite não aparece de novo')
+    await dialog.getByRole('button', { name: 'Cancelar' }).click()
     await expect(form).toBeVisible()
     await form.getByRole('button', { name: 'Copiar convite' }).click()
     await expect(form.getByRole('status')).toHaveText('Link copiado.')
     await form.getByRole('button', { name: 'Fechar' }).click()
     await expect(form).toHaveCount(0)
-    expect(dialogs).toHaveLength(1)
+    await expect(dialog).toHaveCount(0)
   })
 
   test('evento encerrado não oferece “Convidar alguém” nem manda publicar', async ({ page }) => {

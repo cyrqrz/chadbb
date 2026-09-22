@@ -10,7 +10,7 @@ import { failedLast, live } from '../../lib/query'
 import { useLastError } from '../../lib/useLastError'
 import { useAuth } from '../auth/context'
 import { ErrorState, LoadingState, RefreshStatus, SlowRefresh, SuccessMessage } from '../../components/States'
-import { Button } from '../../components/ui'
+import { Button, ConfirmDialog } from '../../components/ui'
 import { EventNotFound } from './EventLayout'
 import type { EventLayoutContext } from './EventLayout'
 
@@ -36,6 +36,7 @@ function EventEditor({ server, created, refreshing, refreshFailed, retry }: { se
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState('')
   const [confirmClose, setConfirmClose] = useState(false)
+  const [confirmReload, setConfirmReload] = useState(false)
   const [publicConsent, setPublicConsent] = useState(false)
   const [imageFile, setImageFile] = useState<File | null>(null)
   // Publicado nesta tela: o aviso com o próximo passo recebe o foco, porque o botão some.
@@ -95,11 +96,14 @@ function EventEditor({ server, created, refreshing, refreshFailed, retry }: { se
     }
     catch (cause) { setError(errorMessage(cause)) } finally { setBusy(false) }
   }
-  async function reload() {
-    if (dirty && !window.confirm('Descartar as alterações locais e carregar a versão salva?')) return
+  async function doReload() {
     setBusy(true); setError(null)
     try { const latest = await getEvent(record.id); if (!latest) throw new Error('EVENT_NOT_FOUND'); await accept(latest); setMessage('Dados recarregados.') }
     catch (cause) { setError(errorMessage(cause)) } finally { setBusy(false) }
+  }
+  function reload() {
+    if (dirty) { setConfirmReload(true); return }
+    void doReload()
   }
   return <div className="tab-panel max-w-3xl">
     <div className="flex flex-wrap items-center gap-4"><h2 className="tab-title">Dados do evento</h2><SlowRefresh fetching={refreshing} className="mt-0" /></div>
@@ -137,6 +141,9 @@ function EventEditor({ server, created, refreshing, refreshFailed, retry }: { se
         confirmClose ? <div className="notice"><p>Encerrar este evento? Ele não poderá receber novas reservas nem ser reaberto.</p><div className="mt-4 flex flex-wrap gap-4"><button className="btn-danger btn-danger-strong" disabled={busy || dirty} onClick={() => void transition('closed')}>Confirmar encerramento</button><Button variant="ghost" disabled={busy} onClick={() => setConfirmClose(false)}>Continuar com evento aberto</Button></div></div> :
           <button className="btn-danger" disabled={busy || dirty} onClick={() => setConfirmClose(true)}>Encerrar evento</button>}
     </div>}
+    <ConfirmDialog open={confirmReload} title="Descartar as alterações locais?"
+      description="A versão salva será carregada no lugar do que você digitou." confirmLabel="Descartar e recarregar" tone="danger"
+      onCancel={() => setConfirmReload(false)} onConfirm={() => { setConfirmReload(false); void doReload() }} />
   </div>
 }
 

@@ -10,7 +10,7 @@ import { errorMessage } from '../../lib/errors'
 import { failedLast, live } from '../../lib/query'
 import { useLastError } from '../../lib/useLastError'
 import { EmptyState, ErrorState, LoadingState, RefreshStatus, SuccessMessage } from '../../components/States'
-import { Button, Progress, StatusBadge } from '../../components/ui'
+import { Button, ConfirmDialog, Progress, StatusBadge } from '../../components/ui'
 import type { StatusTone } from '../../components/ui'
 import { EventNotFound } from '../events/EventLayout'
 import { StepCompletion } from '../events/SetupDock'
@@ -40,6 +40,7 @@ export function InvitationsPage() {
   const formId = useId()
   const toggleId = useId()
   const [copied, setCopied] = useState(false)
+  const [confirmClose, setConfirmClose] = useState<{ fromInside: boolean } | null>(null)
   // Ao fechar pelo botão de dentro do formulário, o foco volta para “Convidar alguém”.
   const refocus = useRef(false)
   useEffect(() => { if (inviting) nameField.current?.focus() }, [inviting])
@@ -79,10 +80,13 @@ export function InvitationsPage() {
   const formOpen = open
   // O aviso fica junto do que o provocou: formulário de convite, edição ou a lista.
   const feedbackPlace = editing && feedbackAt === 'edit' ? 'edit' : formOpen && feedbackAt === 'create' ? 'create' : 'list'
-  function closeForm(fromInside = false) {
-    if (link && !copied && !window.confirm('Fechar o formulário? O link deste convite não aparece de novo: copie antes de fechar.')) return
+  function doCloseForm(fromInside: boolean) {
     setInviting(false); setLink(''); setNotice(''); setError(''); setCopied(false)
     refocus.current = fromInside
+  }
+  function closeForm(fromInside = false) {
+    if (link && !copied) { setConfirmClose({ fromInside }); return }
+    doCloseForm(fromInside)
   }
   return <div className="tab-panel">
     <RefreshStatus fetching={query.isFetching} failed={query.isError} onRetry={() => void query.refetch()} label="Atualizando painel…" />
@@ -119,13 +123,17 @@ export function InvitationsPage() {
       {!data.invitations.length ? <div className="mt-5"><EmptyState title="Nenhum convite ainda.">{closed ? 'Este evento foi encerrado sem convites.' : ready ? 'Use “Convidar alguém” para criar o primeiro convite.' : 'Depois de publicar o evento, use “Convidar alguém” para criar o primeiro convite.'}</EmptyState></div> :
       <ul className="mt-5 grid gap-4 md:grid-cols-2">{data.invitations.map(inv => <GuestCard key={inv.id} invitation={inv} sending={inv.response === 'no' && sendingGift.has(inv.name)} canEdit={!busy && ready} canRevoke={!busy}
         onEdit={() => { setEditing({ ...inv }); setError(''); setNotice('') }}
-        onRotate={() => { if (window.confirm('Gerar um novo link e invalidar o anterior? Respostas e presentes serão mantidos.')) void act('rotate', { id: inv.id }) }}
-        onRevoke={() => { if (window.confirm('Revogar este acesso? Respostas e presentes serão mantidos.')) void act('revoke', { id: inv.id }) }} />)}</ul>}
+        onRotate={() => void act('rotate', { id: inv.id })}
+        onRevoke={() => void act('revoke', { id: inv.id })} />)}</ul>}
     </section>
 
     <Diapers items={data.items.filter(item => item.category === 'fralda')} eventId={id} />
     <Treats items={data.items.filter(item => item.category === 'mimo')} />
     <Choices reservations={data.reservations} />
+    <ConfirmDialog open={confirmClose !== null} title="Fechar o formulário?"
+      description="O link deste convite não aparece de novo: copie antes de fechar." confirmLabel="Fechar sem copiar" tone="danger"
+      onCancel={() => setConfirmClose(null)}
+      onConfirm={() => { const pending = confirmClose; setConfirmClose(null); if (pending) doCloseForm(pending.fromInside) }} />
   </div>
 }
 
@@ -138,6 +146,8 @@ const responseIcons: Partial<Record<Invitation['response'], string>> = { no: '�
 function GuestCard({ invitation: inv, sending, canEdit, canRevoke, onEdit, onRotate, onRevoke }: {
   invitation: Invitation; sending: boolean; canEdit: boolean; canRevoke: boolean; onEdit: () => void; onRotate: () => void; onRevoke: () => void
 }) {
+  // G5.1: cada card cuida do próprio diálogo, para o foco voltar ao botão certo.
+  const [confirmAction, setConfirmAction] = useState<'rotate' | 'revoke' | null>(null)
   return <li className="card card-stack guest-card">
     <header className="card-header">
       <div className="card-badges">
@@ -151,9 +161,15 @@ function GuestCard({ invitation: inv, sending, canEdit, canRevoke, onEdit, onRot
     {inv.revoked && <p className="hint">O link antigo não funciona mais; as respostas e escolhas foram preservadas.</p>}
     <div className="card-actions">
       <Button variant="secondary" size="sm" disabled={!canEdit} onClick={onEdit}>Editar convite<span className="sr-only"> de {inv.name}</span></Button>
-      <Button variant="ghost" size="sm" disabled={!canEdit} onClick={onRotate}>Reemitir link</Button>
-      {!inv.revoked && <Button variant="danger" size="sm" disabled={!canRevoke} onClick={onRevoke}>Revogar acesso</Button>}
+      <Button variant="ghost" size="sm" disabled={!canEdit} onClick={() => setConfirmAction('rotate')}>Reemitir link</Button>
+      {!inv.revoked && <Button variant="danger" size="sm" disabled={!canRevoke} onClick={() => setConfirmAction('revoke')}>Revogar acesso</Button>}
     </div>
+    <ConfirmDialog open={confirmAction !== null}
+      title={confirmAction === 'rotate' ? 'Gerar um novo link e invalidar o anterior?' : 'Revogar este acesso?'}
+      description="Respostas e presentes serão mantidos." confirmLabel={confirmAction === 'rotate' ? 'Gerar novo link' : 'Revogar acesso'}
+      tone={confirmAction === 'revoke' ? 'danger' : 'default'}
+      onCancel={() => setConfirmAction(null)}
+      onConfirm={() => { const action = confirmAction; setConfirmAction(null); if (action === 'rotate') onRotate(); else if (action === 'revoke') onRevoke() }} />
   </li>
 }
 

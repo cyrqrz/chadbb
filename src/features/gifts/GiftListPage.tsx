@@ -8,7 +8,7 @@ import { errorMessage } from '../../lib/errors'
 import { failedLast, live } from '../../lib/query'
 import { useLastError } from '../../lib/useLastError'
 import { EmptyState, ErrorState, LoadingState, RefreshStatus, SuccessMessage } from '../../components/States'
-import { Button, Pagination, QuantityField, Skeleton, StatusBadge } from '../../components/ui'
+import { Button, ConfirmDialog, Pagination, QuantityField, Skeleton, StatusBadge } from '../../components/ui'
 import { EventNotFound } from '../events/EventLayout'
 import { StepCompletion } from '../events/SetupDock'
 import { addCustomTreat, addItem, CATALOG_LIMIT, giftKeys, listedProducts, listItems, listProducts, PAGE_SIZE, prepareList, removeItem, setQuantity } from './api'
@@ -162,6 +162,7 @@ function ItemRow({ item, closed, onRemoved }: { item: EventItem; closed: boolean
   // "Recarregar quantidade" é o único jeito de sair do erro e some ao ser usado:
   // sem isso o foco cairia no <body> e o próximo Tab voltaria ao topo da página.
   const [reloaded, setReloaded] = useState(0)
+  const [confirmReload, setConfirmReload] = useState(false)
   const reloadNotice = useRef<HTMLParagraphElement>(null)
   useEffect(() => { if (reloaded) reloadNotice.current?.focus() }, [reloaded])
   const cache = useQueryClient()
@@ -189,6 +190,9 @@ function ItemRow({ item, closed, onRemoved }: { item: EventItem; closed: boolean
   // depois de salvar não deve ser anunciada como alteração de outra sessão.
   const outdated = item.version > baseline.version
   const notes = outdated || error || message
+  function doReloadQuantity() {
+    setBaseline(item); setValue(String(item.quantity_requested ?? '')); setError(null); setMessage('Quantidade recarregada.'); setReloaded(count => count + 1)
+  }
   return <article className="item-row" aria-labelledby={titleId}>
     <div className="item-row-text">
       <div className="item-row-head">
@@ -211,12 +215,15 @@ function ItemRow({ item, closed, onRemoved }: { item: EventItem; closed: boolean
       {outdated && <p role="status" className="text-sm">Existe uma versão mais recente desta quantidade.</p>}
       {error && <ErrorState message={error} />}
       {(error || outdated) && <Button variant="ghost" size="sm" className="self-start" disabled={busy} onClick={() => {
-        if (!unchanged && !window.confirm('Descartar a quantidade digitada e carregar a versão salva?')) return
-        setBaseline(item); setValue(String(item.quantity_requested ?? '')); setError(null); setMessage('Quantidade recarregada.'); setReloaded(count => count + 1)
+        if (!unchanged) { setConfirmReload(true); return }
+        doReloadQuantity()
       }}>Recarregar quantidade</Button>}
       {/* O foco só vem para cá depois do "Recarregar": salvar mantém o foco no botão. */}
       {message && <p ref={reloadNotice} tabIndex={-1} role="status" className="state state-success">{message}</p>}
     </div>}
+    <ConfirmDialog open={confirmReload} title="Descartar a quantidade digitada?"
+      description="A versão salva será carregada no lugar do que você digitou." confirmLabel="Descartar e recarregar" tone="danger"
+      onCancel={() => setConfirmReload(false)} onConfirm={() => { setConfirmReload(false); doReloadQuantity() }} />
   </article>
 }
 // Remover pede confirmação na própria linha. Com reserva ativa o servidor recusa,

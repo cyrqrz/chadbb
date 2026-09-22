@@ -196,7 +196,13 @@ o ensaio familiar no celular continua pendente.
   e T-F5 nos gates indicados no plano. G0 e G1 mergeados (PR #7, 2026-09-16);
   G2 e G2.1 (foundation, forma e hierarquia de ações; fontes Manrope + Fraunces
   aprovadas) mergeados (PR #8). G3 (convite, página inicial e prévia) e G3.1 (sistema de cards,
-  `docs/design/CARDS.md`) mergeados (PR #9, 2026-09-17). Próximo: G4.
+  `docs/design/CARDS.md`) mergeados (PR #9, 2026-09-17). G4 (painel, abas,
+  prévia, `docs/design/G4-PAINEL.md`) e G4b (lista de presentes com menos
+  caixas, `docs/design/G4b-LISTA.md`) **já estavam prontos** ao retomar em
+  2026-09-22 — esta linha estava desatualizada dizendo "Próximo: G4". G5.1
+  (`ConfirmDialog` no lugar do `window.confirm`, `docs/design/G5-ESTADOS.md`)
+  feito em 2026-09-22. Próximo: G5.2 (skeleton nas telas que faltam,
+  `ActionMenu`).
 - [ ] **T-F6 · Testes.** Ampliar os testes e2e para o que mudar; `npm run check`
   antes de cada PR.
 
@@ -415,6 +421,30 @@ acima permanece pendente. Nenhuma alteração remota foi feita nesta revisão.
 | Codex | T-B5: G2 remoto reprovado em 17/09 (p95 ~4,2 s, zero erros, sync ok); G3.1 local concluído (2 chamadas por POST); G3.2 (publicar e medir de novo) aguardando aprovação. Exclusão de evento concluída e testada em produção (plano em PLANO-DESEMPENHO-T-B5.md, remoto não autorizado) | `codex/back` | livre para a próxima tarefa |
 
 ## Concluídas
+
+- 2026-09-22 · Claude · G5.1: `ConfirmDialog` no lugar das seis chamadas de
+  `window.confirm` (T-F7, `docs/design/G5-ESTADOS.md`).
+  - Ao retomar o plano visual, constatado que o G4 e o G4b já estavam prontos
+    e mergeados (`docs/design/G4-PAINEL.md`, `docs/design/G4b-LISTA.md`); a
+    linha do T-F7 acima estava desatualizada dizendo "Próximo: G4" — corrigida.
+  - Novo `src/components/ui/ConfirmDialog.tsx`: `<dialog>` nativo (sem Radix,
+    não instalado), foco preso e Esc de graça via `showModal()`, retorno do
+    foco ao elemento que abriu feito à mão, clique fora cancela.
+  - Trocados os seis pontos que usavam `window.confirm`: `EventLayout.tsx`
+    (sair da edição, com navegação adiada até confirmar), `EventPage.tsx`
+    ("Recarregar dados"), `GiftListPage.tsx` ("Recarregar quantidade", por
+    linha), `InvitationsPage.tsx` (fechar formulário com link não copiado,
+    reemitir link, revogar acesso). `EventsPage.tsx` ("Excluir evento") não
+    mudou: já usava confirmação inline, sem `window.confirm`.
+  - Amostra em `/amostras` e teste novo em `tests/e2e/specimens.spec.ts`
+    (axe com o diálogo aberto, Esc, clique fora, foco de volta ao botão).
+    Testes existentes que usavam `page.on('dialog', …)` (`organizer.spec.ts`,
+    `panel.spec.ts`) passaram a clicar nos botões do diálogo em página.
+  - `npm run check` e `npm run test:e2e` completo: 463 passed, 3 skipped, sem
+    regressão. Sem mudança em `supabase/`, `functions/` ou contrato.
+  - Achado A17 do `audit.md` (confirmação de encerrar/excluir evento) não
+    entrou: essas telas já tinham confirmação inline funcional; migrar ou não
+    fica para o G5.2, registrado em `docs/design/G5-ESTADOS.md`.
 
 - 2026-09-22 · Claude · R1: prévia do cabeçalho descartava rascunho não salvo
   (achado do Codex em [revisão de 22/09](reviews/2026-09-22-retomada.md)), PR

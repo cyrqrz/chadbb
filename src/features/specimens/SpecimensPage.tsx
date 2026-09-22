@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { EmptyState, ErrorState, LoadingState, SuccessMessage } from '../../components/States'
-import { BackLink, Button, Field, Progress, Section, Skeleton, StatusBadge, Tabs } from '../../components/ui'
+import { BackLink, Button, ConfirmDialog, Field, Progress, Section, Skeleton, StatusBadge, Tabs } from '../../components/ui'
 
 // Página de amostras da foundation (G2). Só existe em desenvolvimento.
 const colors = [
@@ -12,6 +12,7 @@ const colors = [
 export function SpecimensPage() {
   const [tab, setTab] = useState<'fralda' | 'mimo'>('fralda')
   const [busy, setBusy] = useState(false)
+  const [confirm, setConfirm] = useState<'default' | 'danger' | null>(null)
   return <div className="page flex flex-col gap-12">
     <header className="flex flex-col gap-2">
       <p className="eyebrow">Foundation · G2 e G2.1 · Manrope + Fraunces</p>
@@ -131,6 +132,17 @@ export function SpecimensPage() {
         <article className="card card-link"><p className="eyebrow">Com efeito ao passar o mouse</p><p>Chá de teste</p></article>
         <p className="notice">Publique o evento para criar convites.</p>
       </div>
+    </Section>
+
+    <Section title="Diálogo de confirmação" description="G5.1: <dialog> nativo no lugar do window.confirm. Esc e o clique fora fecham como Cancelar; o foco volta ao botão que abriu.">
+      <div className="flex flex-wrap gap-3">
+        <Button variant="secondary" onClick={() => setConfirm('default')}>Gerar um novo link</Button>
+        <Button variant="danger" onClick={() => setConfirm('danger')}>Revogar acesso</Button>
+      </div>
+      <ConfirmDialog open={confirm !== null}
+        title={confirm === 'danger' ? 'Revogar este acesso?' : 'Gerar um novo link e invalidar o anterior?'}
+        description="Respostas e presentes serão mantidos." confirmLabel={confirm === 'danger' ? 'Revogar acesso' : 'Gerar novo link'}
+        tone={confirm === 'danger' ? 'danger' : 'default'} onCancel={() => setConfirm(null)} onConfirm={() => setConfirm(null)} />
     </Section>
   </div>
 }

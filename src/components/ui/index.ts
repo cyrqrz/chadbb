@@ -1,6 +1,7 @@
 export { BackLink } from './BackLink'
 export { Button } from './Button'
 export type { ButtonVariant } from './Button'
+export { ConfirmDialog } from './ConfirmDialog'
 export { Field } from './Field'
 export type { FieldControlProps } from './Field'
 export { Pagination } from './Pagination'

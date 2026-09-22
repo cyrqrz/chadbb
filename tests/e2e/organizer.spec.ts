@@ -203,20 +203,20 @@ test('cabeçalho: alteração pendente exige confirmação para sair da edição
   await page.getByLabel('Nome do evento').fill('Rascunho não salvo')
 
   // Cancelar no diálogo: permanece na tela e o rascunho continua intacto.
-  page.once('dialog', dialog => void dialog.dismiss())
   await page.getByRole('navigation', { name: 'Áreas do evento' }).getByRole('link', { name: 'Painel' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Cancelar' }).click()
   await expect(page).toHaveURL(new RegExp(`/eventos/${eventId}/dados$`))
   await expect(page.getByLabel('Nome do evento')).toHaveValue('Rascunho não salvo')
 
   // A prévia do cabeçalho pede a mesma confirmação.
-  page.once('dialog', dialog => void dialog.dismiss())
   await page.getByRole('link', { name: 'Ver como o convidado vê' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Cancelar' }).click()
   await expect(page).toHaveURL(new RegExp(`/eventos/${eventId}/dados$`))
   await expect(page.getByLabel('Nome do evento')).toHaveValue('Rascunho não salvo')
 
   // Confirmar no diálogo: a navegação segue normalmente.
-  page.once('dialog', dialog => void dialog.accept())
   await page.getByRole('link', { name: 'Ver como o convidado vê' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Sair sem salvar' }).click()
   await expect(page).toHaveURL(new RegExp(`/eventos/${eventId}/previa$`))
   expect(mock.getRecord()?.title).not.toBe('Rascunho não salvo')
 })
@@ -260,8 +260,8 @@ test('conflito conserva alterações locais e explica recuperação', async ({ p
   await page.getByRole('button', { name: 'Salvar alterações' }).click()
   await expect(page.getByRole('alert')).toContainText('outra aba')
   await expect(page.getByLabel('Nome do evento')).toHaveValue('Minha alteração local')
-  page.once('dialog', dialog => void dialog.accept())
   await page.getByRole('button', { name: 'Recarregar dados' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Descartar e recarregar' }).click()
   await expect(page.getByLabel('Nome do evento')).toHaveValue('Chá de bebê da Lia')
 })
 

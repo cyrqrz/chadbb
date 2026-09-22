@@ -88,7 +88,7 @@ Problemas:
 | A2 | média | Contorno dos campos `#cdb8c1` com 1,87:1 sobre branco | cálculo de contraste | WCAG 1.4.11 (3:1) | G2 |
 | A3 | média | Placeholder `#8c7780` com 4,15:1 | cálculo de contraste | boa prática (4,5:1) | G2 |
 | A4 | média | Links de voltar (“← Detalhes do evento”, “← Seus eventos”) com 19 px de altura | medição a 390 px | WCAG 2.5.8 (24 px) e meta do projeto (44 px) | G2 |
-| A5 | baixa | Ações destrutivas usam `window.confirm`, fora do visual e sem explicar a consequência | código | consistência | G4 |
+| A5 | baixa | Ações destrutivas usam `window.confirm`, fora do visual e sem explicar a consequência | código | consistência | **corrigido** no G5.1 (`ConfirmDialog`, `<dialog>` nativo, nos seis pontos que usavam `window.confirm`) |
 | A6 | baixa | Sem axe em `/`, `/entrar`, `/eventos` e `/auth/callback` | testes atuais | T-F3 | G2 (login) e G4 |
 | A7 | baixa | Erro do callback e 404 fora dos componentes comuns | código | consistência | G5 |
 | A8 | média | Ao apertar Enter em “Tentar novamente”, o botão fica `disabled` e o foco volta ao `body` | QA de UX, confirmado no Playwright | WCAG 2.4.3 | G2 (`Button` com `aria-disabled`) |
@@ -100,7 +100,7 @@ Problemas:
 | A14 | baixa | Durante a tentativa, o leitor de tela ouve só “Tentar novamente, indisponível”, sem dizer que está tentando | QA de UX (G2) | WCAG 4.1.3 | G5 |
 | A15 | baixa | “Tamanho completo” comunicava um estado por meio de um botão indisponível (texto a ~3,1:1) | QA de UX (G2.1) | UX | **corrigido no G3** (selo “Completo”) |
 | A16 | baixa | Várias ações primárias por tela (uma por card de presente, por produto, e “Salvar convite” junto de “Criar convite”) | QA de UX (G2.1) | hierarquia | G3/G4 |
-| A17 | baixa | Confirmação de encerramento na própria tela, sem diálogo | QA de UX (G2.1) | UX | G4 (`ConfirmDialog`) |
+| A17 | baixa | Confirmação de encerramento na própria tela, sem diálogo | QA de UX (G2.1) | UX | `ConfirmDialog` existe desde o G5.1, mas "Encerrar evento" (`EventPage`) e "Excluir evento" (`EventsPage`) continuam com a confirmação inline em disclosure, não migradas — G5.2 |
 | A18 | baixa | No convite, se outro convidado esgota o tamanho enquanto a pessoa digita a quantidade, o formulário some sem explicação | QA de UX (G3) | UX, regra 7 do AGENTS.md | G5 (contrato de atualização) |
 | A19 | baixa | Quantidade acima do máximo só mostra a mensagem nativa do navegador; falta dica visível do limite | QA de UX (G3) | UX | G5 |
 | A20 | média | A 320 px com texto a 200%, o campo do stepper não encolhia. Onde o campo era forçado a caber (convite e lista), quem cedia espaço eram o − e o +, que caíam para 36 px, porque `.stepper` esconde o que transborda; no catálogo, onde nada forçava, o próprio campo passava da borda da linha (medido: 242 px numa linha de 224 px) e o + era cortado por um ancestral. Preexistente nas duas telas do convidado e do catálogo | medição no Playwright (QA da G4b.3): botões de 36 px a 320 px com texto a 200%, no convite e na lista; o documento continua com rolagem lateral zero, e por isso nenhum teste de 320 px pegava a falha | WCAG 2.5.5 / 2.5.8 (alvo de toque) | **corrigido** na G4b.3 (`min-width: 0` no campo, `flex-shrink: 0` nos botões); guardas: e2e “stepper: − e + mantêm 44 px a 320 px com texto a 200%” (`panel.spec.ts`) e “quantidade: − e + mantêm 44 px a 320 px com texto a 200%” (`guest.spec.ts`) |

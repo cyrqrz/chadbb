@@ -143,7 +143,7 @@ opacidade), ocupado (`aria-disabled`, mantém o foco), erro e selecionado
 | `Skeleton` | bloco | largura e altura | `--radius-control` | — | decorativo; o anúncio fica com o `LoadingState` |
 | `Pagination` | `nav` + anterior/próxima + “Página X de Y” | recebe `pageSize` | botões `secondary` | quebra linha | `nav` rotulada; botões indisponíveis nas pontas |
 | `ActionMenu` (G4) | botão “…” + menu | — | `--radius-surface` | — | a definir com Radix: setas, Esc, foco de volta ao botão |
-| `ConfirmDialog` (G4) | diálogo modal | destrutivo e comum | `--radius-panel` | tela cheia no celular | a definir com Radix: foco preso, Esc, título e descrição ligados |
+| `ConfirmDialog` (G5.1) | `<dialog>` nativo: título, descrição opcional, Cancelar + ação | destrutivo e comum | `--radius-panel` | largura mínima entre o conteúdo e a tela | foco preso e Esc vêm do próprio `<dialog>` (`showModal`); clique fora (`::backdrop`) cancela; foco guardado antes de abrir e devolvido ao fechar (feito à mão, sem garantia do navegador) |
 
 Estados (`src/components/States.tsx`): `LoadingState`, `ErrorState`,
 `EmptyState`, `SuccessMessage` e `RefreshStatus`, agora com `Button`. Aviso sem
@@ -153,8 +153,8 @@ Consultas (`src/lib/query.ts`, `src/lib/useLastError.ts`): `failedLast` e
 `useLastError` mantêm a tela de erro (e o foco no botão) durante a nova tentativa,
 e evitam que uma falha de atualização apague uma tela que já tinha dados.
 
-Ficam para as fases seguintes: `ActionMenu` e `ConfirmDialog` no lugar de
-`window.confirm`, e componentes React para os cards (G4).
+Ficam para as fases seguintes: `ActionMenu` (G5.2) e componentes React para os
+cards (G4).
 
 ## Automação de acessibilidade
 
