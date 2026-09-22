@@ -379,6 +379,14 @@ mantém o cálculo antigo só como transição, isolado em `src/features/guests/
   animação inicial, ainda sem causa comprovada. Conferir sincronização antes de
   medir a reconsulta; não remover a asserção. Evidências na
   [revisão de 22/09](reviews/2026-09-22-retomada.md).
+  Mais evidência (2026-09-22, à tarde): na mesma suíte `describe('reconsulta
+  sem tremida', ...)`, outros dois testes (`detalhes do evento no celular:
+  reconsulta não mexe no formulário` e `painel: resposta rápida não pisca
+  "Atualizando painel…"`) falharam juntos numa rodada completa com
+  `Execution context was destroyed, most likely because of a navigation` —
+  sintoma diferente do de cima, mesmo bloco. Os dois passaram isolados de
+  primeira. Reforça que é sensibilidade à carga da máquina rodando a suíte
+  inteira, não um teste específico; não investigado a fundo.
 
 - [x] **2026-09-22 · Codex → Claude · R1: proteger a prévia do cabeçalho contra
   perda de edição.** _(Corrigido em `fbbbcb1`.)_ Em `EventLayout.tsx:42`, “Ver como
