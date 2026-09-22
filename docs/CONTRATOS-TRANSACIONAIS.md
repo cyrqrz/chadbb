@@ -18,11 +18,27 @@ Funções de organizador retornam uma linha com `.single()` na chamada PostgREST
 | `remove_event_item` | `p_event_id`, `p_item_id`, `p_version` | Proprietário; ordem evento → item → reserva; apaga reservas canceladas do item e, se for mimo próprio, o produto; retorna o item removido | `EVENT_NOT_FOUND`, `EVENT_CLOSED`, `ITEM_NOT_FOUND`, `ITEM_VERSION_CONFLICT`, `ITEM_HAS_RESERVATIONS` (reserva ativa: não remove) |
 | `add_custom_treat` | `p_event_id`, `p_title` (1–160 após `btrim`), `p_description` (até 2000, opcional) | Proprietário; cria produto `manual` com `event_id` (só o dono vê; fora do catálogo) e o item de mimo sem limite; retorna o item | `EVENT_NOT_FOUND`, `EVENT_CLOSED`, `INVALID_TREAT`, `ITEM_ALREADY_EXISTS` (nome igual ao de um item já na lista do evento, mimo próprio ou do catálogo, sem diferença de maiúsculas) |
 
-Lista: evento `FOR SHARE` → item `FOR UPDATE`. Adição também estabiliza o produto
-com `FOR SHARE` antes de inserir o item. O par evento/produto é único; repetição de
+Lista (migration `20260922000000_list_identity_and_lock_order`, validada localmente,
+ainda não publicada): inclusão, mimo próprio, lista pronta e remoção adquirem
+evento `FOR UPDATE` antes de produto/item. Isso serializa mudanças estruturais
+do mesmo evento e evita o ciclo entre inclusão (produto → item) e remoção
+(item → produto próprio). Edição de quantidade mantém evento `FOR SHARE` →
+item `FOR UPDATE`. Adição também estabiliza o produto com `FOR SHARE` antes de
+inserir o item. O par evento/produto é único; repetição de
 inclusão com mesma quantidade devolve a linha atual, sem somar. Com quantidade
 diferente, informa item já existente. Isso não é idempotência de reserva e não
 reconstitui uma resposta histórica se a quantidade tiver sido editada depois.
+
+Identidade na inclusão: quando ao menos um dos itens é mimo, nomes iguais por
+`lower(btrim(title))` conflitam no mesmo evento (`ITEM_ALREADY_EXISTS`), tanto
+no catálogo quanto no mimo próprio. Espaços internos e acentos não são removidos.
+Fraldas entre si continuam identificadas pelo tamanho. A regra fica em
+`private.event_item_title_conflicts`, sem acesso direto pelos clientes.
+`prepare_family_list` pula homônimos já presentes, preserva itens, versões,
+reservas e cotas existentes e retorna só o número de inclusões efetivas.
+Duplicatas legadas não são apagadas nem impedem repetir o mesmo produto; novos
+homônimos são recusados. Renomeação administrativa de produtos não passa por
+esse protocolo de inclusão.
 
 Edição usa versão obrigatória, recusa evento encerrado e não altera vínculos.
 Contagem de comprometimento ocorre depois do bloqueio do item. Não há exclusão

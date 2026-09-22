@@ -417,14 +417,21 @@ mantém o cálculo antigo só como transição, isolado em `src/features/guests/
   seguido de produto homônimo do catálogo duplica o nome; a ordem inversa é
   recusada. Reproduzido em PostgreSQL descartável. Rever `add_event_item` e a
   lista pronta, em migration nova.
+  **22/09: correção local pronta**, em `20260922000000_list_identity_and_lock_order.sql`:
+  regra única de nomes nos três caminhos, lista pronta pula homônimo e replay
+  preservado inclusive em listas com duplicatas legadas. Publicação pendente.
 - [ ] **Codex · R3: ordem dos locks de produto/item.** Inclusão e remoção do mesmo
   mimo próprio por RPC podem entrar em deadlock (`40P01` reproduzido com duas
   conexões). Uniformizar locks e cobrir concorrência; o front atual não oferece
   reinclusão de produto próprio pelo catálogo.
+  **22/09: correção local pronta**, na mesma migration: inclusão e remoção
+  bloqueiam o evento `FOR UPDATE` antes de produto/item. Regressão reproduziu
+  `40P01` antes da correção; concorrência nas duas ordens e reserva versus remoção
+  aprovadas depois. Publicação pendente.
 
 Detalhes, escopo e limites em [revisão de 22/09](reviews/2026-09-22-retomada.md).
-As duas migrations de 18/09 foram revisadas; a implementação das correções
-acima permanece pendente. Nenhuma alteração remota foi feita nesta revisão.
+As duas migrations de 18/09 permanecem intactas. Evidências das correções locais
+em [R2/R3](reviews/2026-09-22-r2-r3.md). Nenhuma alteração remota foi feita.
 
 ## Em andamento
 

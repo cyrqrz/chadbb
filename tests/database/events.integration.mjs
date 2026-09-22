@@ -1040,3 +1040,225 @@ test('exclusão: evento expurgado e encerrado pode ser excluído; publicado nunc
   await assert.rejects(as(bob, 'select public.delete_event($1,$2)', [other.event.id, other.event.version]), /EVENT_NOT_FOUND/)
   assert.equal((await eventRows(other.event.id)).events, 1)
 })
+
+async function customTreat(event, title, client = null) {
+  const sql = 'select * from public.add_custom_treat($1,$2)'
+  return (await (client ? client.query(sql, [event.id, title]) : as(alice, sql, [event.id, title]))).rows[0]
+}
+async function namedProduct(title, size = null) {
+  const gift = await product(true, 'manual', size)
+  return (await admin.query('update public.products set title=$2 where id=$1 returning *', [gift.id, title])).rows[0]
+}
+async function waitBlocked(client, blocker) {
+  const deadline = Date.now() + 4000
+  while (Date.now() < deadline) {
+    const { rows } = await admin.query('select $2::integer = any(pg_blocking_pids($1)) blocked', [client.processID, blocker.processID])
+    if (rows[0].blocked) return
+    await new Promise(resolve => setTimeout(resolve, 10))
+  }
+  assert.fail('a operação não chegou ao bloqueio esperado')
+}
+const outcome = promise => promise.then(value => ({ value }), error => ({ error }))
+
+test('R2: mimo próprio e catálogo homônimos são recusados nas duas ordens; replay preservado', async () => {
+  for (const customFirst of [true, false]) {
+    const event = await create(); const gift = await namedProduct('  Livro DE PANO  ')
+    let original
+    if (customFirst) {
+      original = await customTreat(event, ' livro de pano ')
+      await assert.rejects(addGift(event, gift), /ITEM_ALREADY_EXISTS/)
+    } else {
+      original = await addGift(event, gift)
+      await assert.rejects(customTreat(event, ' livro de pano '), /ITEM_ALREADY_EXISTS/)
+    }
+    const replay = await addGift(event, { id: original.product_id, category: 'mimo' })
+    assert.deepEqual(replay, original)
+    assert.equal((await admin.query('select count(*) from public.event_items where event_id=$1', [event.id])).rows[0].count, '1')
+  }
+})
+
+test('R2: produtos distintos do catálogo com mesmo nome não duplicam; eventos são independentes', async () => {
+  const event = await create(); const first = await namedProduct('Mimo homonimo'); const second = await namedProduct(' MIMO HOMONIMO ')
+  await addGift(event, first)
+  await assert.rejects(addGift(event, second), /ITEM_ALREADY_EXISTS/)
+  assert.equal((await addGift(await create(), second)).product_id, second.id)
+  assert.ok(await customTreat(event, 'Outro mimo'))
+})
+
+test('R2: homônimo entre mimo e fralda é simétrico; fraldas diferentes continuam por tamanho', async () => {
+  const gift = await namedProduct('Nome compartilhado', 'P')
+  const first = await create(); await customTreat(first, 'Nome compartilhado')
+  await assert.rejects(addGift(first, gift), /ITEM_ALREADY_EXISTS/)
+  const second = await create(); await addGift(second, gift)
+  await assert.rejects(customTreat(second, 'Nome compartilhado'), /ITEM_ALREADY_EXISTS/)
+  assert.ok(await addGift(second, await namedProduct('Nome compartilhado', 'M')))
+})
+
+test('R2: lista pronta pula homônimo e preserva item, reservas e cotas existentes', async () => {
+  const event = await transition(await save(await create()), 'published')
+  const item = await customTreat(event, '  TOALHA COM CAPUZ  ')
+  const limited = await addGift(event, await diaper('P'), 9)
+  const invite = await organizerAction(event, 'create', { name: 'Pessoa fictícia', kind: 'individual', capacity: 1 })
+  const access = await guestAction(invite.token, 'exchange')
+  await guestAction(access.session_token, 'reserve', request({ item_id: item.id, quantity: 1, version: null }))
+  assert.equal((await as(alice, 'select public.prepare_family_list($1) n', [event.id])).rows[0].n, 25)
+  assert.equal((await as(alice, 'select public.prepare_family_list($1) n', [event.id])).rows[0].n, 0)
+  assert.deepEqual((await admin.query('select * from public.event_items where id=$1', [item.id])).rows[0], item)
+  assert.deepEqual((await admin.query('select * from public.event_items where id=$1', [limited.id])).rows[0], limited)
+  const snapshot = (await guestAction(access.session_token, 'read')).snapshot
+  assert.equal(snapshot.items.length, 27)
+  assert.equal(snapshot.items.find(i => i.id === item.id).committed, 1)
+})
+
+test('R2: catálogo aguarda criação concorrente de mimo próprio e recusa o homônimo', async () => {
+  const event = await create(); const gift = await namedProduct('Concorrente')
+  const maker = await connectAs(alice); const adder = await connectAs(alice)
+  let pending
+  try {
+    await adder.query("set statement_timeout='8s'")
+    await maker.query('begin')
+    const item = await customTreat(event, 'Concorrente', maker)
+    pending = outcome(adder.query('select * from public.add_event_item($1,$2,null)', [event.id, gift.id]))
+    await waitBlocked(adder, maker)
+    await maker.query('commit')
+    assert.match((await pending).error?.message ?? '', /ITEM_ALREADY_EXISTS/)
+    assert.deepEqual((await admin.query('select id from public.event_items where event_id=$1', [event.id])).rows, [{ id: item.id }])
+  } finally {
+    await maker.query('rollback'); await pending
+    await Promise.all([maker.end(), adder.end()])
+  }
+})
+
+test('R3: inclusão pausada antes do item e remoção concorrente terminam sem deadlock', async () => {
+  const event = await create(); const item = await customTreat(event, 'Mimo concorrente')
+  const gate = server.getPgClient(); await gate.connect()
+  const adder = await connectAs(alice); const remover = await connectAs(alice)
+  let adding, removing
+  try {
+    // Barreira apenas no banco descartável: pausa a RPC real depois do produto,
+    // antes da inserção/conflito no item. Não inventa locks de produto fora da RPC.
+    await admin.query(`create function public.test_pause_item_insert() returns trigger language plpgsql as $$
+      begin perform pg_advisory_xact_lock(92222); return new; end $$;
+      create trigger test_pause_item_insert before insert on public.event_items
+      for each row when (new.event_id='${event.id}'::uuid) execute function public.test_pause_item_insert()`)
+    await gate.query('select pg_advisory_lock(92222)')
+    await adder.query("set statement_timeout='8s'")
+    await remover.query("set statement_timeout='8s'")
+    adding = outcome(adder.query('select * from public.add_event_item($1,$2,null)', [event.id, item.product_id]))
+    await waitBlocked(adder, gate)
+    removing = outcome(remover.query('select * from public.remove_event_item($1,$2,$3)', [event.id, item.id, item.version]))
+    await waitBlocked(remover, adder)
+    await gate.query('select pg_advisory_unlock(92222)')
+    const results = await Promise.all([adding, removing])
+    assert.deepEqual(results.map(r => r.error?.code ?? 'ok'), ['ok', 'ok'])
+    assert.equal(results[0].value.rows[0].id, item.id)
+    assert.equal(results[1].value.rows[0].id, item.id)
+    assert.equal((await admin.query('select count(*) from public.products where id=$1', [item.product_id])).rows[0].count, '0')
+    assert.equal((await admin.query('select count(*) from public.event_items where id=$1', [item.id])).rows[0].count, '0')
+  } finally {
+    await gate.query('select pg_advisory_unlock_all()')
+    await Promise.all([adding, removing])
+    await Promise.all([gate.end(), adder.end(), remover.end()])
+    await admin.query('drop trigger if exists test_pause_item_insert on public.event_items; drop function if exists public.test_pause_item_insert()')
+  }
+})
+
+test('R3: remoção primeiro faz inclusão concorrente recusar produto apagado', async () => {
+  const event = await create(); const item = await customTreat(event, 'Mimo removido')
+  const remover = await connectAs(alice); const adder = await connectAs(alice)
+  let pending
+  try {
+    await adder.query("set statement_timeout='8s'")
+    await remover.query('begin')
+    await remover.query('select public.remove_event_item($1,$2,$3)', [event.id, item.id, item.version])
+    pending = outcome(adder.query('select public.add_event_item($1,$2,null)', [event.id, item.product_id]))
+    await waitBlocked(adder, remover)
+    await remover.query('commit')
+    assert.match((await pending).error?.message ?? '', /PRODUCT_UNAVAILABLE/)
+  } finally {
+    await remover.query('rollback'); await pending
+    await Promise.all([remover.end(), adder.end()])
+  }
+})
+
+test('R2: duplicata legada não impede replay nem permite novo homônimo', async () => {
+  const event = await create(); const first = await namedProduct('Duplicata legada')
+  const second = await namedProduct('Duplicata legada'); const third = await namedProduct('Duplicata legada')
+  const original = await addGift(event, first)
+  // Estado permitido pelas migrations anteriores; a correção não apaga dados.
+  await admin.query("insert into public.event_items(event_id,product_id,category,quantity_requested) values ($1,$2,'mimo',null)", [event.id, second.id])
+  assert.deepEqual(await addGift(event, first), original)
+  await assert.rejects(addGift(event, third), /ITEM_ALREADY_EXISTS/)
+  assert.equal((await admin.query('select count(*) from public.event_items where event_id=$1', [event.id])).rows[0].count, '2')
+})
+
+test('R2: dois produtos homônimos concorrentes resultam em apenas uma inclusão', async () => {
+  const event = await create(); const first = await namedProduct('Concorrência catálogo'); const second = await namedProduct('Concorrência catálogo')
+  const holder = await connectAs(alice); const waiter = await connectAs(alice)
+  let pending
+  try {
+    await waiter.query("set statement_timeout='8s'")
+    await holder.query('begin')
+    const original = (await holder.query('select * from public.add_event_item($1,$2,null)', [event.id, first.id])).rows[0]
+    pending = outcome(waiter.query('select public.add_event_item($1,$2,null)', [event.id, second.id]))
+    await waitBlocked(waiter, holder)
+    await holder.query('commit')
+    assert.match((await pending).error?.message ?? '', /ITEM_ALREADY_EXISTS/)
+    assert.deepEqual((await admin.query('select id from public.event_items where event_id=$1', [event.id])).rows, [{ id: original.id }])
+  } finally {
+    await holder.query('rollback'); await pending
+    await Promise.all([holder.end(), waiter.end()])
+  }
+})
+
+test('R3: reserva e remoção concorrentes respeitam quem bloqueou primeiro', async () => {
+  for (const reserveFirst of [true, false]) {
+    const f = await familyFixture(); const item = await customTreat(f.event, 'Mimo disputado')
+    const owner = await connectAs(alice); const guest = server.getPgClient(); await guest.connect()
+    let pending
+    try {
+      await owner.query("set statement_timeout='8s'"); await guest.query("set statement_timeout='8s'")
+      const reserve = () => guestAction(f.token, 'reserve', request({ item_id: item.id, quantity: 1, version: null }), guest)
+      const remove = () => owner.query('select public.remove_event_item($1,$2,$3)', [f.event.id, item.id, item.version])
+      if (reserveFirst) {
+        await guest.query('begin'); await reserve()
+        pending = outcome(remove())
+        await waitBlocked(owner, guest)
+        await guest.query('commit')
+        assert.match((await pending).error?.message ?? '', /ITEM_HAS_RESERVATIONS/)
+        assert.equal((await guestAction(f.token, 'read')).snapshot.items.find(i => i.id === item.id).committed, 1)
+        assert.equal((await admin.query('select count(*) from public.products where id=$1', [item.product_id])).rows[0].count, '1')
+      } else {
+        await owner.query('begin'); await remove()
+        pending = outcome(reserve())
+        await waitBlocked(guest, owner)
+        await owner.query('commit')
+        assert.match((await pending).error?.message ?? '', /ITEM_NOT_FOUND/)
+        assert.equal((await admin.query('select count(*) from public.reservations where item_id=$1', [item.id])).rows[0].count, '0')
+        assert.equal((await admin.query('select count(*) from public.products where id=$1', [item.product_id])).rows[0].count, '0')
+      }
+    } finally {
+      // Libera o titular do lock antes de aguardar a conexão concorrente.
+      await (reserveFirst ? guest : owner).query('rollback'); await pending
+      await Promise.all([owner.end(), guest.end()])
+    }
+  }
+})
+
+test('R2/R3: helper privado e mutações da lista continuam restritos ao proprietário', async () => {
+  const event = await create(); const item = await customTreat(event, 'Privado')
+  for (const role of ['anon', 'authenticated', 'service_role']) {
+    assert.equal((await admin.query("select has_function_privilege($1,'private.event_item_title_conflicts(uuid,uuid,text,text)','EXECUTE') allowed", [role])).rows[0].allowed, false)
+  }
+  for (const [sql, values] of [
+    ['select public.add_custom_treat($1,$2)', [event.id, 'Invasão']],
+    ['select public.remove_event_item($1,$2,$3)', [event.id, item.id, item.version]],
+    ['select public.prepare_family_list($1)', [event.id]],
+  ]) {
+    await assert.rejects(as(bob, sql, values), /EVENT_NOT_FOUND/)
+    await assert.rejects(as(null, sql, values, 'anon'), { code: '42501' })
+  }
+  const other = await create(bob)
+  await assert.rejects(addGift(other, { id: item.product_id, category: 'mimo' }, null, bob), /PRODUCT_UNAVAILABLE/)
+  assert.deepEqual((await admin.query('select * from public.event_items where id=$1', [item.id])).rows[0], item)
+})
