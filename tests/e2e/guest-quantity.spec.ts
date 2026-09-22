@@ -13,7 +13,7 @@ const makeSnapshot = (version: number | null): Snapshot => ({
   invitation: { name: 'Pessoa fictícia', kind: 'individual', capacity: 1, response: 'pending', attending: 0, version: 1 },
   event: { id: '60000000-0000-4000-8000-000000000006', title: 'Evento fictício', description: '', starts_at: '2035-09-10T17:30:00Z', address: '', instructions: '', cover_path: null, status: 'published' },
   items: [{ id: '70000000-0000-4000-8000-000000000007', title: 'Fralda fictícia P', description: '', category: 'fralda', diaper_size: 'P', limit: 10, committed: version === null ? 0 : 1,
-    own: version === null ? null : { id: 'r1', quantity: 1, version, status: 'reserved' } }],
+    available: version === null ? 10 : 9, own: version === null ? null : { id: 'r1', quantity: 1, version, status: 'reserved' } }],
 })
 
 test('quantidade fica bloqueada enquanto a reserva é enviada', async ({ page }) => {

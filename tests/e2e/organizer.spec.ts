@@ -42,7 +42,8 @@ async function backend(page: Page, signedIn = false) {
     } else if (path === '/rest/v1/rpc/transition_event' && record) { record = { ...record, status: body.p_status, version: record.version + 1 }; json = record }
     else if (path === '/rest/v1/rpc/set_event_step' && record) {
       record = { ...record, [`${body.p_step}_done_at`]: body.p_done ? '2026-01-02T00:00:00Z' : null, version: record.version + 1 }; json = record
-    } else if (path === '/rest/v1/rpc/organizer_invitations') json = { invitations: [], items: [], reservations: [] }
+    } else if (path === '/rest/v1/rpc/organizer_invitations') json = { invitations: [], items: [], reservations: [],
+      summary: { invitations: { total: 0, answered: 0, yes: 0, no: 0, maybe: 0, pending: 0, revoked: 0 }, people_confirmed: 0 } }
     else if (['/rest/v1/event_items', '/rest/v1/products'].includes(path)) { json = []; headers['content-range'] = '*/0' }
     else if (path.startsWith('/storage/v1/object/')) json = { Key: path.split('/object/')[1] }
     else if (!['/auth/v1/otp', '/auth/v1/logout'].includes(path)) { status = 500; json = { message: 'Unexpected test request' } }

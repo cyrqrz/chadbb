@@ -4,7 +4,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../auth/context'
 import { getEvent, eventKeys } from '../events/api'
-import { availableOf, invitations, panelSummary, responseLabels } from './api'
+import { invitations, responseLabels } from './api'
 import type { Dashboard, DashboardReservation, Invitation, PanelSummary } from './api'
 import { errorMessage } from '../../lib/errors'
 import { failedLast, live } from '../../lib/query'
@@ -70,13 +70,10 @@ export function InvitationsPage() {
   if (!query.data) return <div className="tab-panel"><ErrorState title="Não foi possível abrir o painel." message={errorMessage(loadError)} busy={query.isFetching} onRetry={() => void query.refetch()} /></div>
   const data = query.data
   // Quem respondeu que não vai e mesmo assim reservou presente. O vínculo é pelo
-  // nome porque as reservas do painel ainda não trazem o convite (pedido ao Codex
-  // em docs/TAREFAS-AGENTES.md): com nomes repetidos não há como saber de quem é
-  // a reserva, então o selo fica de fora em vez de marcar a pessoa errada. A
-  // escolha continua visível em "Escolhas dos convidados", onde é só fato.
-  const homonyms = new Map<string, number>()
-  for (const inv of data.invitations) homonyms.set(inv.name, (homonyms.get(inv.name) ?? 0) + 1)
-  const sendingGift = new Set(data.reservations.filter(r => r.status !== 'cancelled' && homonyms.get(r.name) === 1).map(r => r.name))
+  // `invitation_id` que o painel envia (T-B7), então homônimos são distinguidos.
+  // O servidor já deixa as canceladas de fora; o filtro só evita afirmar demais
+  // caso alguma chegue.
+  const sendingGift = new Set(data.reservations.filter(r => r.status !== 'cancelled').map(r => r.invitation_id))
   const feedback = <>{notice && <div className="mt-4"><SuccessMessage>{notice}</SuccessMessage></div>}{error && <div className="mt-4"><ErrorState message={error} /></div>}</>
   const formOpen = open
   // O aviso fica junto do que o provocou: formulário de convite, edição ou a lista.
@@ -102,7 +99,7 @@ export function InvitationsPage() {
   return <div className="tab-panel">
     <RefreshStatus fetching={query.isFetching} failed={query.isError} onRetry={() => void query.refetch()} label="Atualizando painel…" />
     {event.data && <StepCompletion event={event.data} step="guests" />}
-    <Summary summary={panelSummary(data)} />
+    <Summary summary={data.summary} />
 
     <section className="mt-10" aria-labelledby="invites-title">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -132,7 +129,7 @@ export function InvitationsPage() {
         {feedbackPlace === 'edit' && feedback}
       </section>}
       {!data.invitations.length ? <div className="mt-5"><EmptyState title="Nenhum convite ainda.">{closed ? 'Este evento foi encerrado sem convites.' : ready ? 'Use “Convidar alguém” para criar o primeiro convite.' : 'Depois de publicar o evento, use “Convidar alguém” para criar o primeiro convite.'}</EmptyState></div> :
-      <ul className="mt-5 grid gap-4 md:grid-cols-2">{data.invitations.map(inv => <GuestCard key={inv.id} invitation={inv} sending={inv.response === 'no' && sendingGift.has(inv.name)} canEdit={!busy && ready} canRevoke={!busy}
+      <ul className="mt-5 grid gap-4 md:grid-cols-2">{data.invitations.map(inv => <GuestCard key={inv.id} invitation={inv} sending={inv.response === 'no' && sendingGift.has(inv.id)} canEdit={!busy && ready} canRevoke={!busy}
         onEdit={() => startEdit(inv)}
         onRotate={() => void act('rotate', { id: inv.id })}
         onRevoke={() => void act('revoke', { id: inv.id })} />)}</ul>}
@@ -232,7 +229,7 @@ function Diapers({ items, eventId }: { items: PanelItem[]; eventId: string }) {
     <p className="mt-2 text-muted">Pacotes comprometidos: os que os convidados vão levar e os que já informaram ter comprado.</p>
     {!items.length ? <div className="mt-5"><EmptyState title="Nenhum tamanho de fralda na lista.">Prepare a lista do chá para acompanhar os pacotes por tamanho.</EmptyState></div> :
       <ul className="card progress-list mt-5">{items.map(item => {
-        const available = availableOf(item)
+        const available = item.available
         const limit = item.limit ?? 0
         return <li key={item.id} className="progress-row">
           <div className="progress-row-head">

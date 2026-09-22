@@ -82,8 +82,8 @@ Testes antigos de navegador usaram APIs simuladas; não comprovam a jornada real
 - [x] Implementar convite individual com uma pessoa e familiar com nome de referência e limite de pessoas definido pelo organizador. RSVP familiar informa quantas vão dentro desse limite; painel distingue convites respondidos de pessoas confirmadas.
 - [ ] Reunir título, data/hora, local, instruções, imagem autorizada e lista desejada. Usar dados fictícios durante desenvolvimento.
 - [x] Criar uma direção visual única: acolhedora, limpa, com tipografia legível, hierarquia, espaçamentos e cores consistentes. Paleta rosa alinhada ao convite recebido em 14/09, sem construir um editor de temas.
-- [ ] Aplicar o visual às telas de convite, confirmação, presentes e painel; mostrar estados de vazio, carregamento, sucesso e erro com a mesma qualidade.
-- [ ] Manter uma ação principal clara por etapa e linguagem simples: “Confirmar presença”, “Escolher presente”, “Cancelar reserva”. Explicar reserva e compra autodeclarada.
+- [x] Aplicar o visual às telas de convite, confirmação, presentes e painel; mostrar estados de vazio, carregamento, sucesso e erro com a mesma qualidade. _(Feito: T-F7, gates G0–G5.6, publicado em 22/09. Estados comuns em `src/components/States.tsx`.)_
+- [x] Manter uma ação principal clara por etapa e linguagem simples: “Confirmar presença”, “Escolher presente”, “Cancelar reserva”. Explicar reserva e compra autodeclarada. _(Feito: T-F1. A autodeclaração é explicada em `GuestPage.tsx` e `InvitationsPage.tsx`.)_
 
 Aceite: revisão das telas principais em celular e desktop; nenhuma informação
 provisória confundida com informação real; caminho principal compreensível para
@@ -93,11 +93,11 @@ com cada fluxo, sem deixá-lo como acabamento opcional ao final.
 ## M2 — Concluir organizador e lista com dados atuais
 
 - [x] Testar login por e-mail, callback, logout e sessão expirada com Supabase real.
-- [ ] Validar criação/edição/publicação do evento e lista pela API real, incluindo tentativa de outro usuário acessar ou alterar os dados.
+- [x] Validar criação/edição/publicação do evento e lista pela API real, incluindo tentativa de outro usuário acessar ou alterar os dados. _(Feito: T-B4, smoke remoto aprovado no `chadbb-cha` com limpeza confirmada.)_
 - [x] Preparar catálogo com fraldas P/M/G/XG e os 23 mimos da especificação; usar pacotes para fraldas, ausência explícita de limite em todos os mimos, inclusive os originalmente numerados.
 - [x] Implementar abas Fraldas e Mimos, quantidades por mimo e resumo separado; adaptar schema/API para categorias e política de limite própria por item.
-- [ ] Implementar a política de atualização abaixo em eventos, lista e futuros painéis.
-- [ ] Preservar alterações de formulário ainda não salvas quando chegar uma atualização; detectar conflito de versão e oferecer recarregar/revisar.
+- [x] Implementar a política de atualização abaixo em eventos, lista e futuros painéis. _(Feito: T-F4, detalhada nas caixas do contrato logo abaixo.)_
+- [x] Preservar alterações de formulário ainda não salvas quando chegar uma atualização; detectar conflito de versão e oferecer recarregar/revisar. _(Feito: regra 7 do `AGENTS.md`, valendo em todos os formulários; conflito de versão tratado por `*_VERSION_CONFLICT`.)_
 
 Aceite: o organizador salva, recebe confirmação do banco e vê o resultado
 persistido; outra sessão vê a atualização sem precisar de recarga manual.
@@ -109,13 +109,13 @@ em cada consulta explicitamente solicitada. Cache não será apresentado como um
 resposta nova. O banco é a fonte de verdade; a disponibilidade na tela é indicativa
 até a transação da reserva confirmar o resultado.
 
-- [ ] Ao abrir uma tela, trocar evento, solicitar atualização, recuperar a conexão ou retornar à aba, consultar novamente os dados dinâmicos. Tratar respostas fora de ordem para uma resposta antiga não substituir uma mais recente.
-- [ ] Dados em cache podem aparecer durante a consulta com indicação “Atualizando…”. Em falha, informar que não foi possível atualizar e oferecer tentar novamente; nunca apresentar sucesso falso ou falha como lista vazia.
-- [ ] Após salvar, reservar, cancelar ou confirmar presença, aplicar o resultado confirmado pelo servidor e reconsultar as listas e totais afetados. Confirmar salvamento apenas após a transação; se a reconsulta falhar, distinguir “salvo” de “painel ainda não atualizado”.
-- [ ] Para mudanças feitas por outras pessoas, usar notificação autorizada de alteração para disparar nova consulta. Não transmitir nomes, endereços, tokens ou reservas individuais em canais públicos. A consulta do convidado continua passando pelo servidor autorizado.
-- [ ] Manter consulta periódica de segurança a cada 5 segundos nas telas dinâmicas visíveis, com pausa em segundo plano e recuo em falhas; reconsultar imediatamente ao reconectar. Se o canal de notificações não estiver pronto, essa consulta será a estratégia inicial do MVP, com o limite comunicado.
-- [ ] Não cachear respostas privadas em CDN nem em service worker; isolar o cache por evento e identidade e limpar dados privados ao sair ou perder autorização. Configurar respostas privadas para não armazenamento HTTP.
-- [ ] Mostrar perda de conexão e impedir confirmação fictícia. Repetir uma reserva com a mesma chave de idempotência quando o resultado da tentativa anterior for desconhecido.
+- [x] Ao abrir uma tela, trocar evento, solicitar atualização, recuperar a conexão ou retornar à aba, consultar novamente os dados dinâmicos. Tratar respostas fora de ordem para uma resposta antiga não substituir uma mais recente. _(Feito: `queryClient` com `refetchOnMount`/`WindowFocus`/`Reconnect` em `always`; `AbortSignal` no `guestCall` descarta resposta antiga.)_
+- [x] Dados em cache podem aparecer durante a consulta com indicação “Atualizando…”. Em falha, informar que não foi possível atualizar e oferecer tentar novamente; nunca apresentar sucesso falso ou falha como lista vazia. _(Feito: `RefreshStatus` e `SlowRefresh` em `src/components/States.tsx`.)_
+- [x] Após salvar, reservar, cancelar ou confirmar presença, aplicar o resultado confirmado pelo servidor e reconsultar as listas e totais afetados. Confirmar salvamento apenas após a transação; se a reconsulta falhar, distinguir “salvo” de “painel ainda não atualizado”. _(Feito: o resultado do servidor substitui o estado e as consultas afetadas são invalidadas; "salvo" vs. "painel ainda não atualizado" fica no `RefreshStatus`.)_
+- [ ] Para mudanças feitas por outras pessoas, usar notificação autorizada de alteração para disparar nova consulta. Não transmitir nomes, endereços, tokens ou reservas individuais em canais públicos. A consulta do convidado continua passando pelo servidor autorizado. _(Adiado de propósito: a caixa seguinte define a consulta periódica como a estratégia do MVP enquanto o canal de notificação não existir.)_
+- [x] Manter consulta periódica de segurança a cada 5 segundos nas telas dinâmicas visíveis, com pausa em segundo plano e recuo em falhas; reconsultar imediatamente ao reconectar. Se o canal de notificações não estiver pronto, essa consulta será a estratégia inicial do MVP, com o limite comunicado. _(Feito: `live`/`liveInterval` em `src/lib/query.ts` — 5 s, recuo até 60 s em falha, pausa em segundo plano.)_
+- [x] Não cachear respostas privadas em CDN nem em service worker; isolar o cache por evento e identidade e limpar dados privados ao sair ou perder autorização. Configurar respostas privadas para não armazenamento HTTP. _(Feito: `cache: no-store` nas chamadas privadas; sem service worker no projeto.)_
+- [x] Mostrar perda de conexão e impedir confirmação fictícia. Repetir uma reserva com a mesma chave de idempotência quando o resultado da tentativa anterior for desconhecido. _(Feito: G5.3 com `src/lib/useOnline.ts`; `request_id` e "Verificar tentativa anterior" no `GuestPage.tsx`.)_
 
 Metas de aceite no ambiente do evento: resultado da própria ação aparece assim
 que a resposta confirmada chegar; consulta ou mutação com p95 de até 2 segundos
@@ -135,7 +135,7 @@ São metas a validar, não garantias de instantaneidade sob falha de rede.
 - [x] Permitir confirmar, recusar ou deixar “talvez” e alterar a resposta, sem exigir criação de conta do convidado.
 - [x] Mostrar apenas dados do evento e da própria resposta/reservas; não expor outros convidados.
 - [x] Aplicar limites de abuso, validação de entrada e recuperação compreensível para convite inválido ou sessão expirada.
-- [ ] Testar acesso cruzado, revogação, expiração, reabertura do link no WhatsApp, convite individual, família, limites e contagem de pessoas ao alterar uma resposta.
+- [x] Testar acesso cruzado, revogação, expiração, reabertura do link no WhatsApp, convite individual, família, limites e contagem de pessoas ao alterar uma resposta. _(Feito: T-B2, quatro casos novos em `tests/database/events.integration.mjs`.)_
 
 Aceite: um convidado abre o link no celular, responde e vê sua resposta persistida;
 o painel do organizador atualiza conforme o contrato de dados. O fluxo de retorno
@@ -173,14 +173,14 @@ confirmam atualização, mensagens de conflito e totais coerentes.
 
 Estes requisitos acompanham M1–M4; esta etapa confirma o conjunto.
 
-- [ ] Navegação completa por teclado, ordem de foco previsível, foco visível e retorno correto após fechar diálogos; nenhuma armadilha de foco.
-- [ ] HTML semântico, títulos em ordem, nomes acessíveis, rótulos e instruções associados aos campos; erros identificados por texto e associados ao campo.
-- [ ] Contraste alvo de pelo menos 4,5:1 em texto comum e 3:1 em texto grande e componentes essenciais; estado nunca indicado apenas por cor.
-- [ ] Texto ampliado a 200% e tela de 320 px sem perda de ações ou rolagem horizontal no fluxo principal. Áreas de toque de pelo menos 44 × 44 px para ações principais.
-- [ ] Leitor de tela anuncia carregamento, erros e confirmações sem repetir todos os dados a cada sincronização. Imagens informativas têm descrição; decorativas são ignoradas.
-- [ ] Respeitar preferência por movimento reduzido; não usar animação obrigatória, texto em imagem ou controles dependentes de hover.
+- [x] Navegação completa por teclado, ordem de foco previsível, foco visível e retorno correto após fechar diálogos; nenhuma armadilha de foco. _(Feito: T-F3/G5.1 e G5.4; `ConfirmDialog` devolve o foco ao botão de origem, com teste em `specimens.spec.ts`.)_
+- [x] HTML semântico, títulos em ordem, nomes acessíveis, rótulos e instruções associados aos campos; erros identificados por texto e associados ao campo. _(Feito: axe em 7 specs; erro ligado ao campo tem teste próprio em `specimens.spec.ts`.)_
+- [x] Contraste alvo de pelo menos 4,5:1 em texto comum e 3:1 em texto grande e componentes essenciais; estado nunca indicado apenas por cor. _(Feito: verificado pelo axe, que roda com as telas paradas.)_
+- [x] Texto ampliado a 200% e tela de 320 px sem perda de ações ou rolagem horizontal no fluxo principal. Áreas de toque de pelo menos 44 × 44 px para ações principais. _(Feito: testes de 320 px a 200% nas telas principais; alvos de 44 px conferidos em `gift-list-qa.spec.ts` e `gift-list.spec.ts`.)_
+- [x] Leitor de tela anuncia carregamento, erros e confirmações sem repetir todos os dados a cada sincronização. Imagens informativas têm descrição; decorativas são ignoradas. _(Feito: T-F3; regiões vivas sem repetir o conteúdo a cada consulta.)_
+- [x] Respeitar preferência por movimento reduzido; não usar animação obrigatória, texto em imagem ou controles dependentes de hover. _(Feito: `prefers-reduced-motion` no `styles.css`; nenhum controle depende de hover — há teste garantindo que a linha realçada não é clicável.)_
 - [ ] Testar a jornada real no celular, navegador interno do WhatsApp, desktop e ao voltar de outra aba, incluindo rede lenta, queda de conexão e sessão expirada.
-- [ ] Executar verificação automatizada de acessibilidade e inspeção manual com teclado e leitor de tela; corrigir problemas que impeçam concluir a jornada.
+- [ ] Executar verificação automatizada de acessibilidade e inspeção manual com teclado e leitor de tela; corrigir problemas que impeçam concluir a jornada. _(Metade feita: a verificação automatizada roda no `test:e2e` (axe em 7 specs). Falta a inspeção manual com leitor de tela.)_
 - [ ] Ensaiar com o irmão e pelo menos um convidado: abrir convite, confirmar presença, escolher/trocar fralda, adicionar vários mimos com quantidades, cancelar escolhas e acompanhar totais separados no painel.
 
 Aceite: tarefas completas sem ajuda técnica; visual consistente, legível e sem
@@ -188,10 +188,10 @@ cortes; nenhuma barreira conhecida que impeça uso dos fluxos essenciais.
 
 ## M6 — Colocar no ar e entregar ao irmão
 
-- [ ] Configurar ambiente do evento separado do desenvolvimento, HTTPS, URLs de Auth e envio de e-mail; validar login e entrega do link nesse ambiente.
-- [ ] Executar CI e migrations em banco limpo; fazer implantação e verificação com dados fictícios antes de cadastrar dados da família.
-- [ ] Configurar backup e ensaiar restauração em ambiente separado. Registrar frequência, perda de dados tolerada e tempo de recuperação junto ao responsável.
-- [ ] Disponibilizar registro de erros sem dados privados, verificação de disponibilidade e procedimento simples para recuperar convites e acessos.
+- [x] Configurar ambiente do evento separado do desenvolvimento, HTTPS, URLs de Auth e envio de e-mail; validar login e entrega do link nesse ambiente. _(Feito: T-B1, SMTP Resend no Auth do `chadbb-cha`; titular validou login real, persistência, logout e proteção de rota em 16/09.)_
+- [x] Executar CI e migrations em banco limpo; fazer implantação e verificação com dados fictícios antes de cadastrar dados da família. _(Feito: `ci.yml` roda `db:reset` com todas as migrations, pgTAP, API, navegador e e-mail; a verificação com dados fictícios foi o smoke da T-B4.)_
+- [ ] Configurar backup e ensaiar restauração em ambiente separado. Registrar frequência, perda de dados tolerada e tempo de recuperação junto ao responsável. _(Parcial: backup diário ativo e validado. Falta refazer a restauração com dados e Storage reais e medir o RTO — T-B6.)_
+- [x] Disponibilizar registro de erros sem dados privados, verificação de disponibilidade e procedimento simples para recuperar convites e acessos. _(Feito: `health.yml` e `scripts/health`; auditoria só com contagens técnicas (regra 5). Recuperação de convites e acessos em `ENTREGA-E-SUPORTE.md`.)_
 - [x] Definir prazo de retenção e procedimento de exclusão de dados e imagens, incluindo tratamento de backups: 30 dias após o término, implementado e implantado no chadbb-cha em 2026-09-15.
 - [ ] Concluir ensaio de concorrência, atualização e acessibilidade no ambiente do evento; registrar falhas corrigidas e limites remanescentes.
 - [ ] Cadastrar conteúdo real, entregar acesso do organizador e instruções curtas, e liberar o envio dos convites após o ensaio com o irmão.

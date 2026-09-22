@@ -1,11 +1,17 @@
 # Tarefas e combinados entre agentes
 
-Quadro compartilhado entre o Claude (front) e o Codex (back). **Desde 2026-09-21
-os dois trabalham na mesma branch, a `clone-main`** — as antigas `claude/front` e
+Quadro compartilhado entre o Claude e o Codex. **Desde 2026-09-21 os dois
+trabalham na mesma branch, a `clone-main`** — as antigas `claude/front` e
 `codex/back` foram unificadas nela e apagadas, e o remoto tem só `main` e
-`clone-main`. O que separa os dois agora é a área de arquivo, não a branch: faça
-`git pull` antes de começar e `git pull --rebase` antes de commitar. Regras em
-`AGENTS.md`.
+`clone-main`. **Desde 2026-09-22 não há mais divisão por área de arquivo:** os
+dois trabalham juntos no projeto inteiro, e quem pega a tarefa a leva até o fim,
+front e back. Faça `git pull` antes de começar e `git pull --rebase` antes de
+commitar. Regras em `AGENTS.md`.
+
+As seções "Claude — front", "Codex — back", "Pedidos do front para o back" e
+"Pedidos do back para o front" abaixo são a organização antiga. Ficam como
+histórico e como lista de pendências: o que ainda está `- [ ]` continua valendo
+como tarefa, seja de quem for.
 
 A unificação juntou a G4b.3 do front com a T-B5 e a migration
 `20260917010000_guest_rates_batch` do back. Evidências na branch unificada:
@@ -185,14 +191,14 @@ o ensaio familiar no celular continua pendente.
   o mesmo acabamento; uma ação principal por etapa ("Confirmar presença",
   "Escolher presente", "Cancelar reserva"); explicar que "Já comprei" é só uma
   declaração do convidado.
-- [ ] **T-F2 · Painel do organizador.** _(2026-09-16: resumo, fraldas, mimos e
+- [x] **T-F2 · Painel do organizador.** _(2026-09-16: resumo, fraldas, mimos e
   escolhas separados. 2026-09-22: T-B7 publicado em produção — `summary`,
-  `available` e `invitation_id` já existem de verdade. Falta só a limpeza:
-  remover `panelSummary`/`availableOf` (cálculo de transição em
-  `src/features/guests/api.ts`), tipar os campos como obrigatórios e trocar o
-  vínculo do selo "Vai enviar presente" de nome para `invitation_id`. Não é
-  urgente — o front funciona igual com o fallback — mas fica mais simples sem
-  código morto.)_ Conferir se o `InvitationsPage` mostra
+  `available` e `invitation_id` já existem de verdade. Limpeza concluída em
+  2026-09-22: `panelSummary` e `availableOf` removidos de
+  `src/features/guests/api.ts`, `summary`/`available`/`id`/`invitation_id`
+  tipados como obrigatórios e o selo "Vai enviar presente" agora casa reserva
+  com convite por `invitation_id`, não mais por nome. O front deixou de ter
+  qualquer cálculo próprio desses números.)_ Conferir se o `InvitationsPage` mostra
   convites respondidos separados de pessoas confirmadas, fraldas comprometidas e
   disponíveis por tamanho (P 6 / M 19 / G 19 / XG 6) e mimos em separado. Se
   faltar dado, registrar um pedido para o Codex abaixo; não calcular no front.
@@ -222,6 +228,31 @@ o ensaio familiar no celular continua pendente.
   `chadbb.pages.dev` sem erros de console. Por cima do G5, o último pedaço do
   pedido de 17/09 (cartão de calendário com `.ics`) também saiu e foi publicado
   junto. Congelamento a partir de 05/10 segue valendo: só correções até 01/11.
+- [x] **2026-09-22 · Claude · Corrigida a instabilidade de `gift-list-qa.spec.ts:264`.**
+  `o realce da linha é só para quem usa mouse` falhava no projeto `desktop`.
+  Primeiro diagnóstico ERRADO, registrado aqui para não se repetir: chamei de
+  falha determinística porque falhou três vezes seguidas, inclusive isolada no
+  HEAD `abc71b9` limpo. Uma quarta rodada passou — eram três amostras de uma
+  falha frequente, não prova de determinismo.
+  Causa real, medida pelo `console.log` do próprio teste: na rodada que falha o
+  fundo sai `rgba(0, 0, 0, 0)` em repouso **e** sob o ponteiro; nas que passam
+  vira `rgb(248, 238, 241)`. O repouso transparente descarta a hipótese de o
+  ponteiro já estar sobre a linha. O que corre é a leitura: o navegador aplica
+  o `:hover` no hit-test do quadro seguinte ao movimento, e o teste lia o estilo
+  computado uma vez só, logo depois do `hover()`. Sob carga o quadro atrasa e a
+  leitura pega a cor de repouso. O CSS (`.item-rows > li:hover` dentro de
+  `@media (hover: hover)`) está correto e não foi tocado.
+  Correção no teste: o ramo com mouse espera o realce com `expect.poll`; o sem
+  mouse dá dois quadros de folga antes de afirmar que o realce não veio.
+  Conferido com teste de mutação — removendo a regra de realce do `styles.css`,
+  o `desktop` volta a falhar e o `mobile` continua passando, então a asserção
+  não ficou vazia.
+- [ ] **2026-09-22 · Claude · Observar `gift-list.spec.ts:142` no `mobile`.**
+  `lista de mimos cabe em 320 px sem rolagem horizontal` falhou uma vez, na
+  suíte completa, e passou 3/3 isolada depois. Só uma amostra e a evidência do
+  Playwright foi apagada pela rodada seguinte, então não afirmo causa nenhuma —
+  fica anotado para olhar se reaparecer. Não tem relação com a T-F2: o arquivo
+  e a tela não foram tocados.
 - [ ] **T-F6 · Testes.** Ampliar os testes e2e para o que mudar; `npm run check`
   antes de cada PR.
 
@@ -300,10 +331,11 @@ convidado) e `id`/`invitation_id` em cada reserva. Revogação/expiração
 preservam respostas e escolhas, portanto continuam nas contagens, com
 revogados informados separadamente. Contrato em `CONTRATOS-TRANSACIONAIS.md`;
 evidências em [T-B7](reviews/2026-09-22-t-b7.md).
-**Pendente do lado do front (T-F2):** remover os fallbacks `panelSummary` e
-`availableOf` (`src/features/guests/api.ts`), tipar os campos como
-obrigatórios e trocar o vínculo do selo “Vai enviar presente” de nome para
-`invitation_id`. Não implementado ainda nesta sessão.
+**Lado do front (T-F2): feito em 2026-09-22.** Os fallbacks `panelSummary` e
+`availableOf` saíram de `src/features/guests/api.ts`, os campos do contrato
+viraram obrigatórios no tipo e o selo “Vai enviar presente” passou a casar
+reserva com convite por `invitation_id`. Com isso o painel distingue homônimos
+em vez de omitir o selo, e nenhuma tela recalcula saldo ou resumo.
 
 - [x] 2026-09-17 · Claude → Codex · **`invitation_id` nas reservas do painel.**
   _(Publicado em produção em 22/09, ver nota acima.)_ O painel marcava quem
@@ -356,8 +388,10 @@ obrigatórios e trocar o vínculo do selo “Vai enviar presente” de nome para
   persistido em `/etc/sysctl.d/99-supabase.conf`. Conferido em 2026-09-17:
   reserva ativa no kernel, 12 containers de pé e 21 migrations aplicadas.
 
-- [ ] 2026-09-17 · Claude → Codex · **Documentar a reserva de portas no
-  `README.md`.** Junto dos comandos `db:*`: 54321 e 54322 caem na faixa efêmera
+- [x] 2026-09-17 · Claude → Codex · **Documentar a reserva de portas no
+  `README.md`.** _(Feito em 2026-09-22, na seção "Se `db:start` falhar com
+  `address already in use`", logo abaixo do `db:start`. Com o fim da divisão
+  por área, o `README.md` deixou de ser exclusivo do Codex.)_ Junto dos comandos `db:*`: 54321 e 54322 caem na faixa efêmera
   do WSL (`net.ipv4.ip_local_port_range` = `32768 60999`), então
   `npm run db:start` pode falhar com `address already in use` sem nenhum
   processo ouvindo a porta. A saída é reservar a faixa
@@ -382,7 +416,11 @@ obrigatórios e trocar o vínculo do selo “Vai enviar presente” de nome para
   a política de leitura de `products` e `add_event_item` foram refeitas para esse
   produto não vazar para outros eventos). Teste em `supabase/tests/list_items.test.sql`.
 
-- [ ] **2026-09-18 · Usuário → Claude/Codex · Mapa do convite: decisão mudou.**
+- [x] **2026-09-18 · Usuário → Claude/Codex · Mapa do convite: decisão mudou.**
+  _(Concluído; conferido em 2026-09-22. O embed está em `GuestPage.tsx`, o
+  “Como chegar” abre a rota, e a CSP que faltava revisar está correta — só
+  `frame-src https://www.google.com https://maps.google.com`, com teste em
+  `tests/headers.test.ts`. Nada pendente do lado do back.)_
   O titular decidiu que o convite mostra o mapa já carregado e interativo, sem
   clique. Substitui a decisão de 17/09 ("carregar só após o clique", registrada
   na `codex/back`). Implementado com o embed do Google
@@ -426,11 +464,15 @@ obrigatórios e trocar o vínculo do selo “Vai enviar presente” de nome para
   `npm run check` e a suíte Playwright completa (463 passed) verdes.
 
 
-- [ ] 2026-09-16 · Codex → Claude · Usuário relata que “Conheça o chadbb”
-  parece não fazer nada. `HomePage.tsx` aponta para `#como-funciona`, seção já
-  visível na captura enviada. Rever CTA para tornar claro o próximo passo de
-  criar/acessar evento, inclusive autenticado; corrigir o aviso desatualizado
-  “Convites estão em preparação”. Conferir navegação por teclado e clique.
+- [x] 2026-09-16 · Codex → Claude · Usuário relata que “Conheça o chadbb”
+  parece não fazer nada. _(Resolvido em algum gate do T-F7; conferido em
+  2026-09-22. O CTA da `HomePage.tsx` é “Começar a organizar” → `/entrar`, ou
+  “Ir para seus eventos” com sessão: é um `Link`, não uma âncora. `#como-funciona`
+  virou só `id` de seção, sem link apontando para ele, e o aviso “Convites estão
+  em preparação” não existe mais no código.)_ `HomePage.tsx` apontava para
+  `#como-funciona`, seção já visível na captura enviada. Rever CTA para tornar
+  claro o próximo passo de criar/acessar evento, inclusive autenticado; corrigir
+  o aviso desatualizado “Convites estão em preparação”.
 
 ## Pendências encontradas na revisão de 22/09
 
@@ -457,7 +499,7 @@ ver `AGENTS.md`. A tabela abaixo reflete o fim do dia de 22/09.)_
 
 | Agente | Tarefa | Situação |
 |---|---|---|
-| Claude | T-F7 completo e publicado (G0–G5.6 + cartão de calendário). Próximo natural: T-F2 (remover `panelSummary`/`availableOf`, tipar campos, trocar vínculo por `invitation_id`) — pequeno, sem pressa. Depois, itens urgentes ainda abertos de 17/09: código de e-mail no login, mensagem de "conexão" no envio de link, voltar à página pedida após login, fonte bloqueada pela CSP, campos de data no iPhone | livre para a próxima tarefa |
+| Claude | T-F7 e T-F2 completas. T-F2 fechada em 22/09: fallbacks removidos, campos obrigatórios, selo por `invitation_id`. Depois dela, corrigida a instabilidade de `gift-list-qa.spec.ts:264` (corrida de leitura do `:hover`, não bug de CSS). Próximos: os itens de 17/09 ainda abertos — mensagem de "conexão" no envio do link e voltar à página pedida depois do login | livre para a próxima tarefa |
 | Codex | R2/R3 e T-B7 publicados em produção (22/09, com aprovação do titular). Livre para a próxima — candidatos no quadro: T-B6 (operação/backup), login por código no e-mail (falta a tela do front, já é item do Claude), ou os pedidos urgentes de 17/09 que são do back | livre para a próxima tarefa |
 
 ## Concluídas

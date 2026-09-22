@@ -18,7 +18,8 @@ const event: EventRecord = { id: eventId, owner_id: userId, type: 'baby_shower',
 async function organizerBackend(page: Page) {
   const calls: string[] = []
   let record = event
-  const dashboard: Dashboard = { invitations: [], items: [], reservations: [] }
+  const dashboard: Dashboard = { invitations: [], items: [], reservations: [],
+    summary: { invitations: { total: 0, answered: 0, yes: 0, no: 0, maybe: 0, pending: 0, revoked: 0 }, people_confirmed: 0 } }
   await page.addInitScript(value => localStorage.setItem('sb-e2e-auth-token', JSON.stringify(value)), session())
   await page.route('https://e2e.supabase.co/**', async route => {
     const url = new URL(route.request().url())

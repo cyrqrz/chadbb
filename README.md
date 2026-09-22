@@ -31,6 +31,22 @@ npm run db:start
 cp .env.example .env.local
 ```
 
+### Se `db:start` falhar com `address already in use`
+
+No WSL, as portas 54321 e 54322 do Supabase local caem dentro da faixa efêmera do
+kernel (`net.ipv4.ip_local_port_range`, por padrão `32768 60999`). O sistema pode
+ter dado uma delas a uma conexão de saída qualquer, e aí o `db:start` falha
+**sem nenhum processo seu ouvindo a porta** — conferir com `ss -ltnp` não mostra
+nada. A saída é reservar a faixa para que o kernel pare de sorteá-la:
+
+```sh
+echo 'net.ipv4.ip_local_reserved_ports = 54320-54330' | sudo tee /etc/sysctl.d/99-supabase.conf
+sudo sysctl --system
+```
+
+Vale para qualquer máquina nova do projeto e sobrevive ao reinício. Reservar a
+faixa não ocupa as portas: só impede que sejam distribuídas como porta de origem.
+
 Preencha `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY` com a URL da API e a
 **publishable key** mostradas pelo CLI (`npx supabase status`), e reinicie o Vite.
 Não use a chave `service_role`, uma secret key ou uma chave JWT legada. As duas
