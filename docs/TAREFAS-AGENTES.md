@@ -153,7 +153,12 @@ o ensaio familiar no celular continua pendente.
     a regra passa a ser `frame-src https://www.google.com https://maps.google.com`.
     Alterar só essa diretiva; qualquer outra mudança na CSP volta ao Codex.
   - Registrar na tela que o endereço é do convite e não deve ser repassado.
-- [ ] **2026-09-17 · Codex → Claude · Erro de envio do link aparece como "conexão".**
+- [x] **2026-09-17 · Codex → Claude · Erro de envio do link aparece como "conexão".**
+  _(Feito em 2026-09-22. `sendFailure` em `LoginPage.tsx` trata 500 e
+  `unexpected_failure` antes de cair no texto genérico, e o caso não liga a
+  contagem regressiva — falha de envio não é limite de tentativas, então pedir
+  de novo continua liberado. Teste em `login.spec.ts` confere o texto novo e a
+  ausência da palavra "conexão".)_
   Se o Auth não consegue enviar o e-mail, `/auth/v1/otp` responde **500**
   `unexpected_failure` ("Error sending confirmation email"). Hoje isso acontece
   com qualquer endereço que não seja o da conta Resend, porque o remetente é o
@@ -161,7 +166,13 @@ o ensaio familiar no celular continua pendente.
   conexão". Mapear esse caso em `/entrar` para algo como "Não conseguimos
   enviar o e-mail para este endereço. Confira o e-mail ou fale com a
   organização.". Visto nos logs em 17/09, 15:24–17:12 UTC.
-- [ ] **2026-09-17 · Codex → Claude · Voltar à página pedida depois do login.**
+- [x] **2026-09-17 · Codex → Claude · Voltar à página pedida depois do login.**
+  _(Feito em 2026-09-22, em `src/features/auth/destination.ts`. `RequireAuth`
+  passa o caminho pedido; o retorno consome o destino uma vez só. A passagem é
+  por `localStorage`, não pelo estado do router, porque o link do e-mail pode
+  abrir noutra aba. `safeInternalPath` recusa `//host`, `/\host`, esquemas e as
+  próprias telas de login, para não virar redirecionamento aberto — 10 testes de
+  unidade e 4 de navegador, incluindo um destino externo plantado à força.)_
   `RequireAuth` manda para `/entrar` e, depois do login, `AuthCallback` vai
   sempre para `/eventos`. Guardar o destino (caminho interno, só do mesmo
   site, nunca uma URL externa) antes de pedir o link e voltar para ele no
