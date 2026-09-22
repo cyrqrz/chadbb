@@ -30,26 +30,29 @@ passo. Nada destrutivo ou remoto roda sem aprovação (ver Regras obrigatórias)
 `claude/front` e `codex/back` foram unificadas na `clone-main` e apagadas.
 
 **Desde 2026-09-22, também não há mais clone por agente.** Os dois trabalham
-na mesma pasta de trabalho (a que este `AGENTS.md` está, hoje
-`/mnt/c/Users/leonardo.martins/chadbb`), sempre na `clone-main`. As entradas
-antigas neste documento e no quadro citando `~/projetos/chadbb-claude` e
+na mesma pasta de trabalho — a que este `AGENTS.md` está, qualquer que seja o
+caminho na máquina do dia — sempre na `clone-main`. As entradas antigas neste
+documento e no quadro citando `~/projetos/chadbb-claude` e
 `~/projetos/chadbb-codex` são históricas; não valem mais. Nenhum dos dois
 altera a pasta `~/projetos/chadbb`, que fica na `main` e é só do usuário.
 
-| Agente | Responsável por |
-|---|---|
-| **Claude** | Front: `src/`, `public/`, `index.html`, estilos, acessibilidade, testes de navegador (`tests/browser`, e2e) |
-| **Codex** | Back e tarefas mais difíceis: `supabase/` (migrations, functions, testes pgTAP), `functions/`, `scripts/`, `.github/workflows/`, testes de banco/API |
+**Desde 2026-09-22 também não há mais divisão por área de arquivo**, por decisão
+do usuário: os dois trabalham juntos no projeto inteiro. Quem pegar a tarefa
+mexe no que ela exigir — front, back, migrations, scripts ou docs — e leva o
+trabalho até o fim, em vez de registrar um pedido e parar. As tabelas e os
+"pedidos de um agente para o outro" no quadro são históricos.
 
-- A divisão por **área de arquivo continua valendo**, e agora é a única coisa que
-  separa os dois: um agente não altera arquivos da área do outro. Se o front
-  precisar mudar um contrato (RPC, tabela, payload de função), registre o pedido
-  em `docs/TAREFAS-AGENTES.md`. O contrato vigente fica em
-  `docs/CONTRATOS-TRANSACIONAIS.md`.
+O que a divisão garantia e continua valendo por mérito próprio:
+
+- **Contrato antes de código.** Mudança de RPC, tabela ou payload de função se
+  decide em `docs/CONTRATOS-TRANSACIONAIS.md`, que é a fonte do que as duas
+  pontas combinam — não importa quem escreve os dois lados.
+- **Os gates não mudam.** Nada destrutivo ou remoto sem a aprovação da seção
+  "Regras obrigatórias"; escrever back agora não afrouxa nenhum deles.
 - **Com uma branch só, os dois escrevem no mesmo lugar.** Antes de começar,
   `git pull` na `clone-main`; antes de commitar, `git pull --rebase`. Commits
-  pequenos e por área reduzem o atrito. Um trabalho longo que mexa em muita coisa
-  merece uma branch temporária a partir da `clone-main`, avisada no quadro.
+  pequenos e por assunto reduzem o atrito. Um trabalho longo que mexa em muita
+  coisa merece uma branch temporária a partir da `clone-main`, avisada no quadro.
 - A integração com a `main` é feita por PR de `clone-main` → `main`; quem faz o
   merge é o usuário.
 - Os agentes não se veem em tempo real. A comunicação entre eles passa por

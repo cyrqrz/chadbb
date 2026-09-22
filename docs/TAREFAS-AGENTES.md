@@ -1,11 +1,17 @@
 # Tarefas e combinados entre agentes
 
-Quadro compartilhado entre o Claude (front) e o Codex (back). **Desde 2026-09-21
-os dois trabalham na mesma branch, a `clone-main`** — as antigas `claude/front` e
+Quadro compartilhado entre o Claude e o Codex. **Desde 2026-09-21 os dois
+trabalham na mesma branch, a `clone-main`** — as antigas `claude/front` e
 `codex/back` foram unificadas nela e apagadas, e o remoto tem só `main` e
-`clone-main`. O que separa os dois agora é a área de arquivo, não a branch: faça
-`git pull` antes de começar e `git pull --rebase` antes de commitar. Regras em
-`AGENTS.md`.
+`clone-main`. **Desde 2026-09-22 não há mais divisão por área de arquivo:** os
+dois trabalham juntos no projeto inteiro, e quem pega a tarefa a leva até o fim,
+front e back. Faça `git pull` antes de começar e `git pull --rebase` antes de
+commitar. Regras em `AGENTS.md`.
+
+As seções "Claude — front", "Codex — back", "Pedidos do front para o back" e
+"Pedidos do back para o front" abaixo são a organização antiga. Ficam como
+histórico e como lista de pendências: o que ainda está `- [ ]` continua valendo
+como tarefa, seja de quem for.
 
 A unificação juntou a G4b.3 do front com a T-B5 e a migration
 `20260917010000_guest_rates_batch` do back. Evidências na branch unificada:
