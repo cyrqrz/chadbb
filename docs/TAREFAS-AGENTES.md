@@ -333,7 +333,9 @@ mantém o cálculo antigo só como transição, isolado em `src/features/guests/
   `/etc/sysctl.d/99-supabase.conf`). Atinge qualquer máquina nova do projeto;
   o diagnóstico completo está no item acima. `README.md` é área do Codex.
 
-- [ ] **2026-09-18 · Claude → Codex · Revisar a migration das etapas de configuração.**
+- [x] **2026-09-18 · Claude → Codex · Revisar a migration das etapas de configuração.**
+  _(Revisão concluída em 22/09; etapas e isolamento conferidos em PostgreSQL
+  descartável. Correções R2/R3 da lista registradas abaixo e ainda pendentes.)_
   Com o limite do Codex esgotado, o usuário autorizou o Claude a fazer esta parte
   do back: `supabase/migrations/20260918000000_event_setup_steps.sql` (colunas
   `guests_done_at`/`gifts_done_at` em `events`, backfill dos eventos em uso e RPC
@@ -360,11 +362,43 @@ mantém o cálculo antigo só como transição, isolado em `src/features/guests/
 
 ## Pedidos do back para o front
 
+- [ ] **2026-09-22 · Codex → Claude · Investigar teste de estabilidade visual.**
+  `panel.spec.ts:1755` falhou no desktop (posição 279 → 271) na suíte completa
+  e isoladamente. Cópias instrumentadas ficaram estáveis; possível medição da
+  animação inicial, ainda sem causa comprovada. Conferir sincronização antes de
+  medir a reconsulta; não remover a asserção. Evidências na
+  [revisão de 22/09](reviews/2026-09-22-retomada.md).
+
+- [ ] **2026-09-22 · Codex → Claude · R1: proteger a prévia do cabeçalho contra
+  perda de edição.** Em `EventLayout.tsx:42`, “Ver como o convidado vê” continua
+  navegável quando o editor tem alterações não salvas, embora “Ver prévia” no
+  editor esteja desabilitado. Reproduzido em Chromium: alterar título, abrir a
+  prévia pelo cabeçalho, voltar → texto perdido, sem confirmação ou salvamento.
+  Compartilhar proteção/preservação do rascunho com as saídas da tela e testar
+  cabeçalho/barra de etapas. Evidência em
+  [revisão de 22/09](reviews/2026-09-22-retomada.md).
+
+
 - [ ] 2026-09-16 · Codex → Claude · Usuário relata que “Conheça o chadbb”
   parece não fazer nada. `HomePage.tsx` aponta para `#como-funciona`, seção já
   visível na captura enviada. Rever CTA para tornar claro o próximo passo de
   criar/acessar evento, inclusive autenticado; corrigir o aviso desatualizado
   “Convites estão em preparação”. Conferir navegação por teclado e clique.
+
+## Pendências encontradas na revisão de 22/09
+
+- [ ] **Codex · R2: identidade de mimos na inclusão pelo catálogo.** Mimo próprio
+  seguido de produto homônimo do catálogo duplica o nome; a ordem inversa é
+  recusada. Reproduzido em PostgreSQL descartável. Rever `add_event_item` e a
+  lista pronta, em migration nova.
+- [ ] **Codex · R3: ordem dos locks de produto/item.** Inclusão e remoção do mesmo
+  mimo próprio por RPC podem entrar em deadlock (`40P01` reproduzido com duas
+  conexões). Uniformizar locks e cobrir concorrência; o front atual não oferece
+  reinclusão de produto próprio pelo catálogo.
+
+Detalhes, escopo e limites em [revisão de 22/09](reviews/2026-09-22-retomada.md).
+As duas migrations de 18/09 foram revisadas; a implementação das correções
+acima permanece pendente. Nenhuma alteração remota foi feita nesta revisão.
 
 ## Em andamento
 
