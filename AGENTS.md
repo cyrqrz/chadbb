@@ -27,15 +27,19 @@ passo. Nada destrutivo ou remoto roda sem aprovação (ver Regras obrigatórias)
 ## Divisão de trabalho
 
 **Desde 2026-09-21 existem só duas branches: `main` e `clone-main`.** As antigas
-`claude/front` e `codex/back` foram unificadas na `clone-main` e apagadas. Cada
-agente continua no próprio clone, mas os dois trabalham a partir da `clone-main`.
-Nenhum dos dois altera a pasta `~/projetos/chadbb`, que fica na `main` e é só do
-usuário.
+`claude/front` e `codex/back` foram unificadas na `clone-main` e apagadas.
 
-| Agente | Clone | Branch | Responsável por |
-|---|---|---|---|
-| **Claude** | `~/projetos/chadbb-claude` | `clone-main` | Front: `src/`, `public/`, `index.html`, estilos, acessibilidade, testes de navegador (`tests/browser`, e2e) |
-| **Codex** | `~/projetos/chadbb-codex` | `clone-main` | Back e tarefas mais difíceis: `supabase/` (migrations, functions, testes pgTAP), `functions/`, `scripts/`, `.github/workflows/`, testes de banco/API |
+**Desde 2026-09-22, também não há mais clone por agente.** Os dois trabalham
+na mesma pasta de trabalho (a que este `AGENTS.md` está, hoje
+`/mnt/c/Users/leonardo.martins/chadbb`), sempre na `clone-main`. As entradas
+antigas neste documento e no quadro citando `~/projetos/chadbb-claude` e
+`~/projetos/chadbb-codex` são históricas; não valem mais. Nenhum dos dois
+altera a pasta `~/projetos/chadbb`, que fica na `main` e é só do usuário.
+
+| Agente | Responsável por |
+|---|---|
+| **Claude** | Front: `src/`, `public/`, `index.html`, estilos, acessibilidade, testes de navegador (`tests/browser`, e2e) |
+| **Codex** | Back e tarefas mais difíceis: `supabase/` (migrations, functions, testes pgTAP), `functions/`, `scripts/`, `.github/workflows/`, testes de banco/API |
 
 - A divisão por **área de arquivo continua valendo**, e agora é a única coisa que
   separa os dois: um agente não altera arquivos da área do outro. Se o front
