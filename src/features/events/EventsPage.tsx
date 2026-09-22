@@ -10,7 +10,7 @@ import { failedLast, live } from '../../lib/query'
 import { useLastError } from '../../lib/useLastError'
 import { ErrorState, LoadingState, RefreshStatus, SlowRefresh } from '../../components/States'
 import { useAuth } from '../auth/context'
-import { Button, Pagination, StatusBadge } from '../../components/ui'
+import { Button, Pagination, Skeleton, StatusBadge } from '../../components/ui'
 
 export function EventsPage() {
   const { session } = useAuth()
@@ -41,7 +41,7 @@ export function EventsPage() {
   return <section className="page">
     <div className="flex flex-wrap items-center justify-between gap-6"><div><p className="eyebrow">Organize com carinho</p><h1 className="page-title">Seus eventos</h1><SlowRefresh fetching={query.isFetching} /></div>{!firstUse && <button className="button" onClick={() => setCreating(!creating)}>{creating ? 'Fechar formulário' : 'Novo evento'}</button>}</div>
     {creating && !firstUse && <div className="card mt-8">{form(true)}</div>}
-    {query.isPending && !(failedLast(query) && loadError) ? <LoadingState>Carregando eventos…</LoadingState> : !query.data ? <div className="mt-10"><ErrorState title="Não foi possível carregar seus eventos." message={errorMessage(loadError)} busy={query.isFetching} onRetry={() => void query.refetch()} /></div> : <>
+    {query.isPending && !(failedLast(query) && loadError) ? <><LoadingState>Carregando eventos…</LoadingState><EventsSkeleton /></> : !query.data ? <div className="mt-10"><ErrorState title="Não foi possível carregar seus eventos." message={errorMessage(loadError)} busy={query.isFetching} onRetry={() => void query.refetch()} /></div> : <>
       {deleted.title && <div className="mt-8"><p ref={notice} tabIndex={-1} role="status" className="state state-success">Evento “{deleted.title}” excluído.</p></div>}
       {query.isError && <RefreshStatus fetching={query.isFetching} failed onRetry={() => void query.refetch()} />}
       {query.data.events.length === 0 ? <div className="card mt-10"><h2 className="text-xl font-semibold">Seu primeiro encontro começa aqui.</h2><p className="mt-3 text-stone-600">Dê um nome ao evento para começar a preparar o chá de bebê.</p>{form(false)}</div> :
@@ -52,6 +52,13 @@ export function EventsPage() {
 }
 
 const eventDate = (event: EventRecord) => event.starts_at ? new Date(event.starts_at).toLocaleString('pt-BR', { dateStyle: 'long', timeStyle: 'short', timeZone: 'America/Sao_Paulo' }) : 'Data a definir'
+
+// G5.2: forma dos cards de evento (selo, título, data), sem esperar dado nenhum.
+function EventsSkeleton() {
+  return <div className="mt-10 grid gap-5 md:grid-cols-2" aria-hidden="true">{[0, 1].map(i =>
+    <div key={i} className="card card-stack"><Skeleton width="30%" height="1.5rem" /><Skeleton width="70%" height="1.75rem" /><Skeleton width="45%" /></div>)}
+  </div>
+}
 
 // Publicado: o card inteiro é o link. Rascunho e encerrado: o link cobre o
 // conteúdo e “Excluir evento” fica abaixo do divisor, com confirmação no card.

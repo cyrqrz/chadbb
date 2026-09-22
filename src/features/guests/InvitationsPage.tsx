@@ -10,7 +10,7 @@ import { errorMessage } from '../../lib/errors'
 import { failedLast, live } from '../../lib/query'
 import { useLastError } from '../../lib/useLastError'
 import { EmptyState, ErrorState, LoadingState, RefreshStatus, SuccessMessage } from '../../components/States'
-import { Button, ConfirmDialog, Progress, StatusBadge } from '../../components/ui'
+import { Button, ConfirmDialog, Progress, Skeleton, StatusBadge } from '../../components/ui'
 import type { StatusTone } from '../../components/ui'
 import { EventNotFound } from '../events/EventLayout'
 import { StepCompletion } from '../events/SetupDock'
@@ -65,7 +65,7 @@ export function InvitationsPage() {
   const ready = event.data?.status === 'published'
   const closed = event.data?.status === 'closed'
   if (event.data === null) return <EventNotFound />
-  if (query.isPending && !(failedLast(query) && loadError)) return <LoadingState>Carregando seu painel…</LoadingState>
+  if (query.isPending && !(failedLast(query) && loadError)) return <div className="tab-panel"><LoadingState>Carregando seu painel…</LoadingState><PanelSkeleton /></div>
   if (!query.data) return <div className="tab-panel"><ErrorState title="Não foi possível abrir o painel." message={errorMessage(loadError)} busy={query.isFetching} onRetry={() => void query.refetch()} /></div>
   const data = query.data
   // Quem respondeu que não vai e mesmo assim reservou presente. O vínculo é pelo
@@ -171,6 +171,18 @@ function GuestCard({ invitation: inv, sending, canEdit, canRevoke, onEdit, onRot
       onCancel={() => setConfirmAction(null)}
       onConfirm={() => { const action = confirmAction; setConfirmAction(null); if (action === 'rotate') onRotate(); else if (action === 'revoke') onRevoke() }} />
   </li>
+}
+
+// G5.2: forma do resumo (dois cards) e dos primeiros convites, sem esperar dado nenhum.
+function PanelSkeleton() {
+  return <div className="mt-4" aria-hidden="true">
+    <div className="stagger mt-5 grid gap-4 md:grid-cols-2">{[0, 1].map(i =>
+      <div key={i} className="card card-stack"><Skeleton width="35%" /><Skeleton width="25%" height="2rem" /><Skeleton width="75%" /></div>)}
+    </div>
+    <div className="mt-10 grid gap-4 md:grid-cols-2">{[0, 1].map(i =>
+      <div key={i} className="card card-stack"><Skeleton width="40%" /><Skeleton width="60%" height="1.25rem" /><Skeleton width="50%" /></div>)}
+    </div>
+  </div>
 }
 
 function Figure({ value, of, children }: { value: number; of?: number | null; children: ReactNode }) {

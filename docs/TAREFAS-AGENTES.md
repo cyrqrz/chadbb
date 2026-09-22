@@ -201,8 +201,9 @@ o ensaio familiar no celular continua pendente.
   caixas, `docs/design/G4b-LISTA.md`) **já estavam prontos** ao retomar em
   2026-09-22 — esta linha estava desatualizada dizendo "Próximo: G4". G5.1
   (`ConfirmDialog` no lugar do `window.confirm`, `docs/design/G5-ESTADOS.md`)
-  feito em 2026-09-22. Próximo: G5.2 (skeleton nas telas que faltam,
-  `ActionMenu`).
+  e G5.2 (skeleton no painel, em "Seus eventos" e no convite; achado A17
+  decidido sem migração; `ActionMenu` adiado por falta de caso de uso) feitos
+  em 2026-09-22. Próximo: G5.3 (estado sem conexão, T-F4).
 - [ ] **T-F6 · Testes.** Ampliar os testes e2e para o que mudar; `npm run check`
   antes de cada PR.
 
@@ -421,6 +422,21 @@ acima permanece pendente. Nenhuma alteração remota foi feita nesta revisão.
 | Codex | T-B5: G2 remoto reprovado em 17/09 (p95 ~4,2 s, zero erros, sync ok); G3.1 local concluído (2 chamadas por POST); G3.2 (publicar e medir de novo) aguardando aprovação. Exclusão de evento concluída e testada em produção (plano em PLANO-DESEMPENHO-T-B5.md, remoto não autorizado) | `codex/back` | livre para a próxima tarefa |
 
 ## Concluídas
+
+- 2026-09-22 · Claude · G5.2: skeleton nas telas que só tinham `LoadingState`;
+  achado A17 decidido; `ActionMenu` adiado (T-F7, `docs/design/G5-ESTADOS.md`).
+  - `EventsSkeleton` ("Seus eventos"), `PanelSkeleton` (painel) e
+    `GuestSkeleton` (convite): mesmo padrão do `ListSkeleton` da lista de
+    presentes — `LoadingState` continua fazendo o anúncio, um bloco
+    `aria-hidden` ao lado desenha a forma do conteúdo com `Skeleton`.
+  - A17 (`audit.md`): decisão de não migrar "Encerrar evento"/"Excluir evento"
+    para `ConfirmDialog` — a confirmação inline já é acessível, e um modal não
+    é melhoria clara sobre manter a pergunta no lugar da ação.
+  - `ActionMenu`: nenhuma tela hoje tem ações secundárias demais para os
+    botões visíveis (o card de convidado, com três ações, foi decidido assim
+    no G2.1); construir o menu agora seria especulativo. Adiado até haver caso
+    de uso.
+  - `npm run check` e `npm run test:e2e` completo, sem regressão.
 
 - 2026-09-22 · Claude · G5.1: `ConfirmDialog` no lugar das seis chamadas de
   `window.confirm` (T-F7, `docs/design/G5-ESTADOS.md`).

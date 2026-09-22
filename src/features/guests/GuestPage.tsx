@@ -7,7 +7,7 @@ import type { GuestItem, ResponseChoice, Snapshot } from './api'
 import { live } from '../../lib/query'
 import { coverUrl } from '../events/api'
 import { EmptyState, ErrorState, LoadingState, RefreshStatus, SuccessMessage } from '../../components/States'
-import { Availability, Button, QuantityField, StatusBadge, Tabs } from '../../components/ui'
+import { Availability, Button, QuantityField, Skeleton, StatusBadge, Tabs } from '../../components/ui'
 
 // O efeito reutiliza a promessa no StrictMode, sem compartilhar credenciais
 // entre montagens. Abrir outro fragmento invalida o acesso anterior imediatamente.
@@ -47,8 +47,18 @@ export function GuestPage() {
   }, [])
   if (error instanceof GuestError && error.message === 'INVITE_LINK_MISSING') return <section className="page"><p className="eyebrow">Seu convite</p><h1 className="page-title">Abra o convite pelo link recebido</h1><div className="state state-empty mt-6"><p>Por segurança, o convite não fica salvo nesta página. Toque de novo no link que você recebeu pelo WhatsApp.</p></div></section>
   if (error) return <section className="page"><p className="eyebrow">Seu convite</p><h1 className="page-title">Vamos recuperar seu acesso</h1><div className="mt-6"><ErrorState message={guestMessage(error)} /></div></section>
-  if (!access) return <section className="page"><LoadingState>Abrindo seu convite…</LoadingState></section>
+  if (!access) return <section className="page"><LoadingState>Abrindo seu convite…</LoadingState><GuestSkeleton /></section>
   return <GuestEvent access={access} />
+}
+// G5.2: ainda não se sabe se há capa; a forma genérica (título, data, dois blocos) evita
+// um salto grande quando o convite de verdade aparece.
+function GuestSkeleton() {
+  return <div className="mt-6 flex flex-col gap-4" aria-hidden="true">
+    <Skeleton width="70%" height="2.5rem" /><Skeleton width="40%" />
+    <div className="mt-4 grid gap-4 md:grid-cols-2">{[0, 1].map(i =>
+      <div key={i} className="card card-stack"><Skeleton width="50%" /><Skeleton width="80%" height="1.25rem" /><Skeleton width="60%" /></div>)}
+    </div>
+  </div>
 }
 const giftTabs = [['fralda', 'Fraldas'], ['mimo', 'Mimos']] as const
 const eventDate = (iso: string, options: Intl.DateTimeFormatOptions) => new Date(iso).toLocaleString('pt-BR', { ...options, timeZone: 'America/Sao_Paulo' })

@@ -15,7 +15,7 @@ T-F4 (contrato de atualização), conforme já previsto em `PLANO-VISUAL.md` §8
 | Gate | Entrega | Situação |
 |---|---|---|
 | G5.1 | `ConfirmDialog` (`<dialog>` nativo) no lugar das seis chamadas de `window.confirm` | **feito** (2026-09-22) |
-| G5.2 | Skeleton nas telas que ainda usam só `LoadingState` (painel, "Seus eventos", convite); migrar "Encerrar evento" e "Excluir evento" para `ConfirmDialog` (achado A17); `ActionMenu` | próximo |
+| G5.2 | Skeleton nas telas que ainda usam só `LoadingState`; achado A17 (`ConfirmDialog` em "Encerrar"/"Excluir evento") e `ActionMenu` | **feito** (2026-09-22) |
 | G5.3 | Estado sem conexão (T-F4): detectar `online`/`offline`, avisar antes de tentar salvar, não confundir com "atualizando" | próximo |
 | G5.4 | Acabamentos de acessibilidade restantes do `audit.md`: A14 (leitor de tela durante a tentativa), A16 (uma ação primária por tela), A18/A19 (contrato de quantidade) | próximo |
 | G5.5 | QA de UX, `npm run check`, e2e completo, `test:browser:local`, capturas antes/depois, medida de build | próximo |
@@ -59,9 +59,47 @@ garante isso em todos os casos.
 `npm run check` (lint, typecheck, 51 testes unitários, build) e
 `npm run test:e2e` completo: **463 passed, 3 skipped** — sem regressão.
 
-### Fora deste gate
+## G5.2 · Skeleton, A17 e ActionMenu (feito)
 
-Achado A17 do `audit.md` (confirmação de encerramento/exclusão de evento):
-`ConfirmDialog` já existe, mas "Encerrar evento" e "Excluir evento" continuam
-com a confirmação inline em disclosure — migrar ou não fica para o G5.2, com
-decisão do usuário se vale a pena trocar um padrão que já funciona bem.
+### Skeleton nas telas que só tinham `LoadingState`
+
+Mesmo padrão do `ListSkeleton` da lista de presentes (G4b.4): `<LoadingState>`
+continua fazendo o anúncio para leitor de tela, e um bloco `aria-hidden`
+com a forma do conteúdo real aparece ao lado, usando `src/components/ui/Skeleton.tsx`.
+
+- `EventsPage.tsx` ("Seus eventos"): `EventsSkeleton`, dois cards no formato
+  selo + título + data.
+- `InvitationsPage.tsx` (painel): `PanelSkeleton`, dois cards de resumo e dois
+  de convite.
+- `GuestPage.tsx` (convite): `GuestSkeleton`. Como o acesso ainda não trocou
+  (não se sabe se há capa), a forma é genérica: título, linha de data, dois
+  blocos — evita um salto grande quando o convite de verdade aparece.
+
+Não entraram: `EventLayout` (o `Suspense` já troca de aba rápido, sem
+depender de rede própria), `EventPage`/`GiftListPage` no carregamento do
+evento (o corpo é um formulário, não uma lista — a forma de um formulário
+vazio não ajuda) e `LoginPage`/`InvitePreview` (trocas de estado muito
+rápidas, sem lista para desenhar).
+
+### A17 · decisão: não migrar "Encerrar evento" / "Excluir evento"
+
+A confirmação inline em disclosure (`EventPage.tsx`, `EventsPage.tsx`) já é
+acessível e nunca usou `window.confirm`. Um `ConfirmDialog` modal não é uma
+melhoria clara sobre manter a pergunta no lugar da ação — a literatura de UX
+atual prefere confirmação inline a modal quando o contexto cabe na tela — e
+trocar sem necessidade arriscava regressão nos testes desses dois fluxos sem
+ganho correspondente. Registrado em `audit.md` (A17) como decisão, não como
+pendência.
+
+### `ActionMenu`: adiado por falta de caso de uso
+
+A foundation previa um menu "…" para "ações raras", mas nenhuma tela atual
+tem mais ações secundárias do que cabe como botões visíveis (o card de
+convidado, com três ações, já foi decidido no G2.1 para ficar com botões
+abaixo do divisor, não atrás de um menu). Construir o componente agora seria
+especulativo, sem consumidor. Fica adiado até que uma tela precise mesmo
+esconder ações atrás de um menu.
+
+### Evidência
+
+`npm run check` e `npm run test:e2e` completo, sem regressão (ver commit).
