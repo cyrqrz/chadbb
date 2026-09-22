@@ -18,8 +18,8 @@ T-F4 (contrato de atualização), conforme já previsto em `PLANO-VISUAL.md` §8
 | G5.2 | Skeleton nas telas que ainda usam só `LoadingState`; achado A17 (`ConfirmDialog` em "Encerrar"/"Excluir evento") e `ActionMenu` | **feito** (2026-09-22) |
 | G5.3 | Estado sem conexão (T-F4): detectar `online`/`offline`, avisar antes de tentar salvar, não confundir com "atualizando" | **feito** (2026-09-22) |
 | G5.4 | Acabamentos de acessibilidade restantes do `audit.md`: A14 (leitor de tela durante a tentativa), A16 (uma ação primária por tela), A18/A19 (contrato de quantidade) | **feito** (2026-09-22) |
-| G5.5 | QA de UX, `npm run check`, e2e completo, `test:browser:local`, capturas antes/depois, medida de build | próximo |
-| G5.6 | Aprovação do usuário → commit, push e PR | próximo |
+| G5.5 | QA de UX, `npm run check`, e2e completo, `test:browser:local`, capturas antes/depois, medida de build | **feito** (2026-09-22) |
+| G5.6 | Aprovação do usuário → `main` acompanha a `clone-main` (fast-forward: sem commits exclusivos em `main`, o Cloudflare Pages publica em produção) | aguardando decisão do usuário |
 
 ## G5.1 · `ConfirmDialog` (feito)
 
@@ -183,3 +183,30 @@ Testes novos: `tests/e2e/panel.spec.ts` (três casos do A16) e
 `tests/e2e/guest.spec.ts` (A18); o teste existente "tentar de novo pelo
 teclado mantém o foco no botão" (`panel.spec.ts`) passou a checar também o
 `status` do A14. `npm run check` e `npm run test:e2e` completo, sem regressão.
+
+## G5.5 · QA final (feito)
+
+Fechamento do gate com o G5 inteiro (G5.1–G5.4) na árvore, junto das
+migrations do Codex (R2/R3 e T-B7, locais nesta sessão — sem `db push`).
+
+- `npm run check`: lint, typecheck, 51 testes unitários e build, verde.
+- `npm run test:e2e` completo: **479 passed, 3 skipped** (duas falhas vistas
+  numa rodada anterior eram a instabilidade já registrada de
+  "reconsulta sem tremida" sob carga da máquina, confirmada não relacionada
+  ao G5 ao rodar os dois testes isolados).
+- `npm run test:browser:local`: **8/8**, contra o Supabase local de verdade
+  (stack que o Codex deixou de pé nesta sessão), com as duas migrations novas
+  já aplicadas — primeira vez que o G5 roda contra o banco real, e não só o
+  backend simulado dos e2e.
+- Build de produção: `dist` com **1,0 MB** (≈700 KB em JS/CSS, o resto são as
+  fontes Manrope/Fraunces em todos os subconjuntos de caractere — só os
+  necessários ao português chegam ao navegador real). Sem crescimento fora do
+  esperado em relação ao G2 (fontes) e às telas novas.
+- Capturas antes/depois de cada peça (`ConfirmDialog`, skeleton) já foram
+  feitas gate a gate, nas revisões pedidas durante o G5.1 e o G5.2.
+
+### Fora deste gate
+
+A publicação em `main` (Cloudflare Pages) e o `db push` das migrations do
+Codex são decisões separadas do titular — nenhuma das duas é automática só
+por o G5 estar pronto. Ver G5.6.

@@ -202,12 +202,16 @@ o ensaio familiar no celular continua pendente.
   2026-09-22 — esta linha estava desatualizada dizendo "Próximo: G4". G5.1
   (`ConfirmDialog` no lugar do `window.confirm`, `docs/design/G5-ESTADOS.md`)
   G5.2 (skeleton no painel, em "Seus eventos" e no convite; achado A17
-  decidido sem migração; `ActionMenu` adiado por falta de caso de uso) e G5.3
+  decidido sem migração; `ActionMenu` adiado por falta de caso de uso), G5.3
   (estado sem conexão, T-F4: banner global e aviso antes de tentar salvar nos
-  quatro pontos de gravação principais) e G5.4 (achados A14, A16, A18 do
-  `audit.md` corrigidos; A19 revisado, já coberto desde o G3.1) feitos em
-  2026-09-22. Próximo: G5.5 (QA de UX, `test:browser:local`, capturas
-  antes/depois, medida de build).
+  quatro pontos de gravação principais), G5.4 (achados A14, A16, A18 do
+  `audit.md` corrigidos; A19 revisado, já coberto desde o G3.1) e G5.5 (QA
+  final: `test:e2e` completo 479/482, `test:browser:local` **8/8 contra o
+  Supabase local de verdade** pela primeira vez no G5, build medido) feitos
+  em 2026-09-22. **O G5 do plano visual está pronto.** Falta só o G5.6:
+  decisão do titular sobre publicar em `main` (Cloudflare Pages) — hoje
+  `main` é fast-forward puro de `clone-main`, mas isso bota o G5 inteiro no
+  ar. Ver `docs/design/G5-ESTADOS.md`.
 - [ ] **T-F6 · Testes.** Ampliar os testes e2e para o que mudar; `npm run check`
   antes de cada PR.
 
@@ -452,6 +456,28 @@ em [R2/R3](reviews/2026-09-22-r2-r3.md). Nenhuma alteração remota foi feita.
 | Codex | T-B5: G2 remoto reprovado em 17/09 (p95 ~4,2 s, zero erros, sync ok); G3.1 local concluído (2 chamadas por POST); G3.2 (publicar e medir de novo) aguardando aprovação. Exclusão de evento concluída e testada em produção (plano em PLANO-DESEMPENHO-T-B5.md, remoto não autorizado) | `codex/back` | livre para a próxima tarefa |
 
 ## Concluídas
+
+- 2026-09-22 · Claude · G5.5: QA final do plano visual — **o G5 está pronto**
+  (`docs/design/G5-ESTADOS.md`).
+  - `npm run check` verde; `npm run test:e2e` completo: 479 passed, 3
+    skipped (duas falhas numa rodada anterior confirmadas como a
+    instabilidade já conhecida de "reconsulta sem tremida" sob carga, não
+    relacionadas ao G5 — passaram isoladas).
+  - `npm run test:browser:local`: **8/8**, contra o Supabase local de
+    verdade que o Codex deixou de pé nesta sessão, já com as migrations
+    R2/R3 e T-B7 aplicadas localmente — primeira vez que o G5 é validado
+    contra o banco real, não só o backend simulado dos e2e.
+  - Build de produção medido: `dist` com 1,0 MB (≈700 KB JS/CSS; o resto são
+    todos os subconjuntos de fonte, dos quais só os do português chegam ao
+    navegador real).
+  - Revisei também as duas migrations que o Codex deixou commitadas
+    localmente nesta pasta compartilhada (R2/R3 e T-B7): lock do evento
+    antes de produto/item, identidade de mimo por título normalizado,
+    `summary.diapers`/`available`/`invitation_id` — sem achado, evidência
+    própria em `docs/reviews/2026-09-22-r2-r3.md` e
+    `2026-09-22-t-b7.md`. Sem `db push`; publicação remota é gate separado.
+  - Falta só o G5.6 (decisão do titular sobre publicar `main`, que hoje é
+    fast-forward puro de `clone-main` — mas isso coloca o G5 inteiro no ar).
 
 - 2026-09-22 · Claude · G5.4: acabamentos de acessibilidade A14, A16, A18, A19
   (`docs/design/G5-ESTADOS.md`).
