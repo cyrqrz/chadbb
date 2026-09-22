@@ -369,14 +369,21 @@ mantém o cálculo antigo só como transição, isolado em `src/features/guests/
   medir a reconsulta; não remover a asserção. Evidências na
   [revisão de 22/09](reviews/2026-09-22-retomada.md).
 
-- [ ] **2026-09-22 · Codex → Claude · R1: proteger a prévia do cabeçalho contra
-  perda de edição.** Em `EventLayout.tsx:42`, “Ver como o convidado vê” continua
-  navegável quando o editor tem alterações não salvas, embora “Ver prévia” no
-  editor esteja desabilitado. Reproduzido em Chromium: alterar título, abrir a
-  prévia pelo cabeçalho, voltar → texto perdido, sem confirmação ou salvamento.
-  Compartilhar proteção/preservação do rascunho com as saídas da tela e testar
-  cabeçalho/barra de etapas. Evidência em
+- [x] **2026-09-22 · Codex → Claude · R1: proteger a prévia do cabeçalho contra
+  perda de edição.** _(Corrigido em `fbbbcb1`.)_ Em `EventLayout.tsx:42`, “Ver como
+  o convidado vê” continuava navegável quando o editor tinha alterações não
+  salvas, embora “Ver prévia” no editor estivesse desabilitado. Reproduzido em
+  Chromium: alterar título, abrir a prévia pelo cabeçalho, voltar → texto
+  perdido, sem confirmação ou salvamento. Evidência em
   [revisão de 22/09](reviews/2026-09-22-retomada.md).
+  `EventLayout` passou a manter o estado de rascunho pendente e expô-lo via
+  `Outlet context`; `EventPage` sincroniza e limpa esse estado ao salvar, trocar
+  de evento ou desmontar. Com edição pendente, o link de prévia e as três abas
+  do cabeçalho (Painel/Presentes/Dados) pedem `window.confirm` antes de sair;
+  sem alteração, nada muda. `BackLink` ("Seus eventos") ficou fora do escopo.
+  Testes novos em `organizer.spec.ts` cobrem cancelar (mantém tela e rascunho),
+  confirmar (navega) e ausência de dirty (navega direto), na prévia e numa aba.
+  `npm run check` e a suíte Playwright completa (463 passed) verdes.
 
 
 - [ ] 2026-09-16 · Codex → Claude · Usuário relata que “Conheça o chadbb”
@@ -408,6 +415,25 @@ acima permanece pendente. Nenhuma alteração remota foi feita nesta revisão.
 | Codex | T-B5: G2 remoto reprovado em 17/09 (p95 ~4,2 s, zero erros, sync ok); G3.1 local concluído (2 chamadas por POST); G3.2 (publicar e medir de novo) aguardando aprovação. Exclusão de evento concluída e testada em produção (plano em PLANO-DESEMPENHO-T-B5.md, remoto não autorizado) | `codex/back` | livre para a próxima tarefa |
 
 ## Concluídas
+
+- 2026-09-22 · Claude · R1: prévia do cabeçalho descartava rascunho não salvo
+  (achado do Codex em [revisão de 22/09](reviews/2026-09-22-retomada.md)), PR
+  `fbbbcb1`.
+  - `EventLayout.tsx` passou a guardar o estado de rascunho pendente e a expor
+    `{ setDirty }` via `Outlet context`; `EventEditor` (`EventPage.tsx`)
+    sincroniza `dirty` para lá em `useEffect` e limpa ao desmontar (salvar,
+    trocar de evento, sair).
+  - O link "Ver como o convidado vê" e as três abas (Painel/Presentes/Dados) do
+    cabeçalho passaram a interceptar o clique com `window.confirm('Descartar as
+    alterações e sair sem salvar?')` quando há edição pendente; cancelar
+    preserva a tela e o rascunho, confirmar navega normalmente. Sem alteração
+    pendente, nada muda.
+  - Fora do escopo, por decisão do usuário: `BackLink` ("Seus eventos") não foi
+    protegido, só o cabeçalho (`<header>`) e as abas.
+  - Testes novos em `tests/e2e/organizer.spec.ts`: cancelar mantém o valor
+    digitado (aba e prévia), confirmar permite navegar, e sem dirty a
+    navegação segue sem diálogo. `npm run check` verde e suíte Playwright
+    completa 463/463 (+3 skipped), sem regressão.
 
 - 2026-09-22 · Claude · Espera de ~15,7 s quando o PostgREST devolve 503
   (pendência aberta pelo QA da lista de mimos).
