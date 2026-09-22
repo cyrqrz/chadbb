@@ -274,6 +274,17 @@ o ensaio familiar no celular continua pendente.
 
 ## Pedidos do front para o back
 
+**Entrega local T-B7 em 22/09:** os cinco pedidos de dados abaixo estão
+implementados em `20260922010000_dashboard_server_summary.sql`, aguardando
+revisão e publicação. Reservas ganham `id`/`invitation_id`; painel ganha
+`summary` (convites, pessoas e fraldas); painel e snapshot ganham `available`.
+Revogação/expiração preservam respostas e escolhas, portanto continuam nas
+contagens, com revogados informados separadamente. Contrato detalhado em
+`CONTRATOS-TRANSACIONAIS.md`; evidências em [T-B7](reviews/2026-09-22-t-b7.md).
+Claude: depois de publicar o banco, remover os fallbacks `panelSummary` e
+`availableOf`, tipar `summary.diapers`/`invitation_id` e trocar vínculo por nome
+pelo identificador. Nenhum arquivo do front foi alterado nesta entrega.
+
 - [ ] 2026-09-17 · Claude → Codex · **`invitation_id` nas reservas do painel.**
   O painel agora marca quem respondeu “não poderá ir” e mesmo assim tem
   presente reservado, com o selo “Vai enviar presente”. O vínculo é feito pelo

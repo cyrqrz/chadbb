@@ -132,6 +132,31 @@ substituí-la. Mimos somam quantidade prometida sem saldo nem estado de esgotado
 A troca de tamanho da etapa de reservas envolve dois itens: ordenar os bloqueios
 por identificador estável, sem inverter a ordem evento → itens → reservas.
 
+## Resumo e saldos do painel (T-B7)
+
+Migration `20260922010000_dashboard_server_summary`, preparada localmente e
+ainda não publicada. Campos aditivos na ação `list` de `organizer_invitations`:
+
+- `reservations[].id`: identificador da reserva; `invitation_id`: identificador
+  do convite, para vincular homônimos sem comparar nomes. Canceladas ficam fora.
+- `summary.invitations`: `total`, `answered`, `yes`, `no`, `maybe`, `pending`,
+  `revoked`. Total inclui todos os convites do evento, inclusive revogados e
+  expirados; `answered = yes + no + maybe`, `total = answered + pending`.
+  `revoked` é um subconjunto transversal, não outra categoria de resposta.
+- `summary.people_confirmed`: soma de `attending` dos convites `yes`.
+  Revogar ou expirar acesso preserva a resposta e não reduz essa contagem.
+- `summary.diapers: { committed, limit }`: quantidades não canceladas de
+  fraldas (inclui compra declarada) e soma das cotas atuais dos itens de fralda.
+  Mimos não entram; evento vazio retorna zeros, sem usar defaults do catálogo.
+- `items[].available`: `max(0, limit - committed)` nas fraldas, `null` nos mimos.
+  O mesmo campo chega em `snapshot.items` do convidado, com uma fonte única em
+  `private.item_available`. A reserva própria não é somada de volta ao saldo.
+
+Resumo, reservas e itens do painel são calculados no mesmo comando SQL/snapshot.
+Revogação e resposta “não” não cancelam reservas: elas continuam comprometendo
+quantidades até cancelamento explícito. As mutações mantêm seus payloads e erros.
+Os identificadores de outros convites não são expostos no snapshot do convidado.
+
 ## Versão e relógio garantidos pelo banco
 
 `version` e `updated_at` de `events` e `event_items` são impostos por trigger, não

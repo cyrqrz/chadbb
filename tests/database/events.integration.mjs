@@ -1262,3 +1262,71 @@ test('R2/R3: helper privado e mutações da lista continuam restritos ao proprie
   await assert.rejects(addGift(other, { id: item.product_id, category: 'mimo' }, null, bob), /PRODUCT_UNAVAILABLE/)
   assert.deepEqual((await admin.query('select * from public.event_items where id=$1', [item.id])).rows[0], item)
 })
+
+test('T-B7: resumo vazio, respostas, revogação e isolamento calculados no servidor', async () => {
+  const empty = await create()
+  assert.deepEqual((await organizerAction(empty, 'list')).summary, {
+    invitations: { total: 0, answered: 0, yes: 0, no: 0, maybe: 0, pending: 0, revoked: 0 },
+    people_confirmed: 0, diapers: { committed: 0, limit: 0 },
+  })
+  const f = await familyFixture()
+  await guestAction(f.token, 'rsvp', request({ response: 'yes', attending: 3, version: 1 }))
+  for (const response of ['no', 'maybe', 'pending']) {
+    const inv = await organizerAction(f.event, 'create', { name: 'Homônimo fictício', kind: 'individual', capacity: 1 })
+    const token = (await guestAction(inv.token, 'exchange')).session_token
+    if (response !== 'pending') await guestAction(token, 'rsvp', request({ response, attending: 0, version: 1 }))
+  }
+  await organizerAction(f.event, 'revoke', { id: f.invite.id })
+  await admin.query("update private.invitations set expires_at=now()-interval '1 day' where id=$1", [f.invite.id])
+  await familyFixture() // Outro evento não participa das contagens.
+  const summary = (await organizerAction(f.event, 'list')).summary
+  assert.deepEqual(summary, {
+    invitations: { total: 4, answered: 3, yes: 1, no: 1, maybe: 1, pending: 1, revoked: 1 },
+    people_confirmed: 3, diapers: { committed: 0, limit: 50 },
+  })
+  await assert.rejects(organizerAction(f.event, 'list', {}, bob), /EVENT_NOT_FOUND/)
+  await organizerAction(f.event, 'rotate', { id: f.invite.id })
+  assert.deepEqual((await organizerAction(f.event, 'list')).summary, { ...summary, invitations: { ...summary.invitations, revoked: 0 } })
+})
+
+test('T-B7: reservas têm IDs estáveis e saldo/progresso incluem compra e excluem cancelamento', async () => {
+  const f = await familyFixture(); const p = f.snapshot.items.find(i => i.diaper_size === 'P')
+  const mimo = f.snapshot.items.find(i => i.category === 'mimo')
+  const second = await organizerAction(f.event, 'create', { name: 'Família fictícia', kind: 'individual', capacity: 1 })
+  const token = (await guestAction(second.token, 'exchange')).session_token
+  await guestAction(f.token, 'reserve', request({ item_id: p.id, quantity: 2, version: null }))
+  await guestAction(f.token, 'purchase', request({ item_id: p.id, version: 1 }))
+  await guestAction(token, 'reserve', request({ item_id: p.id, quantity: 4, version: null }))
+  await guestAction(f.token, 'reserve', request({ item_id: mimo.id, quantity: 3, version: null }))
+  let panel = await organizerAction(f.event, 'list')
+  assert.deepEqual(panel.summary.diapers, { committed: 6, limit: 50 })
+  assert.equal(panel.items.find(i => i.id === p.id).available, 0)
+  assert.equal(panel.items.find(i => i.id === mimo.id).available, null)
+  const stored = (await admin.query('select id, invitation_id from public.reservations where item_id=any($1::uuid[]) order by id', [[p.id, mimo.id]])).rows
+  assert.deepEqual(panel.reservations.map(r => ({ id: r.id, invitation_id: r.invitation_id })).sort((a,b) => a.id.localeCompare(b.id)), stored)
+  await organizerAction(f.event, 'update', { id: second.id, version: 1, name: 'Nome alterado', kind: 'individual', capacity: 1 })
+  const renamed = (await organizerAction(f.event, 'list')).reservations.find(r => r.invitation_id === second.id)
+  assert.equal(renamed.name, 'Nome alterado')
+  assert.equal(renamed.id, stored.find(r => r.invitation_id === second.id).id)
+  panel = await organizerAction(f.event, 'list')
+  await organizerAction(f.event, 'revoke', { id: f.invite.id })
+  assert.deepEqual((await organizerAction(f.event, 'list')).reservations, panel.reservations)
+  await guestAction(token, 'cancel', request({ item_id: p.id, version: 1 }))
+  panel = await organizerAction(f.event, 'list')
+  const snapshot = (await guestAction(token, 'read')).snapshot
+  assert.deepEqual(panel.summary.diapers, { committed: 2, limit: 50 })
+  assert.equal(panel.reservations.length, 2)
+  for (const item of panel.items) {
+    assert.equal(item.available, item.category === 'mimo' ? null : item.limit - item.committed)
+    assert.equal(snapshot.items.find(i => i.id === item.id).available, item.available)
+  }
+  // Identificadores dos outros convidados não entram na projeção pública.
+  assert.equal(JSON.stringify(snapshot).includes(f.invite.id), false)
+  const current = (await admin.query('select * from public.event_items where id=$1', [p.id])).rows[0]
+  await updateGift(current, 8)
+  const updated = await organizerAction(f.event, 'list')
+  assert.deepEqual(updated.summary.diapers, { committed: 2, limit: 52 })
+  assert.equal(updated.items.find(i => i.id === p.id).available, 6)
+  assert.equal((await guestAction(token, 'read')).snapshot.items.find(i => i.id === p.id).available, 6)
+  assert.equal((await admin.query('select private.item_available(1,2) n')).rows[0].n, '0')
+})
