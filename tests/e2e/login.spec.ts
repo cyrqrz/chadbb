@@ -278,3 +278,68 @@ test('dois toques em “Entrar” mandam uma verificação só', async ({ page }
   await expect(page).toHaveURL(/\/eventos$/)
   expect(calls.filter(call => call.path === '/auth/v1/verify')).toHaveLength(1)
 })
+
+// Pedido do back (2026-09-17): quando o Auth não consegue entregar o e-mail,
+// `/auth/v1/otp` responde 500 `unexpected_failure`. O texto genérico mandava
+// conferir a conexão, que está boa — o problema é o endereço ou o remetente.
+test('falha de envio do e-mail não é anunciada como problema de conexão', async ({ page }) => {
+  await auth(page, { otp: () => ({ status: 500, json: { code: 'unexpected_failure', error_code: 'unexpected_failure', msg: 'Error sending confirmation email' } }) })
+  await request(page)
+  const alert = page.getByRole('alert')
+  await expect(alert).toContainText('Não conseguimos enviar o e-mail para este endereço')
+  await expect(alert).not.toContainText('conexão')
+  // Falha de envio não é limite de tentativas: pedir de novo continua liberado.
+  await expect(page.getByRole('button', { name: 'Receber código de acesso' })).toBeEnabled()
+  await accessible(page)
+})
+
+// Pedido do back (2026-09-17): quem abre uma página protegida sem sessão volta
+// para ela depois de entrar, em vez de cair sempre em "Seus eventos".
+test.describe('voltar à página pedida depois de entrar', () => {
+  const protectedPath = '/eventos/20000000-0000-4000-8000-000000000002/convites'
+
+  test('o código devolve a pessoa à página que ela tinha pedido', async ({ page }) => {
+    await auth(page)
+    await page.goto(protectedPath)
+    await expect(page).toHaveURL(/\/entrar$/)
+    await page.getByLabel('Seu e-mail').fill('organizer@example.test')
+    await page.getByRole('button', { name: 'Receber código de acesso' }).click()
+    await page.getByLabel('Código de 8 dígitos').fill('12345678')
+    await page.getByRole('button', { name: 'Entrar', exact: true }).click()
+    await expect(page).toHaveURL(new RegExp(`${protectedPath}$`))
+  })
+
+  // O link do e-mail pode abrir noutra aba, onde o estado do router não existe:
+  // o destino tem de sobreviver por fora dele. Aqui o pedido acontece primeiro,
+  // e só depois a sessão aparece, como acontece ao abrir o link recebido.
+  test('o link do e-mail também volta, mesmo abrindo o callback do zero', async ({ page }) => {
+    await auth(page)
+    await page.goto(protectedPath)
+    await expect(page).toHaveURL(/\/entrar$/)
+    await page.addInitScript(value => localStorage.setItem('sb-e2e-auth-token', JSON.stringify(value)), session())
+    await page.goto('/auth/callback')
+    await expect(page).toHaveURL(new RegExp(`${protectedPath}$`))
+  })
+
+  test('sem página pedida, entrar continua indo para os eventos', async ({ page }) => {
+    await auth(page)
+    await request(page)
+    await page.getByLabel('Código de 8 dígitos').fill('12345678')
+    await page.getByRole('button', { name: 'Entrar', exact: true }).click()
+    await expect(page).toHaveURL(/\/eventos$/)
+  })
+
+  // Redirecionamento aberto: um destino externo guardado levaria a pessoa, logo
+  // depois de entrar, a um site que imita o chadbb.
+  test('destino externo guardado à força é ignorado', async ({ page }) => {
+    await auth(page)
+    await page.addInitScript(value => localStorage.setItem('sb-e2e-auth-token', JSON.stringify(value)), session())
+    await page.goto('/entrar')
+    await page.evaluate(() => localStorage.setItem('chadbb.login.destination',
+      JSON.stringify({ path: '//evil.example/eventos', at: Date.now() })))
+    await page.goto('/auth/callback')
+    await expect(page).toHaveURL(/\/eventos$/)
+    expect(new URL(page.url()).host, 'a pessoa não pode sair do site').toBe('127.0.0.1:4173')
+    await expect(page.getByRole('heading', { name: 'Seus eventos' })).toBeVisible()
+  })
+})

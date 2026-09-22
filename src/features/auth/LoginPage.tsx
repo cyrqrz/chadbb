@@ -1,21 +1,28 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Link, Navigate, Outlet } from 'react-router-dom'
+import { Link, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { backend, supabase } from '../../lib/supabase'
 import { errorMessage } from '../../lib/errors'
 import { LINK_FAILED, useAuth } from './context'
+import { rememberDestination, safeInternalPath, takeDestination } from './destination'
 import { ErrorState, LoadingState, SuccessMessage } from '../../components/States'
 import { Button } from '../../components/ui'
 
 export function RequireAuth() {
   const { session, loading } = useAuth()
+  const location = useLocation()
   if (loading) return <section className="page"><LoadingState>Verificando seu acesso…</LoadingState></section>
-  return session ? <Outlet /> : <Navigate to="/entrar" replace />
+  // Quem foi barrado diz para onde queria ir; o login devolve a pessoa a esse
+  // lugar em vez de largá-la sempre em "Seus eventos".
+  return session ? <Outlet /> : <Navigate to="/entrar" replace state={{ from: `${location.pathname}${location.search}` }} />
 }
 export function AuthCallback() {
   const { session, loading, error } = useAuth()
+  // Uma vez por montagem: `takeDestination` consome o destino, e recalcular a
+  // cada render devolveria "/eventos" na segunda passada.
+  const [target] = useState(() => takeDestination() ?? '/eventos')
   if (loading) return <section className="page"><LoadingState>Concluindo seu acesso…</LoadingState></section>
-  if (session) return <Navigate to="/eventos" replace />
+  if (session) return <Navigate to={target} replace />
   return <section className="page"><h1 className="page-title">Não foi possível entrar</h1><p role="alert" className="mt-6 max-w-2xl">{error ?? LINK_FAILED}</p><Link to="/entrar" className="button mt-6">Entrar com o código</Link></section>
 }
 
@@ -25,6 +32,12 @@ type Failure = { status?: number; code?: string; message?: string }
 // Quanto esperar: o Auth informa os segundos no limite de 60 s; no limite por hora, não.
 function sendFailure(cause: unknown): { text: string; wait: number } {
   const failure = (cause ?? {}) as Failure
+  // O Auth responde 500 `unexpected_failure` quando não consegue entregar o
+  // e-mail. Cair no texto genérico manda a pessoa conferir a conexão, que está
+  // boa — o problema é o endereço ou o remetente.
+  if (failure.status === 500 || failure.code === 'unexpected_failure') {
+    return { text: 'Não conseguimos enviar o e-mail para este endereço. Confira se ele está escrito certo ou fale com a organização.', wait: 0 }
+  }
   if (failure.status !== 429) return { text: errorMessage(cause), wait: 0 }
   const seconds = Number(/after (\d+) seconds?/i.exec(failure.message ?? '')?.[1])
   if (seconds > 0) return { text: `Muitos pedidos em sequência. Aguarde ${seconds} segundos para pedir outro código.`, wait: seconds }
@@ -39,6 +52,11 @@ function codeFailure(cause: unknown) {
 
 export function LoginPage() {
   const { session, loading } = useAuth()
+  const location = useLocation()
+  const from = safeInternalPath((location.state as { from?: unknown } | null)?.from)
+  // O link do e-mail pode abrir em outra aba: o destino precisa sobreviver a ela.
+  useEffect(() => { if (from) rememberDestination(from) }, [from])
+  const [target] = useState(() => from ?? takeDestination() ?? '/eventos')
   const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
   // `codeFor`: o e-mail do passo do código (fica travado até “Usar outro e-mail”).
@@ -97,7 +115,7 @@ export function LoginPage() {
     } catch (cause) { setError({ at: 'code', text: codeFailure(cause) }); codeField.current?.focus() } finally { setChecking(false); verifying.current = false }
   }
   if (loading) return <section className="page"><LoadingState>Verificando seu acesso…</LoadingState></section>
-  if (session) return <Navigate to="/eventos" replace />
+  if (session) return <Navigate to={target} replace />
   const sendLabel = busy ? 'Enviando…' : left > 0 ? `Pedir outro código em ${left} s` : sent || codeFor ? 'Pedir outro código' : 'Receber código de acesso'
   return <section className="login-shell">
     <div className="login-form">
