@@ -51,6 +51,7 @@ export function InvitationsPage() {
   useEffect(() => { if (link) linkField.current?.focus() }, [link])
   async function act(action: string, payload: Record<string, unknown>) {
     if (busy) return
+    if (!navigator.onLine) { setError(errorMessage(new Error('OFFLINE'))); return }
     setBusy(true); setError(''); setNotice(''); setCopyFailed(false); setFeedbackAt(action === 'update' ? 'edit' : 'create')
     try {
       const result = await invitations(id, action, payload)

@@ -16,7 +16,7 @@ T-F4 (contrato de atualização), conforme já previsto em `PLANO-VISUAL.md` §8
 |---|---|---|
 | G5.1 | `ConfirmDialog` (`<dialog>` nativo) no lugar das seis chamadas de `window.confirm` | **feito** (2026-09-22) |
 | G5.2 | Skeleton nas telas que ainda usam só `LoadingState`; achado A17 (`ConfirmDialog` em "Encerrar"/"Excluir evento") e `ActionMenu` | **feito** (2026-09-22) |
-| G5.3 | Estado sem conexão (T-F4): detectar `online`/`offline`, avisar antes de tentar salvar, não confundir com "atualizando" | próximo |
+| G5.3 | Estado sem conexão (T-F4): detectar `online`/`offline`, avisar antes de tentar salvar, não confundir com "atualizando" | **feito** (2026-09-22) |
 | G5.4 | Acabamentos de acessibilidade restantes do `audit.md`: A14 (leitor de tela durante a tentativa), A16 (uma ação primária por tela), A18/A19 (contrato de quantidade) | próximo |
 | G5.5 | QA de UX, `npm run check`, e2e completo, `test:browser:local`, capturas antes/depois, medida de build | próximo |
 | G5.6 | Aprovação do usuário → commit, push e PR | próximo |
@@ -103,3 +103,50 @@ esconder ações atrás de um menu.
 ### Evidência
 
 `npm run check` e `npm run test:e2e` completo, sem regressão (ver commit).
+
+## G5.3 · Estado sem conexão (feito)
+
+### Decisão
+
+`navigator.onLine` só fala da interface de rede do aparelho, não se o servidor
+responde — por isso o aviso é só informativo ("você está offline"), e quem
+garante o dado atualizado ao reconectar continua sendo `refetchOnReconnect`
+(já configurado em `src/lib/query.ts`, regra 7 do `AGENTS.md`). O gate não
+promete "salvo" nem reescreve esse contrato.
+
+### O que mudou
+
+- `src/lib/useOnline.ts`: hook com `navigator.onLine` e os eventos
+  `online`/`offline` da janela.
+- `src/components/Layout.tsx`: banner global (`role="status"`) visível em
+  qualquer tela quando offline — "O que está na tela continua visível, mas
+  alterações não serão enviadas até a internet voltar." Fica fora do fluxo de
+  `RefreshStatus`/`SlowRefresh` de propósito, para não se confundir com
+  "atualizando": é um aviso persistente e não uma mensagem de tentativa.
+- Um código de erro novo, `OFFLINE`, no mapa de mensagens já existente
+  (`src/lib/errors.ts` e `guestMessage` em `src/features/guests/api.ts`, para
+  o convidado).
+- **Avisar antes de tentar salvar**: os pontos que já concentravam a
+  gravação de cada tela ganharam `if (!navigator.onLine) { ...; return }`
+  antes do `setBusy(true)`, evitando a espera por um `fetch` que nunca sairia:
+  `EventPage.tsx` (`save`, `transition`), `InvitationsPage.tsx` (`act`,
+  usado por criar/editar/reemitir/revogar convite), `GuestPage.tsx`
+  (`mutate`, usado por presença/reserva/compra/cancelamento) e
+  `GiftListPage.tsx` (quantidade da lista, remover item, mimo próprio,
+  adicionar do catálogo).
+- Não entrou: `EventPage.reload`/`doReload` (é leitura, não gravação; falha
+  natural já tem mensagem) e o upload de capa (mesma função de `save`, já
+  coberta).
+
+### Evidência
+
+Novo `tests/e2e/offline.spec.ts`: banner aparece/some com o navegador (axe
+incluso) e três dos quatro pontos de gravação (dados do evento, criar
+convite, confirmar presença) avisam sem chamar o mock do servidor —
+`context.setOffline` bloqueia a rede de verdade nesses três. No teste do
+banner, `context.setOffline` também derruba o WebSocket de HMR do servidor
+de dev usado nos testes, então ali o `navigator.onLine` é simulado direto
+(`Object.defineProperty`), esperando o conteúdo real da rota (depois do
+`Suspense`) antes de disparar o evento — sem essa espera, o listener do hook
+ainda não tinha montado e o evento se perdia.
+`npm run check` e `npm run test:e2e` completo, sem regressão.

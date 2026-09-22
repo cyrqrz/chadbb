@@ -201,9 +201,11 @@ o ensaio familiar no celular continua pendente.
   caixas, `docs/design/G4b-LISTA.md`) **já estavam prontos** ao retomar em
   2026-09-22 — esta linha estava desatualizada dizendo "Próximo: G4". G5.1
   (`ConfirmDialog` no lugar do `window.confirm`, `docs/design/G5-ESTADOS.md`)
-  e G5.2 (skeleton no painel, em "Seus eventos" e no convite; achado A17
-  decidido sem migração; `ActionMenu` adiado por falta de caso de uso) feitos
-  em 2026-09-22. Próximo: G5.3 (estado sem conexão, T-F4).
+  G5.2 (skeleton no painel, em "Seus eventos" e no convite; achado A17
+  decidido sem migração; `ActionMenu` adiado por falta de caso de uso) e G5.3
+  (estado sem conexão, T-F4: banner global e aviso antes de tentar salvar nos
+  quatro pontos de gravação principais) feitos em 2026-09-22. Próximo: G5.4
+  (acabamentos de acessibilidade restantes do `audit.md`: A14, A16, A18, A19).
 - [ ] **T-F6 · Testes.** Ampliar os testes e2e para o que mudar; `npm run check`
   antes de cada PR.
 
@@ -422,6 +424,24 @@ acima permanece pendente. Nenhuma alteração remota foi feita nesta revisão.
 | Codex | T-B5: G2 remoto reprovado em 17/09 (p95 ~4,2 s, zero erros, sync ok); G3.1 local concluído (2 chamadas por POST); G3.2 (publicar e medir de novo) aguardando aprovação. Exclusão de evento concluída e testada em produção (plano em PLANO-DESEMPENHO-T-B5.md, remoto não autorizado) | `codex/back` | livre para a próxima tarefa |
 
 ## Concluídas
+
+- 2026-09-22 · Claude · G5.3: estado sem conexão (T-F4, `docs/design/G5-ESTADOS.md`).
+  - `src/lib/useOnline.ts` (hook com `navigator.onLine` + eventos
+    `online`/`offline`) e banner global em `Layout.tsx`, fora do fluxo de
+    `RefreshStatus` de propósito — é aviso persistente, não "atualizando".
+  - Código de erro `OFFLINE` no mapa de mensagens (`lib/errors.ts` e
+    `guestMessage`); os quatro pontos que concentram a gravação de cada tela
+    (`EventPage.save`/`transition`, `InvitationsPage.act`, `GuestPage.mutate`,
+    `GiftListPage` quantidade/remover/mimo próprio/catálogo) avisam antes de
+    tentar, sem esperar o `fetch` falhar.
+  - `navigator.onLine` só fala da interface de rede: quem garante o dado
+    atualizado ao reconectar continua sendo `refetchOnReconnect` (regra 7).
+  - Novo `tests/e2e/offline.spec.ts`. Achado no caminho: `context.setOffline`
+    do Playwright derruba também o WebSocket de HMR do servidor de dev usado
+    nos testes, então o teste do banner simula `navigator.onLine` direto e
+    espera o conteúdo real da rota (depois do `Suspense`) antes de disparar o
+    evento — sem essa espera, o listener do hook ainda não tinha montado.
+  - `npm run check` e `npm run test:e2e` completo, sem regressão.
 
 - 2026-09-22 · Claude · G5.2: skeleton nas telas que só tinham `LoadingState`;
   achado A17 decidido; `ActionMenu` adiado (T-F7, `docs/design/G5-ESTADOS.md`).

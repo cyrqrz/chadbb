@@ -2,10 +2,12 @@ import { useState } from 'react'
 import { Link, Outlet } from 'react-router-dom'
 import { useAuth } from '../features/auth/context'
 import { supabase } from '../lib/supabase'
+import { useOnline } from '../lib/useOnline'
 import { ErrorState } from './States'
 
 export function Layout() {
   const { session } = useAuth()
+  const online = useOnline()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(false)
   async function signOut() {
@@ -24,6 +26,9 @@ export function Layout() {
       </div>
     </header>
     {error && <div className="mt-4"><ErrorState message="Não foi possível sair. Tente novamente." /></div>}
+    {/* G5.3: `navigator.onLine` só fala da interface de rede do aparelho; a reconsulta ao
+        voltar (src/lib/query.ts) é quem garante o dado atualizado, não este aviso. */}
+    {!online && <p role="status" className="state state-warning mt-4">Sem conexão. O que está na tela continua visível, mas alterações não serão enviadas até a internet voltar.</p>}
     <main id="conteudo" className="min-w-0 flex-1"><Outlet /></main>
     <footer className="flex flex-wrap justify-between gap-2 border-t border-stone-300 py-6 text-sm text-stone-600"><span>chadbb · Pequenos começos, grandes encontros.</span><span>Presença, fraldas e mimos em um só lugar.</span></footer>
   </div>

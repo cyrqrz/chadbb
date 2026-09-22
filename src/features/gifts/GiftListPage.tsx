@@ -172,6 +172,7 @@ function ItemRow({ item, closed, onRemoved }: { item: EventItem; closed: boolean
     const value = parseQuantity(quantity)
     if (value === null) { setError('Informe uma quantidade inteira entre 1 e 10.000.'); return }
     if (busy || closed || unchanged) return
+    if (!navigator.onLine) { setError(errorMessage(new Error('OFFLINE'))); return }
     setBusy(true); setError(null); setMessage('')
     try {
       const saved = await setQuantity(baseline, value)
@@ -247,6 +248,7 @@ function RemoveItem({ item, disabled, onRemoved }: { item: EventItem; disabled: 
   function cancel() { setConfirming(false); setError(null); setBlocked(false); trigger.current?.focus() }
   async function remove() {
     if (sending.current) return
+    if (!navigator.onLine) { setError(errorMessage(new Error('OFFLINE'))); return }
     sending.current = true; setBusy(true); setError(null)
     try {
       await removeItem(item)
@@ -298,6 +300,7 @@ function CustomTreatForm({ eventId }: { eventId: string }) {
     e.preventDefault()
     if (sending.current) return
     if (!title.trim()) { setError('Informe o nome do mimo.'); setNameInvalid(true); nameField.current?.focus(); return }
+    if (!navigator.onLine) { setError(errorMessage(new Error('OFFLINE'))); return }
     sending.current = true; setBusy(true); setError(null); setNameInvalid(false); setMessage('')
     try {
       await addCustomTreat(eventId, title, description)
@@ -367,6 +370,7 @@ function ProductCard({ product, eventId, onAdded }: { product: Product; eventId:
     const value = diaper ? parseQuantity(quantity) : null
     if (diaper && value === null) { setError('Informe uma quantidade inteira entre 1 e 10.000.'); return }
     if (busy) return
+    if (!navigator.onLine) { setError(errorMessage(new Error('OFFLINE'))); return }
     setBusy(true); setError(null)
     try {
       await addItem(eventId, product.id, value)

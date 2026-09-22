@@ -31,6 +31,7 @@ export function errorMessage(error: unknown): string {
     ITEM_HAS_RESERVATIONS: 'Um convidado já escolheu este presente. Ele não pode sair da lista.',
     INVALID_TREAT: 'Informe o nome do mimo (até 160 caracteres) e uma descrição de até 2.000.',
     INVALID_COVER: 'Imagem inválida para este evento. Envie a imagem novamente.',
+    OFFLINE: 'Sem conexão. Esta alteração não foi enviada — tente de novo quando a internet voltar.',
   }
   if (object.message && messages[object.message]) return messages[object.message]
   if (object.status === 401 || object.code === 'PGRST301' || object.code === 'refresh_token_not_found') return messages.AUTH_REQUIRED

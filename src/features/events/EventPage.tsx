@@ -71,6 +71,7 @@ function EventEditor({ server, created, refreshing, refreshFailed, retry }: { se
     const validation = validateDraft(draft, record.status === 'published')
     if (validation) { setError(validation); return }
     if (imageFile && !publicConsent) { setError('Autorize a divulgação da imagem antes de salvar.'); return }
+    if (!navigator.onLine) { setError(errorMessage(new Error('OFFLINE'))); return }
     setBusy(true); setError(null); setMessage('')
     try {
       let nextDraft = draft
@@ -89,6 +90,7 @@ function EventEditor({ server, created, refreshing, refreshFailed, retry }: { se
     if (busy || dirty) return
     const validation = status === 'published' ? validateDraft(draft, true) : null
     if (validation) { setError(validation); return }
+    if (!navigator.onLine) { setError(errorMessage(new Error('OFFLINE'))); return }
     setBusy(true); setError(null); setMessage('')
     try {
       await accept(await transitionEvent(record, status)); setConfirmClose(false)

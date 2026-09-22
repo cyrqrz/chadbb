@@ -96,6 +96,7 @@ export function GuestEvent({ access, preview = false }: { access: { token: strin
     const area = where ?? (action === 'rsvp' ? 'presenca' : String(payload.from_item_id ?? payload.item_id ?? 'presentes'))
     setFeedbackAt(area)
     if (preview) { setError(null); setNotice({ ok: false, text: 'Na prévia, nada é enviado. O convidado verá a confirmação aqui.' }); return false }
+    if (!navigator.onLine) { setError(new Error('OFFLINE')); return false }
     // Pedido de resultado desconhecido precisa ser resolvido antes de outro pedido.
     if (pending && pending.signature !== signature) {
       setNotice({ ok: false, text: 'Há uma confirmação pendente. Use “Verificar tentativa anterior” antes de fazer outra escolha.' }); return false

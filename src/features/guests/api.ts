@@ -71,6 +71,7 @@ export function guestMessage(error: unknown) {
     INVALID_GIFT_QUANTITY: 'Informe uma quantidade inteira entre 1 e 1.000.',
     PURCHASE_ALREADY_DECLARED: 'Você já informou a compra deste presente. Para mudar, cancele a escolha e escolha de novo.',
     TEMPORARILY_UNAVAILABLE: 'O serviço está temporariamente indisponível. Sua tentativa foi guardada: tente novamente em instantes.',
+    OFFLINE: 'Sem conexão. Esta escolha não foi enviada — tente de novo quando a internet voltar.',
   }
   return error instanceof Error && messages[error.message] || 'Não foi possível confirmar a operação. Confira a conexão e tente novamente.'
 }
