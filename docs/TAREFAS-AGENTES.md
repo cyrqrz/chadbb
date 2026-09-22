@@ -91,7 +91,10 @@ o ensaio familiar no celular continua pendente.
   - Testes: `tests/local/email-code.test.mjs` já cobre o back (código em outro
     cliente, código errado e reúso). Se o texto do botão mudar, ajustar
     `tests/local/email-login.test.mjs`. Limite local: 2 e-mails por hora.
-- [ ] **2026-09-17 · Usuário → Claude · Refazer o visual do convite (prioridade alta).**
+- [x] **2026-09-17 · Usuário → Claude · Refazer o visual do convite (prioridade alta).**
+  _(Concluído em 2026-09-22: cabeçalho, mapa, sistema de cards e movimento já
+  vieram do G3/G3.1; o cartão de calendário com `.ics`, único pedaço que
+  faltava, foi feito por último — ver `CalendarCard` em `GuestPage.tsx`.)_
   Pedido do titular, com capturas de 17/09. Vale para `GuestPage.tsx`,
   `styles.css` e componentes de `src/components/ui`. Nada aqui muda contrato:
   todos os dados já vêm de `snapshot` (`guest_action`).
@@ -457,8 +460,29 @@ em [R2/R3](reviews/2026-09-22-r2-r3.md). Nenhuma alteração remota foi feita.
 
 ## Concluídas
 
-- 2026-09-22 · Claude · G5.5: QA final do plano visual — **o G5 está pronto**
-  (`docs/design/G5-ESTADOS.md`).
+- 2026-09-22 · Claude · Cartão de calendário no convite (último pedaço do
+  pedido de 17/09 "Refazer o visual do convite").
+  - `src/lib/ics.ts`: `buildIcs` (gera um VEVENT no formato RFC 5545, com
+    escape de `;`, `,` e quebra de linha, e dobra de linha em 75 octetos) e
+    `googleCalendarUrl`. Testado por unidade em `tests/ics.test.ts` (5 casos).
+  - `CalendarCard` em `GuestPage.tsx`, no lugar do bloco `.invite-art` que só
+    mostrava dia/mês — agora dia da semana, dia, mês, horário, botão
+    "Adicionar ao calendário" (baixa o `.ics` via `Blob` +
+    `URL.createObjectURL`, sem servidor e sem CSP nova) e o link opcional
+    "Google Agenda" (`<a target="_blank">`, nenhuma diretiva de CSP entra em
+    jogo porque não é `fetch`/`iframe`). Só aparece sem capa, como pedido.
+  - O snapshot do convidado não traz `ends_at` (só o organizador tem); em vez
+    de pedir mudança de contrato para uma conveniência de exibição, o `.ics`
+    usa 3 h de duração padrão quando falta o término — documentado no código
+    como decisão do front, não regra de negócio (regra 6 do `AGENTS.md`).
+  - Testes novos em `tests/e2e/guest.spec.ts`: baixa o `.ics` com o conteúdo
+    certo, o link do Google Agenda tem as datas certas, e o cartão não
+    aparece quando há capa. Achado no caminho: o teste do A18 (G5.4) tinha
+    uma corrida própria (contava a mesma leitura inicial da montagem como se
+    já fosse a leitura pós-mudança) — corrigido para comparar com a contagem
+    antes da mudança, não com zero.
+  - `npm run check` e `npm run test:e2e` completo: **485 passed, 3 skipped**,
+    sem regressão.
   - `npm run check` verde; `npm run test:e2e` completo: 479 passed, 3
     skipped (duas falhas numa rodada anterior confirmadas como a
     instabilidade já conhecida de "reconsulta sem tremida" sob carga, não

@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { availableOf, guestCall, GuestError, guestMessage, responseLabels } from './api'
 import type { GuestItem, ResponseChoice, Snapshot } from './api'
 import { live } from '../../lib/query'
+import { buildIcs, googleCalendarUrl } from '../../lib/ics'
 import { coverUrl } from '../events/api'
 import { EmptyState, ErrorState, LoadingState, RefreshStatus, SuccessMessage } from '../../components/States'
 import { Availability, Button, QuantityField, Skeleton, StatusBadge, Tabs } from '../../components/ui'
@@ -147,11 +148,7 @@ export function GuestEvent({ access, preview = false }: { access: { token: strin
       </div>
       {event.cover_path
         ? <img className="invite-cover" src={coverUrl(event.cover_path)} alt="Capa do chá de bebê" />
-        : <div className="invite-art" aria-hidden="true">
-          <span className="invite-art-day">{eventDate(event.starts_at, { day: '2-digit' })}</span>
-          <span className="invite-art-month">{eventDate(event.starts_at, { month: 'long' })}</span>
-          <span className="invite-art-note">Pequenos começos, muito amor.</span>
-        </div>}
+        : <CalendarCard eventId={event.id} title={event.title} startsAt={event.starts_at} address={event.address} />}
     </header>
 
     {closed && <p className="state state-warning mt-8">O evento foi encerrado. Você ainda pode consultar suas escolhas, cancelar ou informar uma compra enquanto seu convite estiver válido.</p>}
@@ -359,5 +356,31 @@ function VenueMap({ address }: { address: string }) {
     {!loaded && <span className="venue-map-placeholder" aria-hidden="true">Carregando mapa…</span>}
     <iframe title={`Mapa do local: ${place}`} src={`https://www.google.com/maps?q=${encodeURIComponent(address)}&hl=pt-BR&output=embed`}
       loading="lazy" referrerPolicy="no-referrer" onLoad={() => setLoaded(true)} />
+  </div>
+}
+
+// Cartão de calendário no lugar da capa quando não há uma. O .ics é gerado no
+// próprio navegador (Blob + URL.createObjectURL): sem servidor novo, sem CSP
+// nova. O convite do convidado não traz `ends_at` (regra 6: o front não
+// recalcula prazos de negócio); a duração de 3 h em `buildIcs` é só um padrão
+// de exibição no calendário pessoal, sem efeito em nenhuma regra do site.
+function CalendarCard({ eventId, title, startsAt, address }: { eventId: string; title: string; startsAt: string; address: string }) {
+  const place = address.split('\n')[0]
+  function addToCalendar() {
+    const ics = buildIcs({ uid: `${eventId}@chadbb.pages.dev`, title, startsAt, location: place || undefined })
+    const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }))
+    const link = document.createElement('a')
+    link.href = url; link.download = 'convite.ics'
+    document.body.appendChild(link); link.click(); link.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
+  return <div className="invite-art">
+    <span className="invite-art-weekday">{eventDate(startsAt, { weekday: 'long' })}</span>
+    <span className="invite-art-day">{eventDate(startsAt, { day: '2-digit' })}</span>
+    <span className="invite-art-month">{eventDate(startsAt, { month: 'long' })} · {eventDate(startsAt, { timeStyle: 'short' })}</span>
+    <div className="invite-art-actions">
+      <button type="button" className="secondary" onClick={addToCalendar}>Adicionar ao calendário</button>
+      <a className="text-link" href={googleCalendarUrl({ uid: eventId, title, startsAt, location: place || undefined })} target="_blank" rel="noopener noreferrer">Google Agenda<span className="sr-only"> (abre em nova aba)</span></a>
+    </div>
   </div>
 }

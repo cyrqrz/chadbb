@@ -243,10 +243,12 @@
   .invite-facts dd::first-letter { text-transform: uppercase; }
   .invite-cover { width: 100%; max-width: 100%; aspect-ratio: 5 / 4; border-radius: var(--radius-panel); object-fit: cover; }
   .invite-art { display: flex; max-width: 100%; aspect-ratio: 5 / 4; flex-direction: column; justify-content: flex-end; border-radius: var(--radius-panel); background: radial-gradient(110% 80% at 100% 0%, var(--color-blush) 0%, transparent 60%), linear-gradient(160deg, var(--color-surface-soft), var(--color-brand-soft)); padding: clamp(1.25rem, 5vw, 2.5rem); color: var(--color-brand-hover); }
+  .invite-art-weekday { font-size: var(--text-label); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+  .invite-art-weekday::first-letter { text-transform: uppercase; }
   .invite-art-day { font-family: var(--font-display); font-size: clamp(5rem, 22vw, 9rem); font-weight: 480; line-height: 0.85; font-variant-numeric: lining-nums; }
   .invite-art-month { font-family: var(--font-display); font-size: clamp(1.75rem, 6vw, 2.5rem); font-weight: 480; }
   .invite-art-month::first-letter { text-transform: uppercase; }
-  .invite-art-note { margin-top: 1rem; border-top: 1px solid color-mix(in srgb, var(--color-brand) 30%, transparent); padding-top: 0.75rem; font-weight: 600; }
+  .invite-art-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.25rem; margin-top: 1.25rem; border-top: 1px solid color-mix(in srgb, var(--color-brand) 30%, transparent); padding-top: 1rem; }
   .invite-message { max-width: 60ch; margin-top: 2.5rem; border-inline-start: 3px solid var(--color-blush); padding-inline-start: 1.25rem; font-family: var(--font-display); font-size: 1.25rem; line-height: 1.5; white-space: pre-line; }
   .invite-section { display: flex; flex-direction: column; gap: 1rem; margin-top: 3rem; border-top: 1px solid var(--color-border-subtle); padding-top: 2.5rem; scroll-margin-top: 5rem; }
   .invite-section:focus { outline: none; }

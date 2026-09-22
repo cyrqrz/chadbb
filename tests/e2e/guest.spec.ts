@@ -364,6 +364,40 @@ test.describe('G3 · convite', () => {
     expect(clipped).toBe(false)
   })
 
+  test('cartão de calendário: baixa um .ics e o link do Google Agenda tem as datas certas', async ({ page }) => {
+    await backend(page)
+    await page.goto(`/convite#${token}`)
+    const art = page.locator('.invite-art')
+    await expect(art).toContainText('segunda-feira')
+    await expect(art).toContainText('14:30')
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      art.getByRole('button', { name: 'Adicionar ao calendário' }).click(),
+    ])
+    expect(download.suggestedFilename()).toBe('convite.ics')
+    const path = await download.path()
+    const content = await (await import('node:fs/promises')).readFile(path!, 'utf8')
+    expect(content).toContain('BEGIN:VEVENT')
+    expect(content).toContain('DTSTART:20350910T173000Z')
+    expect(content).toContain('SUMMARY:Chá de teste')
+    expect(content).toContain('LOCATION:Endereço fictício')
+
+    const google = art.getByRole('link', { name: /Google Agenda/ })
+    const href = await google.getAttribute('href')
+    const url = new URL(href!)
+    expect(url.hostname).toBe('calendar.google.com')
+    expect(url.searchParams.get('dates')).toBe('20350910T173000Z/20350910T203000Z')
+    await expect(google).toHaveAttribute('target', '_blank')
+  })
+
+  test('com capa, o cartão de calendário não aparece', async ({ page }) => {
+    await backend(page, { event: { cover_path: 'eventos/capa.jpg' } })
+    await page.goto(`/convite#${token}`)
+    await expect(page.getByRole('img', { name: 'Capa do chá de bebê' })).toBeVisible()
+    await expect(page.locator('.invite-art')).toHaveCount(0)
+  })
+
   test('convite cabe em 320 px com texto a 200% e passa no axe', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 740 })
     await backend(page, { items: [diaper, full] })
@@ -922,9 +956,10 @@ test('tamanho completa enquanto a pessoa digita explica que o formulário sumiu'
   await page.getByRole('button', { name: 'Fraldas', exact: true }).click()
   const card = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Fraldas tamanho P' }) })
   await card.getByRole('spinbutton').fill('3')
+  const before = calls.filter(action => action === 'read').length
   full = true
   // A consulta periódica (5 s) traz o tamanho completo enquanto a pessoa ainda está no campo.
-  await expect.poll(() => calls.filter(action => action === 'read').length, { timeout: 15_000 }).toBeGreaterThan(0)
+  await expect.poll(() => calls.filter(action => action === 'read').length, { timeout: 15_000 }).toBeGreaterThan(before)
   await expect(card.getByText('Este tamanho completou enquanto você escolhia.')).toBeVisible()
   await expect(card.getByRole('spinbutton')).toHaveCount(0)
   await expect(card.locator('.badge', { hasText: 'Completo' })).toBeVisible()
