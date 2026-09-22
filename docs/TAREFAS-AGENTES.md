@@ -307,6 +307,11 @@ o ensaio familiar no celular continua pendente.
 - [ ] **T-B6 · Operação.** Acompanhar a sequência diária do backup; depois do
   conteúdo real, refazer a restauração com dados e Storage reais e medir o RTO
   (meta de 2 h); remover a integração órfã "Workers Builds" na Cloudflare.
+  _(Handoff escrito para o Codex em 2026-09-22:
+  [HANDOFF-CODEX-T-B6](HANDOFF-CODEX-T-B6.md). As três partes são independentes:
+  só a remoção do "Workers Builds" dá para fazer agora — as outras duas dependem
+  do conteúdo real do titular. O deadlock de 16/09 no teste de navegador vai
+  junto, como item secundário.)_
 - [x] **T-B7 · Pedidos do front.** _(Publicado em produção em 2026-09-22 — ver
   "Pedidos do front para o back" abaixo. `summary`, `available` e
   `invitation_id` já respondem de verdade; falta só o Claude limpar o cálculo
