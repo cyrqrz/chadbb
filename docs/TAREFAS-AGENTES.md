@@ -388,8 +388,10 @@ em vez de omitir o selo, e nenhuma tela recalcula saldo ou resumo.
   persistido em `/etc/sysctl.d/99-supabase.conf`. Conferido em 2026-09-17:
   reserva ativa no kernel, 12 containers de pé e 21 migrations aplicadas.
 
-- [ ] 2026-09-17 · Claude → Codex · **Documentar a reserva de portas no
-  `README.md`.** Junto dos comandos `db:*`: 54321 e 54322 caem na faixa efêmera
+- [x] 2026-09-17 · Claude → Codex · **Documentar a reserva de portas no
+  `README.md`.** _(Feito em 2026-09-22, na seção "Se `db:start` falhar com
+  `address already in use`", logo abaixo do `db:start`. Com o fim da divisão
+  por área, o `README.md` deixou de ser exclusivo do Codex.)_ Junto dos comandos `db:*`: 54321 e 54322 caem na faixa efêmera
   do WSL (`net.ipv4.ip_local_port_range` = `32768 60999`), então
   `npm run db:start` pode falhar com `address already in use` sem nenhum
   processo ouvindo a porta. A saída é reservar a faixa
@@ -414,7 +416,11 @@ em vez de omitir o selo, e nenhuma tela recalcula saldo ou resumo.
   a política de leitura de `products` e `add_event_item` foram refeitas para esse
   produto não vazar para outros eventos). Teste em `supabase/tests/list_items.test.sql`.
 
-- [ ] **2026-09-18 · Usuário → Claude/Codex · Mapa do convite: decisão mudou.**
+- [x] **2026-09-18 · Usuário → Claude/Codex · Mapa do convite: decisão mudou.**
+  _(Concluído; conferido em 2026-09-22. O embed está em `GuestPage.tsx`, o
+  “Como chegar” abre a rota, e a CSP que faltava revisar está correta — só
+  `frame-src https://www.google.com https://maps.google.com`, com teste em
+  `tests/headers.test.ts`. Nada pendente do lado do back.)_
   O titular decidiu que o convite mostra o mapa já carregado e interativo, sem
   clique. Substitui a decisão de 17/09 ("carregar só após o clique", registrada
   na `codex/back`). Implementado com o embed do Google
@@ -458,11 +464,15 @@ em vez de omitir o selo, e nenhuma tela recalcula saldo ou resumo.
   `npm run check` e a suíte Playwright completa (463 passed) verdes.
 
 
-- [ ] 2026-09-16 · Codex → Claude · Usuário relata que “Conheça o chadbb”
-  parece não fazer nada. `HomePage.tsx` aponta para `#como-funciona`, seção já
-  visível na captura enviada. Rever CTA para tornar claro o próximo passo de
-  criar/acessar evento, inclusive autenticado; corrigir o aviso desatualizado
-  “Convites estão em preparação”. Conferir navegação por teclado e clique.
+- [x] 2026-09-16 · Codex → Claude · Usuário relata que “Conheça o chadbb”
+  parece não fazer nada. _(Resolvido em algum gate do T-F7; conferido em
+  2026-09-22. O CTA da `HomePage.tsx` é “Começar a organizar” → `/entrar`, ou
+  “Ir para seus eventos” com sessão: é um `Link`, não uma âncora. `#como-funciona`
+  virou só `id` de seção, sem link apontando para ele, e o aviso “Convites estão
+  em preparação” não existe mais no código.)_ `HomePage.tsx` apontava para
+  `#como-funciona`, seção já visível na captura enviada. Rever CTA para tornar
+  claro o próximo passo de criar/acessar evento, inclusive autenticado; corrigir
+  o aviso desatualizado “Convites estão em preparação”.
 
 ## Pendências encontradas na revisão de 22/09
 
