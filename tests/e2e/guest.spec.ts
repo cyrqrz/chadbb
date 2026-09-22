@@ -904,3 +904,28 @@ test.describe('cascata da página inicial', () => {
     for (const state of states) expect(state).toEqual({ fill: 'backwards', opacity: '1', transform: 'none' })
   })
 })
+
+// A18: o tamanho completa por outra pessoa enquanto esta digita a quantidade; regra 7
+// do AGENTS.md (nunca sobrescrever o que está sendo digitado) exige explicar, não sumir.
+test('tamanho completa enquanto a pessoa digita explica que o formulário sumiu', async ({ page }) => {
+  let full = false
+  const calls: string[] = []
+  await page.route('https://e2e.supabase.co/functions/v1/guest', async route => {
+    const body = route.request().postDataJSON()
+    calls.push(String(body.action))
+    const item: GuestItem = { ...diaper, committed: full ? 6 : 0 }
+    const snap = snapshot([item])
+    if (body.action === 'exchange') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ session_token: 'fake', snapshot: snap }) })
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ snapshot: snap }) })
+  })
+  await page.goto(`/convite#${token}`)
+  await page.getByRole('button', { name: 'Fraldas', exact: true }).click()
+  const card = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Fraldas tamanho P' }) })
+  await card.getByRole('spinbutton').fill('3')
+  full = true
+  // A consulta periódica (5 s) traz o tamanho completo enquanto a pessoa ainda está no campo.
+  await expect.poll(() => calls.filter(action => action === 'read').length, { timeout: 15_000 }).toBeGreaterThan(0)
+  await expect(card.getByText('Este tamanho completou enquanto você escolhia.')).toBeVisible()
+  await expect(card.getByRole('spinbutton')).toHaveCount(0)
+  await expect(card.locator('.badge', { hasText: 'Completo' })).toBeVisible()
+})

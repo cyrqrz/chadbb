@@ -30,7 +30,7 @@ Retomada do Codex: gate remoto T-B5, conforme `PLANO-DESEMPENHO-T-B5.md`.
 Claude segue no painel e visual (T-F2 e T-F1). Titular assumiu como organizador;
 o ensaio familiar no celular continua pendente.
 
-## Claude — front (`chadbb-claude`, `claude/front`)
+## Claude — front
 
 - [x] **2026-09-17 · Codex → Claude · Revisão G3/G3.1: corrigir quantidade no convite.**
   _(Feito em `4dc63ae`, PR #9, com o foco mantido durante o envio.)_
@@ -204,12 +204,14 @@ o ensaio familiar no celular continua pendente.
   G5.2 (skeleton no painel, em "Seus eventos" e no convite; achado A17
   decidido sem migração; `ActionMenu` adiado por falta de caso de uso) e G5.3
   (estado sem conexão, T-F4: banner global e aviso antes de tentar salvar nos
-  quatro pontos de gravação principais) feitos em 2026-09-22. Próximo: G5.4
-  (acabamentos de acessibilidade restantes do `audit.md`: A14, A16, A18, A19).
+  quatro pontos de gravação principais) e G5.4 (achados A14, A16, A18 do
+  `audit.md` corrigidos; A19 revisado, já coberto desde o G3.1) feitos em
+  2026-09-22. Próximo: G5.5 (QA de UX, `test:browser:local`, capturas
+  antes/depois, medida de build).
 - [ ] **T-F6 · Testes.** Ampliar os testes e2e para o que mudar; `npm run check`
   antes de cada PR.
 
-## Codex — back e tarefas difíceis (`chadbb-codex`, `codex/back`)
+## Codex — back e tarefas difíceis
 
 - [ ] **2026-09-17 · Login por código no e-mail.** G1 local concluído:
   - modelo `supabase/templates/acesso.html` e `config.toml` com código de 8
@@ -424,6 +426,24 @@ acima permanece pendente. Nenhuma alteração remota foi feita nesta revisão.
 | Codex | T-B5: G2 remoto reprovado em 17/09 (p95 ~4,2 s, zero erros, sync ok); G3.1 local concluído (2 chamadas por POST); G3.2 (publicar e medir de novo) aguardando aprovação. Exclusão de evento concluída e testada em produção (plano em PLANO-DESEMPENHO-T-B5.md, remoto não autorizado) | `codex/back` | livre para a próxima tarefa |
 
 ## Concluídas
+
+- 2026-09-22 · Claude · G5.4: acabamentos de acessibilidade A14, A16, A18, A19
+  (`docs/design/G5-ESTADOS.md`).
+  - A14: `ErrorState`/`RefreshStatus` ganharam um `status` `sr-only` ("Tentando
+    de novo…") ao lado do botão durante a tentativa, sem trocar o nome do
+    botão (foco e testes dependem do nome fixo).
+  - A16: em `InvitationsPage.tsx`, só um formulário principal por vez — abrir
+    "Convidar alguém" cancela uma edição em curso sem confirmação; editar um
+    convite fecha "Convidar alguém", com a mesma confirmação de link não
+    copiado. O link reemitido de dentro da edição continua aparecendo junto
+    dela, de propósito (fora deste achado).
+  - A18: em `GuestPage.tsx`, quando o tamanho completa com um rascunho de
+    quantidade pendente, o formulário que sumia agora explica o motivo.
+  - A19: revisado sem mudança de código — o `Availability` do G3.1 já mostra
+    o limite real perto do campo antes de a pessoa digitar.
+  - Testes novos em `panel.spec.ts` (três do A16) e `guest.spec.ts` (A18); o
+    teste existente do A14 ganhou uma checagem a mais.
+  - `npm run check` e `npm run test:e2e` completo, sem regressão.
 
 - 2026-09-22 · Claude · G5.3: estado sem conexão (T-F4, `docs/design/G5-ESTADOS.md`).
   - `src/lib/useOnline.ts` (hook com `navigator.onLine` + eventos

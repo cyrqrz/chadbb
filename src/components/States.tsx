@@ -13,11 +13,18 @@ export function LoadingState({ children }: { children: ReactNode }) {
 export function ErrorState({ title, message, onRetry, retryLabel = 'Tentar novamente', busy = false }: {
   title?: string; message: ReactNode; onRetry?: () => void; retryLabel?: string; busy?: boolean
 }) {
-  return <div role="alert" className="state state-error">
-    {title && <p className="font-semibold">{title}</p>}
-    <p>{message}</p>
-    {onRetry && <Button variant="secondary" busy={busy} onClick={onRetry}>{retryLabel}</Button>}
-  </div>
+  return <>
+    <div role="alert" className="state state-error">
+      {title && <p className="font-semibold">{title}</p>}
+      <p>{message}</p>
+      {onRetry && <Button variant="secondary" busy={busy} onClick={onRetry}>{retryLabel}</Button>}
+    </div>
+    {/* A14: fora do `alert` de propósito — um teste garante zero mutações ali durante a
+        tentativa (automática ou manual), para o aviso de erro não ser relido. O botão fica
+        aria-disabled sem trocar de nome (foco e outros testes dependem do nome fixo); quem
+        usa leitor de tela ouve a tentativa em andamento por aqui, num `status` à parte. */}
+    {busy && <span role="status" className="sr-only">Tentando de novo…</span>}
+  </>
 }
 
 export function EmptyState({ title, children }: { title: string; children?: ReactNode }) {
@@ -34,11 +41,15 @@ export function SuccessMessage({ children }: { children: ReactNode }) {
 export function RefreshStatus({ fetching, failed, onRetry, label = 'Atualizando…', message = 'Não foi possível atualizar. Os dados abaixo são da última consulta.', retryLabel = 'Tentar novamente' }: {
   fetching: boolean; failed: boolean; onRetry: () => void; label?: string; message?: string; retryLabel?: string
 }) {
-  if (failed) return <div role="alert" className="state state-error mt-4">
-    <p>{message}</p>
-    {/* Texto fixo: a região de alerta é relida a cada mudança, e a tela tenta de novo sozinha. */}
-    <Button variant="secondary" busy={fetching} onClick={onRetry}>{retryLabel}</Button>
-  </div>
+  if (failed) return <>
+    <div role="alert" className="state state-error mt-4">
+      <p>{message}</p>
+      {/* Texto fixo: a região de alerta é relida a cada mudança, e a tela tenta de novo sozinha. */}
+      <Button variant="secondary" busy={fetching} onClick={onRetry}>{retryLabel}</Button>
+    </div>
+    {/* A14: fora do `alert` — mesmo motivo do `ErrorState`. */}
+    {fetching && <span role="status" className="sr-only">Tentando de novo…</span>}
+  </>
   return <SlowRefresh fetching={fetching} label={label} />
 }
 

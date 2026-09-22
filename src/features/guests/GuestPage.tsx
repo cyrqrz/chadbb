@@ -331,6 +331,9 @@ function GuestGift({ item, alternatives, busy, closed, save, feedback }: { item:
         max={available === null ? 1000 : Math.min(1000, available + (active ? own.quantity : 0))} onChange={text => setDraft(previous => ({ text, version: previous ? previous.version : own?.version ?? null }))} />
       <Button type="submit" className="self-start" busy={busy}>{active ? 'Atualizar quantidade' : 'Escolher presente'}</Button>
     </form>}
+    {/* A18: sem isso o formulário só sumia — outro convidado esgotou o tamanho
+        enquanto esta pessoa escolhia a quantidade (regra 7 do AGENTS.md). */}
+    {!purchased && full && !active && draft && <p role="status" className="hint">Este tamanho completou enquanto você escolhia. Sua quantidade não foi enviada; escolha outro tamanho, se houver.</p>}
     {draft && draft.version !== (own?.version ?? null) && <p role="status">A escolha mudou em outra sessão. <button type="button" className="text-link" onClick={() => setDraft(null)}>Usar escolha atual</button></p>}
     {feedback}
     {active && <div className="card-actions">

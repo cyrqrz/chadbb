@@ -407,6 +407,49 @@ test('erro ao salvar fica na edição, não muda de lugar ao copiar e some ao ca
   await expect(page.getByRole('alert')).toHaveCount(0)
 })
 
+// A16: só um formulário principal por vez (uma ação primária por contexto, G2.1).
+test('"Convidar alguém" cancela uma edição em curso, sem confirmação', async ({ page }) => {
+  await backend(page, actions({}))
+  const { edit } = await openEdit(page)
+  await expect(edit).toBeVisible()
+  await page.getByRole('button', { name: 'Convidar alguém' }).click()
+  await expect(edit).toHaveCount(0)
+  await expect(page.getByRole('region', { name: 'Convide alguém especial' })).toBeVisible()
+})
+
+test('editar um convite fecha "Convidar alguém" sem link pendente, sem confirmação', async ({ page }) => {
+  await backend(page, actions({}))
+  await page.goto(`/eventos/${eventId}/convites`)
+  await page.getByRole('button', { name: 'Convidar alguém' }).click()
+  const create = page.getByRole('region', { name: 'Convide alguém especial' })
+  await expect(create).toBeVisible()
+  await page.getByRole('button', { name: 'Editar convite de Convidado fictício 1' }).click()
+  await expect(create).toHaveCount(0)
+  await expect(page.getByRole('region', { name: 'Editar convite' })).toBeVisible()
+})
+
+test('editar um convite com link não copiado em "Convidar alguém" pede confirmação antes de trocar', async ({ page }) => {
+  await backend(page, actions({ create: { status: 200, json: { id: 'novo', token: 'token-ficticio' } } }))
+  await page.goto(`/eventos/${eventId}/convites`)
+  await page.getByRole('button', { name: 'Convidar alguém' }).click()
+  const create = page.getByRole('region', { name: 'Convide alguém especial' })
+  await create.getByLabel('Nome da pessoa ou família').fill('Convidado fictício 9')
+  await create.getByRole('button', { name: 'Criar convite' }).click()
+  await expect(create.getByLabel('Link para compartilhar')).toHaveValue(/token-ficticio/)
+  await page.getByRole('button', { name: 'Editar convite de Convidado fictício 1' }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toContainText('O link deste convite não aparece de novo')
+  // Cancelar: nada muda, o link continua ali para copiar.
+  await dialog.getByRole('button', { name: 'Cancelar' }).click()
+  await expect(create).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Editar convite' })).toHaveCount(0)
+  // Confirmar: fecha o convite novo e abre a edição.
+  await page.getByRole('button', { name: 'Editar convite de Convidado fictício 1' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Fechar sem copiar' }).click()
+  await expect(create).toHaveCount(0)
+  await expect(page.getByRole('region', { name: 'Editar convite' })).toBeVisible()
+})
+
 for (const status of ['published', 'closed'] as const) {
   test(`detalhes do evento (${status}) cabem em 320 px com texto a 200%`, async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 740 })
@@ -432,8 +475,11 @@ test('tentar de novo pelo teclado mantém o foco no botão', async ({ page }) =>
   await page.keyboard.press('Enter')
   await expect(retry).toHaveAttribute('aria-disabled', 'true')
   await expect(retry).toBeFocused()
+  // A14: o botão mantém o nome (o foco depende disso), mas o leitor de tela ouve a tentativa em andamento.
+  await expect(page.getByRole('status').filter({ hasText: 'Tentando de novo…' })).toBeAttached()
   await expect(retry).not.toHaveAttribute('aria-disabled', 'true', { timeout: 15_000 })
   await expect(retry).toBeFocused()
+  await expect(page.getByRole('status').filter({ hasText: 'Tentando de novo…' })).toHaveCount(0)
 })
 
 test('links de voltar e abas têm área de toque de 44 px', async ({ page }) => {

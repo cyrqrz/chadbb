@@ -17,7 +17,7 @@ T-F4 (contrato de atualização), conforme já previsto em `PLANO-VISUAL.md` §8
 | G5.1 | `ConfirmDialog` (`<dialog>` nativo) no lugar das seis chamadas de `window.confirm` | **feito** (2026-09-22) |
 | G5.2 | Skeleton nas telas que ainda usam só `LoadingState`; achado A17 (`ConfirmDialog` em "Encerrar"/"Excluir evento") e `ActionMenu` | **feito** (2026-09-22) |
 | G5.3 | Estado sem conexão (T-F4): detectar `online`/`offline`, avisar antes de tentar salvar, não confundir com "atualizando" | **feito** (2026-09-22) |
-| G5.4 | Acabamentos de acessibilidade restantes do `audit.md`: A14 (leitor de tela durante a tentativa), A16 (uma ação primária por tela), A18/A19 (contrato de quantidade) | próximo |
+| G5.4 | Acabamentos de acessibilidade restantes do `audit.md`: A14 (leitor de tela durante a tentativa), A16 (uma ação primária por tela), A18/A19 (contrato de quantidade) | **feito** (2026-09-22) |
 | G5.5 | QA de UX, `npm run check`, e2e completo, `test:browser:local`, capturas antes/depois, medida de build | próximo |
 | G5.6 | Aprovação do usuário → commit, push e PR | próximo |
 
@@ -150,3 +150,36 @@ de dev usado nos testes, então ali o `navigator.onLine` é simulado direto
 `Suspense`) antes de disparar o evento — sem essa espera, o listener do hook
 ainda não tinha montado e o evento se perdia.
 `npm run check` e `npm run test:e2e` completo, sem regressão.
+
+## G5.4 · Acabamentos de acessibilidade (feito)
+
+Os quatro achados restantes do `audit.md` marcados para o G5.
+
+- **A14** — `src/components/States.tsx`: `ErrorState` e `RefreshStatus` ganharam
+  `{busy && <span role="status" className="sr-only">Tentando de novo…</span>}`
+  ao lado do botão. O nome do botão continua fixo de propósito: o foco durante
+  a tentativa e vários testes de e2e dependem dele não mudar.
+- **A16** — `src/features/guests/InvitationsPage.tsx`: só um formulário
+  principal por vez. Abrir "Convidar alguém" cancela uma edição em curso, sem
+  confirmação (mesmo comportamento de "Cancelar edição"). Abrir "Editar
+  convite" fecha "Convidar alguém" — com a mesma confirmação de link não
+  copiado que já existia para o botão "Fechar", reaproveitando `confirmClose`
+  (agora com um `thenEdit` opcional). Deixado de fora, por ser intencional e
+  já testado: o link reemitido de dentro da própria edição continua
+  aparecendo junto do formulário de edição aberto.
+- **A18** — `src/features/guests/GuestPage.tsx` (`GuestGift`): quando o
+  tamanho completa (`full`) enquanto a pessoa tinha um rascunho de quantidade
+  não enviado, o formulário que sumia agora vira um aviso: "Este tamanho
+  completou enquanto você escolhia. Sua quantidade não foi enviada; escolha
+  outro tamanho, se houver."
+- **A19** — revisado, **sem mudança de código**: o `Availability` (G3.1) já
+  mostra "N de M disponíveis" com a barra antes do `QuantityField` em todo
+  item com limite (fraldas), então o limite real já fica visível perto do
+  campo antes da pessoa digitar. O achado original é anterior ao G3.1.
+
+### Evidência
+
+Testes novos: `tests/e2e/panel.spec.ts` (três casos do A16) e
+`tests/e2e/guest.spec.ts` (A18); o teste existente "tentar de novo pelo
+teclado mantém o foco no botão" (`panel.spec.ts`) passou a checar também o
+`status` do A14. `npm run check` e `npm run test:e2e` completo, sem regressão.

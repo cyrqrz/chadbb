@@ -40,7 +40,7 @@ export function InvitationsPage() {
   const formId = useId()
   const toggleId = useId()
   const [copied, setCopied] = useState(false)
-  const [confirmClose, setConfirmClose] = useState<{ fromInside: boolean } | null>(null)
+  const [confirmClose, setConfirmClose] = useState<{ fromInside: boolean; thenEdit?: Invitation } | null>(null)
   // Ao fechar pelo botão de dentro do formulário, o foco volta para “Convidar alguém”.
   const refocus = useRef(false)
   useEffect(() => { if (inviting) nameField.current?.focus() }, [inviting])
@@ -89,6 +89,16 @@ export function InvitationsPage() {
     if (link && !copied) { setConfirmClose({ fromInside }); return }
     doCloseForm(fromInside)
   }
+  // A16: só um formulário principal por vez — abrir "Editar convite" fecha o de
+  // convidar (com a mesma confirmação de link não copiado), e abrir "Convidar
+  // alguém" cancela uma edição em curso, como o próprio "Cancelar edição" já faz.
+  function startEdit(inv: Invitation) {
+    if (formOpen) {
+      if (link && !copied) { setConfirmClose({ fromInside: false, thenEdit: inv }); return }
+      doCloseForm(false)
+    }
+    setEditing({ ...inv }); setError(''); setNotice('')
+  }
   return <div className="tab-panel">
     <RefreshStatus fetching={query.isFetching} failed={query.isError} onRetry={() => void query.refetch()} label="Atualizando painel…" />
     {event.data && <StepCompletion event={event.data} step="guests" />}
@@ -97,7 +107,7 @@ export function InvitationsPage() {
     <section className="mt-10" aria-labelledby="invites-title">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div><h2 id="invites-title" className="text-2xl font-semibold">Convidados</h2><p className="mt-1 text-muted">Crie um convite para cada pessoa ou família e envie o link pelo WhatsApp.</p></div>
-        {!closed && <Button id={toggleId} aria-expanded={formOpen} aria-controls={formId} disabled={!ready} onClick={() => formOpen ? closeForm() : setInviting(true)}>Convidar alguém</Button>}
+        {!closed && <Button id={toggleId} aria-expanded={formOpen} aria-controls={formId} disabled={!ready} onClick={() => { if (formOpen) { closeForm(); return } setEditing(null); setInviting(true) }}>Convidar alguém</Button>}
       </div>
       {closed ? <p className="notice mt-4">Este evento foi encerrado. Não é possível criar novos convites.</p> :
         !ready && <p className="notice mt-4">Publique o evento em “Dados do evento” para criar ou reemitir convites.</p>}
@@ -123,7 +133,7 @@ export function InvitationsPage() {
       </section>}
       {!data.invitations.length ? <div className="mt-5"><EmptyState title="Nenhum convite ainda.">{closed ? 'Este evento foi encerrado sem convites.' : ready ? 'Use “Convidar alguém” para criar o primeiro convite.' : 'Depois de publicar o evento, use “Convidar alguém” para criar o primeiro convite.'}</EmptyState></div> :
       <ul className="mt-5 grid gap-4 md:grid-cols-2">{data.invitations.map(inv => <GuestCard key={inv.id} invitation={inv} sending={inv.response === 'no' && sendingGift.has(inv.name)} canEdit={!busy && ready} canRevoke={!busy}
-        onEdit={() => { setEditing({ ...inv }); setError(''); setNotice('') }}
+        onEdit={() => startEdit(inv)}
         onRotate={() => void act('rotate', { id: inv.id })}
         onRevoke={() => void act('revoke', { id: inv.id })} />)}</ul>}
     </section>
@@ -134,7 +144,12 @@ export function InvitationsPage() {
     <ConfirmDialog open={confirmClose !== null} title="Fechar o formulário?"
       description="O link deste convite não aparece de novo: copie antes de fechar." confirmLabel="Fechar sem copiar" tone="danger"
       onCancel={() => setConfirmClose(null)}
-      onConfirm={() => { const pending = confirmClose; setConfirmClose(null); if (pending) doCloseForm(pending.fromInside) }} />
+      onConfirm={() => {
+        const pending = confirmClose; setConfirmClose(null)
+        if (!pending) return
+        doCloseForm(pending.fromInside)
+        if (pending.thenEdit) { setEditing({ ...pending.thenEdit }); setError(''); setNotice('') }
+      }} />
   </div>
 }
 
