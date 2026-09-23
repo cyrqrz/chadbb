@@ -159,8 +159,8 @@ test('fluxo de criação: prévia, publicação e etapas pendentes até o evento
   await expect(dock.getByRole('link')).toHaveText(['Convidados', 'Presentes'])
   // A barra fica presa ao rodapé da janela, não ao fim da página (a animação de
   // entrada de `.page` cria um bloco de contenção que prende `position: fixed`).
-  const anchored = await dock.evaluate(el => Math.abs(el.getBoundingClientRect().bottom - window.innerHeight) <= 1)
-  expect(anchored).toBe(true)
+  // Com nova tentativa: a leitura única caía no meio do carregamento do painel na CI.
+  await expect.poll(() => dock.evaluate(el => Math.abs(el.getBoundingClientRect().bottom - window.innerHeight) <= 1)).toBe(true)
   await page.getByRole('button', { name: 'Concluí convidados e presença' }).click()
   await expect(page.getByRole('status').filter({ hasText: 'Etapa concluída.' })).toBeFocused()
   await expect(dock).toContainText('Falta 1 etapa')
