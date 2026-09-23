@@ -272,7 +272,9 @@ o ensaio familiar no celular continua pendente.
   suíte completa, e passou 3/3 isolada depois. Só uma amostra e a evidência do
   Playwright foi apagada pela rodada seguinte, então não afirmo causa nenhuma —
   fica anotado para olhar se reaparecer. Não tem relação com a T-F2: o arquivo
-  e a tela não foram tocados.
+  e a tela não foram tocados. _(2026-09-23: sem reprodução em 123 execuções
+  sob carga — 60 do teste de largura e 63 dos dois arquivos de presentes no
+  `mobile`, `--workers=8`. Sem evidência, o teste não foi alterado.)_
 - [ ] **T-F6 · Testes.** Ampliar os testes e2e para o que mudar; `npm run check`
   antes de cada PR.
 
