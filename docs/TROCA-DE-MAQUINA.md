@@ -1,6 +1,47 @@
 # Retomar o chadbb em outra máquina
 
-## Retomada em 2026-09-23, no PC do trabalho — esta seção é a mais recente
+## Retomada depois de 2026-09-23, no PC pessoal — esta seção é a mais recente
+
+**Toda a parte dos agentes está feita.** O que falta depende do titular.
+Estado no fim de 23/09: `main` em `21dd13e`, com Pages e CI verdes; a
+`clone-main` tem o mesmo conteúdo (a `main` só tem a mais os commits de merge).
+Nada ficou sem commit.
+
+```sh
+git pull origin clone-main
+npm ci
+npm run check                # lint, TypeScript, 62 testes, build
+```
+
+Entregue em 23/09 (PRs #24 a #27, todos mergeados):
+
+- **#24:** deadlock de 16/09 corrigido (era a limpeza dos testes, não o
+  produto) e T-B6 validada: Workers Builds removido, oito backups seguidos.
+- **#25 e #26:** os dois testes instáveis resolvidos — a barra de etapas e o
+  `panel.spec.ts` “reconsulta sem tremida” (animação de entrada medida sob carga).
+- **#27:** auditoria de teclado sem barreira e jornadas só com teclado nos
+  testes; instruções do organizador reescritas; roteiros do ensaio com a
+  família e da restauração com dados reais, em `ENTREGA-E-SUPORTE.md`.
+
+Evidências em `reviews/2026-09-23-t-b6.md` e `reviews/2026-09-23-adiantamento.md`.
+O `gift-list.spec.ts:142` segue só em observação: não reproduziu em 123 execuções.
+
+### O que falta, todo do titular
+
+1. Juntar e cadastrar o conteúdo real (local, instruções com o prazo de
+   18/10, imagem autorizada, lista), seguindo as instruções do organizador.
+2. No dia seguinte ao cadastro, a restauração com dados reais e a medição do
+   RTO, pelo roteiro de seis passos — fecha a T-B6.
+3. Ensaio com o irmão e um convidado (meta: 2 a 4/10), pelo roteiro.
+4. Uma passada com leitor de tela no celular (TalkBack ou VoiceOver).
+5. Liberar o envio dos convites depois do ensaio.
+
+Opcional, não pedido: ensaio de acessibilidade no convite e painel publicados
+com dados fictícios no `chadbb-cha` — exige aprovação (regra 1).
+
+**Congelamento a partir de 05/10:** dali até 01/11, só correções.
+
+## Retomada em 2026-09-23, no PC do trabalho (histórico)
 
 Os PRs #20, #21 e #22 foram mergeados na `main` em 22/09. A nota de retomada
 foi commitada depois, em **`50a21af`**, e enviada apenas para `clone-main`:
