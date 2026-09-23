@@ -42,36 +42,106 @@ Ensaiar em projeto separado com dados fictícios:
 6. Registrar duração, perda observada, arquivos usados e resultado. Só marcar
    restauração concluída após executar esse fluxo; roteiro escrito não é evidência.
 
+### Roteiro da restauração com dados reais (T-B6)
+
+Pronto para executar assim que o conteúdo real estiver cadastrado, com a capa.
+A ferramenta já existe e já passou com o pacote vazio (15/09, ~40 s); falta a
+prova com dados de usuário e **objetos do Storage**, cujo laço de cópia ainda
+não rodou com nenhum objeto.
+
+1. **Captura.** Esperar o backup diário seguinte ao cadastro (04:23 de
+   Brasília) e conferir no GitHub Actions que ele passou. Rodar
+   `npm run backup:remote` na hora exige aprovação (regra 1 do `AGENTS.md`).
+2. **Download** do arquivo mais recente do R2, com as variáveis de
+   `~/.config/chadbb/r2.env` carregadas sem exibir (`set -a; . arquivo; set +a`):
+   `aws s3 ls s3://$R2_BUCKET/ --endpoint-url $R2_ENDPOINT --region auto` e
+   `aws s3 cp s3://$R2_BUCKET/<arquivo> /tmp/ --endpoint-url $R2_ENDPOINT --region auto`.
+3. **Restauração** em Supabase local descartável, com Docker ligado e o chaveiro
+   em `~/.config/chadbb/backup-gnupg`:
+   `npm run test:recovery:archive -- /tmp/<arquivo>`. Ao final ele imprime as
+   contagens restauradas, `storageObjects` e os tempos.
+4. **Conferência** antes de apagar o destino: `storageObjects` ≥ 1 e a capa
+   com o mesmo SHA-256; contagens de eventos, itens, convites e reservas iguais
+   às do painel no momento da captura.
+5. **RTO.** Cronometrar do passo 2 ao fim do passo 4. O script mede só a
+   restauração local; somar o tempo de reconfigurar o que o backup não leva
+   (Auth/SMTP, segredos da Edge, Vault) para comparar com a meta de 2 h.
+6. **Registro** em `docs/reviews/`: horário da captura, SHA-256 do cifrado,
+   contagens, objetos, tempos e o que ficou fora. Nenhum dado pessoal no registro.
+
 ## Ensaio com a família
 
-O irmão e um convidado devem completar sem ajuda técnica: abrir link pelo WhatsApp,
-confirmar presença, reservar mais de um tamanho, adicionar mimo, trocar tamanho,
-informar compra, cancelar e verificar os totais no painel. Testar também voltar
-à aba, perder conexão, reabrir o link e aumentar o texto no celular real.
+Roteiro para o irmão e um convidado, sem ajuda técnica, no celular de cada um.
+Quem conduz só observa e anota onde a pessoa hesitou; não explica a tela.
+Cada item marcado sem ajuda conta; item com ajuda vira ajuste a avaliar.
 
-O ensaio automatizado já cobre 320 px/texto a 200%, desktop/celular, teclado, axe,
-falha de resposta após commit e concorrência de banco. Ainda faltam o navegador
-interno do WhatsApp, leitor de tela manual e o ambiente remoto.
+**Convidado** (link recebido pelo WhatsApp, aberto no navegador do próprio WhatsApp):
+
+- [ ] Abrir o link e entender de quem é o chá, quando e onde.
+- [ ] Responder “Vai participar” com o número de pessoas e confirmar.
+- [ ] Escolher fraldas de um tamanho com mais de um pacote.
+- [ ] Escolher fraldas de outro tamanho.
+- [ ] Trocar o tamanho de uma das escolhas.
+- [ ] Adicionar um mimo com quantidade.
+- [ ] Marcar “Já comprei” em uma escolha.
+- [ ] Cancelar uma escolha.
+- [ ] Sair do WhatsApp, voltar ao convite e encontrar tudo como deixou.
+- [ ] Com o modo avião ligado, tentar escolher algo e ver o aviso de conexão;
+      desligar e conferir que nada foi reservado em dobro.
+- [ ] Reabrir o link pelo WhatsApp e continuar.
+- [ ] Aumentar o texto do celular e conferir que nada corta.
+
+**Organizador** (o irmão, no painel):
+
+- [ ] Achar a resposta e as escolhas do convidado no painel.
+- [ ] Conferir os totais de pessoas e de pacotes por tamanho.
+- [ ] Ver o mimo e a compra informada separados das reservas.
+
+O ensaio automatizado já cobre 320 px com texto a 200%, desktop e celular,
+jornadas só com teclado, axe, falha de resposta depois do commit e concorrência
+de banco. Ficam para o ensaio real: o navegador interno do WhatsApp, o celular
+real e o leitor de tela.
 
 ## Instruções curtas para o organizador
 
-- Entre pelo link enviado ao seu e-mail no mesmo navegador em que o solicitou.
-- Confira título, início às 12h, término, endereço e instruções antes de publicar.
-  Os horários são sempre de Brasília. Se o chá mudar de data, a validade dos
-  convites acompanha automaticamente (novo início + 7 dias).
-- Prepare a lista e confira os quatro limites por tamanho.
-- Crie um convite por pessoa ou família; o limite de pessoas controla apenas RSVP.
-- Copie e envie cada link manualmente. Não publique lista de links ou nomes.
-- Para corrigir nome/tipo/limite, edite o convite. Uma edição antiga pode conflitar
-  com uma resposta recém-enviada; revise o painel antes de salvar novamente.
-- Se um link foi perdido ou compartilhado indevidamente, reemita ou revogue.
-  Respostas e presentes ficam preservados, e a sessão anterior deixa de funcionar.
-- Se uma tentativa ficou sem resultado, use “Verificar tentativa anterior”. Não
-  interprete falha de conexão como cancelamento da reserva.
-- “Já comprei” é uma declaração do convidado, sem confirmação de pagamento. Depois
-  dela, quantidade e tamanho não mudam; para corrigir, o convidado cancela e escolhe de novo.
-- Encerrar impede novas reservas e respostas; não há reabertura pela interface.
-  A data 18/10 consta nas instruções do convite, sem encerramento automático.
+Na ordem em que as coisas acontecem. Os nomes entre aspas são os botões da tela.
+
+1. **Entrar.** Informe o e-mail, toque em “Receber código de acesso” e digite
+   no site o código de 8 dígitos que chegar.
+2. **Criar o evento.** Em “Seus eventos”, dê o nome e toque em “Criar evento”.
+3. **Dados do evento.** Preencha início às 12h e término (sempre horário de
+   Brasília), endereço privado e instruções aos convidados. Escreva nas
+   instruções o prazo de confirmação (**18/10**): o site não encerra as
+   respostas sozinho. A capa é opcional e só entra com imagem autorizada.
+   Toque em “Salvar alterações”.
+4. **Conferir e publicar.** “Ver prévia” mostra o convite como o convidado vê.
+   Estando certo, “Publicar evento”. Convites só podem ser criados depois disso.
+5. **Lista de presentes.** Em “Presentes”, “Comece com a lista pronta do chá”
+   inclui os quatro tamanhos de fralda e mimos sugeridos. Confira a quantidade
+   de pacotes de cada tamanho; mimos não têm limite.
+6. **Convites.** Em “Convidados”, “Convidar alguém”: um convite por pessoa ou
+   família, com o limite de pessoas. Toque em “Copiar convite” e envie pelo
+   WhatsApp, **um por vez**. O link só aparece nessa hora: se perder, use
+   “Reemitir link” (o antigo para de funcionar; respostas e escolhas ficam).
+   Não publique lista de links ou nomes.
+7. **Etapas.** A barra no rodapé mostra o que falta; “Concluí…” marca a etapa.
+8. **Acompanhar.** O painel se atualiza sozinho. Uma edição de convite feita
+   com a tela antiga pode conflitar com uma resposta recém-chegada: se o site
+   avisar, confira o painel antes de salvar de novo.
+
+Situações comuns:
+
+- **Link compartilhado com quem não devia:** “Revogar acesso” ou “Reemitir link”.
+- **Convidado não sabe se a reserva foi:** se a conexão caiu no meio, o próprio
+  convite oferece “Verificar tentativa anterior”; ao reabrir o link, a escolha
+  aparece no cartão se tiver sido feita. Falha de conexão não é cancelamento.
+- **“Compra informada”** é só uma declaração do convidado; o site não recebe
+  pagamento nem confere a compra. Depois dela a quantidade não muda: para
+  corrigir, o convidado cancela e escolhe de novo.
+- **Encerrar o evento** bloqueia novas respostas e reservas e **não tem volta**.
+  Use só depois do chá.
+- **Mudou a data?** Edite em “Dados do evento”; a validade dos convites
+  acompanha sozinha (novo início + 7 dias).
 
 ## Retenção e exclusão
 
