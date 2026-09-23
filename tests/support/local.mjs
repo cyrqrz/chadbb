@@ -21,6 +21,9 @@ export async function cleanupUsers(config, ids) {
   const db = await localDatabase(config)
   try {
     await db.query('begin')
+    // Mesma ordem de locks da guest_action e da delete_event: evento antes dos convites.
+    await db.query('select id from public.events where owner_id=any($1::uuid[]) order by id for update', [ids])
+    await db.query('select id from private.invitations where event_id in (select id from public.events where owner_id=any($1::uuid[])) order by id for update', [ids])
     await db.query('delete from private.guest_requests where invitation_id in (select id from private.invitations where event_id in (select id from public.events where owner_id=any($1::uuid[])))', [ids])
     await db.query('delete from public.reservations where invitation_id in (select id from private.invitations where event_id in (select id from public.events where owner_id=any($1::uuid[])))', [ids])
     await db.query('delete from private.invitations where event_id in (select id from public.events where owner_id=any($1::uuid[]))', [ids])
