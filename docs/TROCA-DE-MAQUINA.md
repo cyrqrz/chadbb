@@ -53,13 +53,14 @@ anotadas no quadro para olhar se reaparecerem.
 medidos. Não reabrir achando que é pendência — esse engano já aconteceu nesta
 sessão, por leitura de uma seção antiga deste próprio arquivo.
 
-Do back sobra a **T-B6**, em três partes. A remoção da integração órfã
-"Workers Builds" foi confirmada pelo titular no painel em 23/09, após o acesso
-da API retornar 403. Falta validar a ausência do check em um novo PR/commit.
-A sequência de backups já pôde ser observada: sete
-execuções agendadas com sucesso de 16 a 22/09. A restauração com dados e
-Storage reais continua dependendo do conteúdo do titular. Evidências e
-próximos passos em `reviews/2026-09-23-t-b6.md`.
+Do back sobra só uma parte da **T-B6**. A integração órfã "Workers Builds"
+foi desconectada pelo titular em 23/09, e o PR #23 e a `main` (`8c16661`)
+passaram em Pages e CI sem o check. A sequência de backups está limpa: oito
+execuções agendadas com sucesso de 16 a 23/09. Resta a restauração com dados
+e Storage reais e a medição do RTO, que dependem do conteúdo do titular.
+O deadlock intermitente de 16/09 foi reproduzido e corrigido no mesmo dia
+(era a limpeza dos testes, não o produto). Evidências em
+`reviews/2026-09-23-t-b6.md`.
 
 ### O que depende do titular, não de código
 

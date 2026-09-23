@@ -1,5 +1,10 @@
 # Próximos passos e validações — M6
 
+> Histórico de 15/09. Para o estado atual, ler a seção de 23/09 do
+> `TROCA-DE-MAQUINA.md`. SMTP/login e T-B5 já foram concluídos;
+> Workers Builds foi desconectado e oito backups agendados passaram até 23/09.
+> Resta o ensaio de restauração com dados e Storage reais e medição do RTO.
+
 Situação em 2026-09-15, branch `entrega-m6`. Complementa `OPERACAO-M6.md`, que
 descreve o desenho do backup e o ensaio local de recuperação.
 

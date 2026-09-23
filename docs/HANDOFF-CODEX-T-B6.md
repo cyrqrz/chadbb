@@ -1,5 +1,20 @@
 # Handoff para o Codex — T-B6 (operação)
 
+## Atualização em 23/09/2026
+
+O histórico abaixo é de 22/09. Workers Builds foi desconectado pelo titular;
+o PR #23 e a publicação de `main` em `8c16661` passaram em Pages e CI sem
+recriar o check órfão. O backup de 23/09 também passou: oito execuções
+agendadas consecutivas desde 16/09. A observação de backups não depende do
+conteúdo real. Resta na operação a restauração com dados e Storage reais e
+medição do RTO de 2 h, dependente do conteúdo do titular.
+
+O deadlock do item secundário foi reproduzido e corrigido em 23/09 (ver
+`reviews/2026-09-23-t-b6.md`, G5). Para continuar, ler a seção de 23/09 do
+`TROCA-DE-MAQUINA.md`.
+
+## Documento original (22/09)
+
 Escrito pelo Claude em 2026-09-22, depois do merge do PR #20. Documento de
 passagem: não altera código, migration, função ou configuração remota. Todos os
 passos abaixo continuam sob os gates do `AGENTS.md` — nada roda sem aprovação
