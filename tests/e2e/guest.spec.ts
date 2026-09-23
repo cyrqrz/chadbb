@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import type { GuestItem, Snapshot } from '../../src/features/guests/api'
+import { tabTo } from './keyboard'
 
 // O convite carrega o mapa do Google em iframe: nos testes ele é simulado, sem rede externa.
 test.beforeEach(async ({ page }) => {
@@ -82,6 +83,44 @@ test('reserva, compra informada e cancelamento com uma ação principal por etap
   await card.getByRole('button', { name: 'Cancelar reserva' }).click()
   await expect(page.getByRole('status')).toHaveText('Reserva cancelada.')
   await expect(card.getByRole('button', { name: 'Escolher presente' })).toBeVisible()
+})
+
+// Jornada inteira sem mouse: resposta, fralda com quantidade, mimo, compra e cancelamento.
+test('convidado conclui a jornada só com teclado', async ({ page }) => {
+  const treat: GuestItem = { id: '70000000-0000-4000-8000-00000000000b', title: 'Mamadeira fictícia', description: 'Mimo fictício.',
+    category: 'mimo', diaper_size: null, limit: null, committed: 0, available: null, own: null }
+  await backend(page, { items: [diaper, treat] })
+  await page.goto(`/convite#${token}`)
+  const going = page.getByRole('radio', { name: 'Vai participar' })
+  await tabTo(page, going)
+  await page.keyboard.press('Space')
+  await expect(going).toBeChecked()
+  await tabTo(page, page.getByRole('spinbutton', { name: /Quantas pessoas vão/ }))
+  await page.keyboard.press('ArrowUp')
+  await tabTo(page, page.getByRole('button', { name: 'Confirmar presença', exact: true }))
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('status').filter({ hasText: 'Resposta salva' })).toBeVisible()
+
+  const diaperCard = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Fraldas tamanho P' }) })
+  await tabTo(page, diaperCard.getByRole('button', { name: 'Aumentar pacotes' }))
+  await page.keyboard.press('Enter')
+  await expect(diaperCard.getByRole('spinbutton')).toHaveValue('2')
+  await tabTo(page, diaperCard.getByRole('button', { name: 'Escolher presente' }))
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('status').filter({ hasText: 'Presente reservado para você.' })).toBeVisible()
+  await tabTo(page, diaperCard.getByRole('button', { name: 'Já comprei' }))
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('status').filter({ hasText: 'Compra informada.' })).toBeVisible()
+  await tabTo(page, diaperCard.getByRole('button', { name: 'Cancelar reserva' }))
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('status').filter({ hasText: 'Reserva cancelada.' })).toBeVisible()
+
+  await tabTo(page, page.getByRole('button', { name: 'Mimos', exact: true }))
+  await page.keyboard.press('Enter')
+  const treatCard = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Mamadeira fictícia' }) })
+  await tabTo(page, treatCard.getByRole('button', { name: 'Escolher presente' }))
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('status').filter({ hasText: 'Presente reservado para você.' })).toBeVisible()
 })
 
 test('lista vazia e falha de atualização têm estado próprio', async ({ page }) => {

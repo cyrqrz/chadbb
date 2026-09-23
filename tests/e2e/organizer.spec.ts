@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import type { EventRecord } from '../../src/features/events/model'
 import { session, userId } from './session'
+import { tabTo } from './keyboard'
 
 // Testes de comportamento da UI. Transporte Auth/PostgREST é simulado aqui;
 // autorização e bloqueios são verificados separadamente no PostgreSQL real.
@@ -101,6 +102,39 @@ async function createInBrowser(page: Page) {
   await expect(page).toHaveURL(new RegExp(`/eventos/${eventId}/dados$`))
   await expect(page.getByRole('heading', { name: 'Dados do evento' })).toBeVisible()
 }
+
+// Jornada do organizador sem mouse: criar, preencher, salvar, publicar e concluir etapa.
+// Data e hora usam o controle nativo do navegador, que já é operável por teclado:
+// o foco chega nele pelo Tab e o valor é preenchido direto.
+test('organizador cria e publica o evento só com teclado', async ({ page }) => {
+  const mock = await backend(page, true)
+  await page.goto('/eventos')
+  await tabTo(page, page.getByLabel('Nome do evento'))
+  await page.keyboard.type('Chá de bebê da Lia')
+  await tabTo(page, page.getByRole('button', { name: 'Criar evento' }))
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL(new RegExp(`/eventos/${eventId}/dados$`))
+  await tabTo(page, page.getByLabel('Data e horário'))
+  await page.getByLabel('Data e horário').fill('2035-09-10T14:30')
+  await tabTo(page, page.getByLabel('Término'))
+  await page.getByLabel('Término').fill('2035-09-10T18:00')
+  await tabTo(page, page.getByLabel('Endereço privado'))
+  await page.keyboard.type('Rua fictícia, 123')
+  await tabTo(page, page.getByRole('button', { name: 'Salvar alterações' }))
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('status')).toHaveText('Alterações salvas.')
+  await tabTo(page, page.getByRole('button', { name: 'Publicar evento' }))
+  await page.keyboard.press('Enter')
+  const published = page.getByRole('status').filter({ hasText: 'Evento publicado.' })
+  await expect(published).toBeFocused()
+  expect(mock.getRecord()).toMatchObject({ status: 'published', private_address: 'Rua fictícia, 123' })
+  await tabTo(page, published.getByRole('link', { name: 'Seguir para convidados e presença' }))
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL(new RegExp(`/eventos/${eventId}$`))
+  await tabTo(page, page.getByRole('button', { name: 'Concluí convidados e presença' }))
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('status').filter({ hasText: 'Etapa concluída.' })).toBeFocused()
+})
 
 test('cria, edita, publica e encerra evento; layout cabe no celular', async ({ page }) => {
   const mock = await backend(page, true)
