@@ -11,8 +11,8 @@ assumirá o suporte técnico.
    separado. Conferir o histórico: banco vazio ou schema `mvp-familiar` aceita a
    sequência do PR #1; schema alternativo da `main` exige migração específica.
 2. Usar Cloudflare Pages para o frontend. Configurar URL Supabase e chave pública;
-   chave de servidor fica somente no backend. O build Workers separado já
-   apresentava falha antes do PR e não substitui a validação do Pages.
+   chave de servidor fica somente no backend. O build Workers órfão foi
+   desconectado em 23/09; Pages e CI passaram no PR #23 e na `main`.
 3. Configurar no Auth a URL do site e o callback HTTPS `/auth/callback`, envio de
    e-mail e remetente. Validar solicitação, recebimento, PKCE no mesmo navegador,
    persistência, logout e proteção de rotas nesse ambiente.
@@ -151,6 +151,9 @@ antigo sem reaplicar o expurgo.
 Projeto remoto criado em 2026-09-14: **chadbb-cha**, ref `fcykqrlnofmdtmewlejr`,
 organização `chadbb` (`zfzzahtvvtmuogmatolo`), região **São Paulo (`sa-east-1`)**,
 exclusivo do chá e separado de desenvolvimento e preview. A senha do banco fica
-apenas na máquina do titular, fora do repositório. Nenhuma migration, função ou
-configuração de Auth foi aplicada ainda. Suporte técnico, do envio dos
+apenas no ambiente autorizado, fora do repositório. O registro original de
+projeto vazio é histórico: Auth/SMTP e login foram validados em 16/09, e
+R2/R3 e T-B7 foram publicados em 22/09. Evidências em
+`reviews/2026-09-22-t-b7.md` e `reviews/2026-09-23-t-b6.md`.
+Suporte técnico, do envio dos
 convites ao dia do evento: Leonardo Martins (solicitante).

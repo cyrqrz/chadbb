@@ -331,11 +331,10 @@ o ensaio familiar no celular continua pendente.
   [HANDOFF-CODEX-T-B6](HANDOFF-CODEX-T-B6.md). As três partes são independentes:
   a observação dos backups não depende do conteúdo real: sete execuções
   agendadas passaram de 16 a 22/09. A desconexão de Workers Builds foi
-  confirmada pelo titular no painel em 23/09; falta validar em novo PR/commit.
-  A restauração com dados e Storage
-  reais depende do titular. Evidências em
-  [revisão T-B6](reviews/2026-09-23-t-b6.md). O deadlock de 16/09 no teste de
-  navegador continua como item secundário, sem nova reprodução nesta sessão.)_
+  confirmada pelo titular no painel em 23/09 e validada no PR #23 e na `main`
+  (`8c16661`): Pages e CI passaram sem o check. Oito backups agendados passaram
+  até 23/09. A restauração com dados e Storage reais depende do titular.
+  Evidências em [revisão T-B6](reviews/2026-09-23-t-b6.md).)_
 - [x] **T-B7 · Pedidos do front.** _(Publicado em produção em 2026-09-22 — ver
   "Pedidos do front para o back" abaixo. `summary`, `available` e
   `invitation_id` já respondem de verdade; falta só o Claude limpar o cálculo
@@ -390,7 +389,11 @@ em vez de omitir o selo, e nenhuma tela recalcula saldo ou resumo.
   _(Publicado em produção em 22/09.)_ `summary.diapers: { committed, limit }`
   (soma de todos os tamanhos) já aparece no painel.
 
-- [ ] 2026-09-16 · Claude → Codex · **Deadlock intermitente no teste de navegador.**
+- [x] 2026-09-16 · Claude → Codex · **Deadlock intermitente no teste de navegador.**
+  _(Resolvido em 2026-09-23: `cleanupUsers` apagava convites antes de bloquear
+  o evento, na ordem inversa da `guest_action`. Reproduzido de forma
+  determinística em `tests/database/cleanup.integration.mjs` e corrigido no
+  helper; o produto não mudou. Ver [revisão T-B6](reviews/2026-09-23-t-b6.md), G5.)_
   Em `npm run test:browser:local` (PR #7, commit `7746e9c`), o teste “M5: outro
   convite e fragmento inválido na mesma aba…” falhou uma vez com
   `deadlock detected`; passou isolado e em duas rodadas completas seguidas.
