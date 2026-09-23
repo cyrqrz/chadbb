@@ -1781,7 +1781,12 @@ test.describe('G4 · painel do evento', () => {
 // piscar "Atualizando…" quando a resposta é rápida.
 test.describe('reconsulta sem tremida', () => {
   // Observa por um ciclo de reconsulta: posições verticais do alvo e se o aviso apareceu.
+  // Começa depois das animações de entrada: sob carga, a `rise` dos cards ainda não
+  // tinha começado na primeira amostra e o card aparecia 8 px abaixo (279 → 271).
   async function watch(page: Page, selector: string, ms = 6500) {
+    await page.evaluate(() => Promise.all(document.getAnimations()
+      .filter(animation => animation.effect?.getComputedTiming().iterations !== Infinity)
+      .map(animation => animation.finished.catch(() => undefined))))
     return page.evaluate(({ selector, ms }) => new Promise<{ tops: number[]; flashed: boolean }>(resolve => {
       const tops = new Set<number>()
       let flashed = false
