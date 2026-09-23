@@ -2,10 +2,11 @@
 
 ## Retomada em 2026-09-23, no PC do trabalho — esta seção é a mais recente
 
-Tudo desta sessão está commitado, enviado e **mergeado na `main`**: os PRs #20,
-#21 e #22 foram fechados em 22/09. **Nada ficou pendente no PC de casa** — não
-há trabalho local por recuperar, e não é preciso voltar nele. `main` e
-`clone-main` estão no mesmo commit.
+Os PRs #20, #21 e #22 foram mergeados na `main` em 22/09. A nota de retomada
+foi commitada depois, em **`50a21af`**, e enviada apenas para `clone-main`:
+na conferência de 23/09, `main` estava em `b97721c`, um commit atrás.
+Não há trabalho local do PC de casa por recuperar. Para obter a nota ao clonar
+do zero, use `git clone --branch clone-main https://github.com/cyrqrz/chadbb.git`.
 
 Branch: **`clone-main`**, como manda o `AGENTS.md`. Não há mais clone nem área
 de arquivo por agente — os dois trabalham no projeto inteiro, na mesma branch.
@@ -52,9 +53,13 @@ anotadas no quadro para olhar se reaparecerem.
 medidos. Não reabrir achando que é pendência — esse engano já aconteceu nesta
 sessão, por leitura de uma seção antiga deste próprio arquivo.
 
-Do back sobra a **T-B6**, em três partes. Só uma dá para fazer agora: remover a
-integração órfã "Workers Builds" na Cloudflare, que pinta um check vermelho em
-todo PR sem ser regressão de nada. As outras duas dependem do conteúdo real.
+Do back sobra a **T-B6**, em três partes. A remoção da integração órfã
+"Workers Builds" foi confirmada pelo titular no painel em 23/09, após o acesso
+da API retornar 403. Falta validar a ausência do check em um novo PR/commit.
+A sequência de backups já pôde ser observada: sete
+execuções agendadas com sucesso de 16 a 22/09. A restauração com dados e
+Storage reais continua dependendo do conteúdo do titular. Evidências e
+próximos passos em `reviews/2026-09-23-t-b6.md`.
 
 ### O que depende do titular, não de código
 

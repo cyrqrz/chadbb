@@ -14,8 +14,9 @@ Suporte técnico: o próprio usuário. Ele escreve em português; responda em po
   (`https://chadbb.pages.dev`). Arquitetura: `docs/ADR-001-arquitetura-mvp-eventos-presentes.md`.
 - Ponto de retomada: `docs/TROCA-DE-MAQUINA.md` (mais recente) e
   `docs/PROXIMOS-PASSOS-M6.md`. `docs/OPERACAO-M6.md` tem o histórico.
-- SMTP Resend e login real validados em 2026-09-16. Próximo gate do back:
-  medição remota T-B5; ver `docs/PLANO-DESEMPENHO-T-B5.md`.
+- SMTP Resend e login real validados em 2026-09-16. T-B5 encerrada em
+  2026-09-21, com o p95 aceito pelo titular. Retomada do back: T-B6;
+  ver `docs/HANDOFF-CODEX-T-B6.md` e `docs/reviews/2026-09-23-t-b6.md`.
 
 ## Início de sessão do Codex
 
