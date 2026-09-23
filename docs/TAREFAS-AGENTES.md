@@ -22,7 +22,16 @@ continua sendo gate manual, com dry-run e aprovação do titular.
 
 Formato de pedido: `- [ ] AAAA-MM-DD · origem → destino · pedido (arquivos/contrato envolvidos)`
 
-## Situação em 2026-09-16
+## Situação em 2026-09-23
+
+T-B5 encerrada por decisão do titular em 21/09; não é gate pendente.
+T-B6 em andamento: sete backups agendados consecutivos passaram (16–22/09).
+Desconexão de Workers Builds confirmada pelo titular no painel em 23/09,
+após a API retornar 403. Falta validar a ausência do check em novo PR/commit.
+Restauração com dados e Storage reais aguarda o conteúdo do titular.
+Evidências: [revisão T-B6](reviews/2026-09-23-t-b6.md).
+
+## Situação em 2026-09-16 (histórico)
 
 Convites, presença e reservas (M3/M4) já estão implementados e implantados no
 `chadbb-cha`, e o backup diário está ativo. Login real do titular liberado e
@@ -320,9 +329,13 @@ o ensaio familiar no celular continua pendente.
   (meta de 2 h); remover a integração órfã "Workers Builds" na Cloudflare.
   _(Handoff escrito para o Codex em 2026-09-22:
   [HANDOFF-CODEX-T-B6](HANDOFF-CODEX-T-B6.md). As três partes são independentes:
-  só a remoção do "Workers Builds" dá para fazer agora — as outras duas dependem
-  do conteúdo real do titular. O deadlock de 16/09 no teste de navegador vai
-  junto, como item secundário.)_
+  a observação dos backups não depende do conteúdo real: sete execuções
+  agendadas passaram de 16 a 22/09. A desconexão de Workers Builds foi
+  confirmada pelo titular no painel em 23/09; falta validar em novo PR/commit.
+  A restauração com dados e Storage
+  reais depende do titular. Evidências em
+  [revisão T-B6](reviews/2026-09-23-t-b6.md). O deadlock de 16/09 no teste de
+  navegador continua como item secundário, sem nova reprodução nesta sessão.)_
 - [x] **T-B7 · Pedidos do front.** _(Publicado em produção em 2026-09-22 — ver
   "Pedidos do front para o back" abaixo. `summary`, `available` e
   `invitation_id` já respondem de verdade; falta só o Claude limpar o cálculo

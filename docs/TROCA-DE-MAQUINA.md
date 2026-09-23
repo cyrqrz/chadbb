@@ -1,5 +1,76 @@
 # Retomar o chadbb em outra máquina
 
+## Retomada em 2026-09-23, no PC do trabalho — esta seção é a mais recente
+
+Os PRs #20, #21 e #22 foram mergeados na `main` em 22/09. A nota de retomada
+foi commitada depois, em **`50a21af`**, e enviada apenas para `clone-main`:
+na conferência de 23/09, `main` estava em `b97721c`, um commit atrás.
+Não há trabalho local do PC de casa por recuperar. Para obter a nota ao clonar
+do zero, use `git clone --branch clone-main https://github.com/cyrqrz/chadbb.git`.
+
+Branch: **`clone-main`**, como manda o `AGENTS.md`. Não há mais clone nem área
+de arquivo por agente — os dois trabalham no projeto inteiro, na mesma branch.
+
+### Primeiros comandos
+
+```sh
+git pull origin clone-main   # traz o trabalho de 22/09
+npm ci                       # o node_modules da máquina pode estar velho
+npm run check                # lint, TypeScript, 62 testes, build
+```
+
+Se `npm run db:start` falhar com `address already in use` sem nada ouvindo a
+porta, a causa e a correção estão no `README.md`, logo abaixo do comando.
+
+### O que foi entregue em 22/09
+
+- **T-F2** (PR #20, mergeado): painel e convite sem cálculo próprio. Os
+  adaptadores `panelSummary` e `availableOf` saíram; `summary`, `available`,
+  `id` e `invitation_id` são **obrigatórios** no tipo. Se o back mudar a forma
+  do payload, a tela quebra em vez de recalcular — é o comportamento desejado
+  pela regra 6, mas convém saber antes de mexer no contrato.
+- **Teste instável do `:hover`** (PR #20): era corrida de leitura no teste, não
+  bug de CSS.
+- **Fim da divisão por área** (PR #20): registrado no `AGENTS.md`.
+- **Auditoria das caixas** (PR #20): 21 itens do plano do MVP estavam
+  desmarcados com a entrega feita. Antes de implementar qualquer coisa,
+  confira se já existe — foi o pedido explícito do titular.
+- **Handoff da T-B6** (PR #21, mergeado em `8e6e935`):
+  `docs/HANDOFF-CODEX-T-B6.md`.
+- **Login** (PR #22, mergeado em `b97721c`): erro de envio honesto e volta à
+  página pedida depois de entrar. O destino é validado por `safeInternalPath`
+  (`src/features/auth/destination.ts`), que recusa endereço externo para o
+  recurso não virar redirecionamento aberto.
+
+### Estado do trabalho
+
+**O front não tem nenhum item de código aberto.** Sobram só duas observações de
+teste instável, nenhuma bloqueando nada: `gift-list.spec.ts:142` no `mobile` e
+`panel.spec.ts:1755`. Ambas passaram nas últimas rodadas completas; estão
+anotadas no quadro para olhar se reaparecerem.
+
+**A T-B5 está encerrada** desde 21/09, por decisão do titular: aceitar os 2,2 s
+medidos. Não reabrir achando que é pendência — esse engano já aconteceu nesta
+sessão, por leitura de uma seção antiga deste próprio arquivo.
+
+Do back sobra a **T-B6**, em três partes. A remoção da integração órfã
+"Workers Builds" foi confirmada pelo titular no painel em 23/09, após o acesso
+da API retornar 403. Falta validar a ausência do check em um novo PR/commit.
+A sequência de backups já pôde ser observada: sete
+execuções agendadas com sucesso de 16 a 22/09. A restauração com dados e
+Storage reais continua dependendo do conteúdo do titular. Evidências e
+próximos passos em `reviews/2026-09-23-t-b6.md`.
+
+### O que depende do titular, não de código
+
+Juntar o conteúdo real (local, instruções, imagem autorizada); o ensaio com o
+irmão e um convidado, no celular e no navegador do WhatsApp; e a inspeção
+manual com leitor de tela. Sem o conteúdo real, a restauração de backup com o
+RTO também não anda.
+
+**Congelamento a partir de 05/10:** dali até 01/11, só correções.
+
+
 ## Retomada do front — 2026-09-18, Claude (`claude/front`)
 
 Esta seção vale para o clone do Claude (`~/projetos/chadbb-claude`). O commit
