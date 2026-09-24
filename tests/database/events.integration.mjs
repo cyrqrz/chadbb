@@ -1330,3 +1330,19 @@ test('T-B7: reservas têm IDs estáveis e saldo/progresso incluem compra e exclu
   assert.equal((await guestAction(token, 'read')).snapshot.items.find(i => i.id === p.id).available, 6)
   assert.equal((await admin.query('select private.item_available(1,2) n')).rows[0].n, '0')
 })
+
+test('lista pronta ajustável: pacotes por tamanho, omitido usa o padrão, valor inválido e dono alheio são recusados', async () => {
+  const event = await transition(await save(await create(), alice, { date: new Date(Date.now()+30*86400000).toISOString() }), 'published')
+  const prepare = (user, diapers) => as(user, 'select public.prepare_family_list($1,$2::jsonb) n', [event.id, diapers === undefined ? null : JSON.stringify(diapers)])
+  for (const bad of [{ P: 0 }, { P: 10001 }, { P: 1.5 }, { P: '5' }, { P: -3 }, { Z: 5 }, [], 5])
+    await assert.rejects(prepare(alice, bad), /INVALID_QUANTITY/, JSON.stringify(bad))
+  await assert.rejects(prepare(bob, { P: 2 }), /EVENT_NOT_FOUND/)
+  assert.equal((await as(alice, 'select count(*)::int n from public.event_items where event_id=$1', [event.id])).rows[0].n, 0)
+  assert.equal((await prepare(alice, { P: 2, M: 3 })).rows[0].n, 27)
+  const rows = (await as(alice, 'select diaper_size s, quantity_requested q from public.event_items where event_id=$1 and diaper_size is not null order by diaper_size', [event.id])).rows
+  assert.deepEqual(Object.fromEntries(rows.map(r => [r.s, r.q])), { G: 19, M: 3, P: 2, XG: 6 })
+  assert.equal((await prepare(alice, { P: 9 })).rows[0].n, 0)
+  const defaults = (await as(alice, 'select public.family_list_defaults() d')).rows[0].d
+  assert.deepEqual(defaults, { P: 6, M: 19, G: 19, XG: 6 })
+  await assert.rejects(as(null, 'select public.family_list_defaults()', [], 'anon'), /permission denied/)
+})

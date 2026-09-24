@@ -72,3 +72,22 @@ test('API real: salva, publica, encerra; edição encerrada rejeitada', async ()
   assert.equal(closed.data.status, 'closed')
   assert.equal((await alice.rpc('save_event', { ...args, p_version: closed.data.version })).error?.message, 'EVENT_CLOSED')
 })
+
+test('lista pronta ajustável pela API real: padrões, quantidades por tamanho e recusa de valor inválido', async () => {
+  const created = await alice.rpc('create_event', { p_title: 'Chá fictício da lista' }).single()
+  assert.equal(created.error, null)
+  const id = created.data.id
+  for (const single of [false, true]) {
+    const call = alice.rpc('family_list_defaults')
+    const { data, error } = single ? await call.single() : await call
+    assert.equal(error, null); assert.deepEqual(data, { P: 6, M: 19, G: 19, XG: 6 })
+  }
+  assert.notEqual((await guest.rpc('family_list_defaults')).error, null)
+  const invalid = await alice.rpc('prepare_family_list', { p_event_id: id, p_diapers: { P: 0 } })
+  assert.match(invalid.error?.message ?? '', /INVALID_QUANTITY/)
+  const ok = await alice.rpc('prepare_family_list', { p_event_id: id, p_diapers: { P: 3, M: 4 } })
+  assert.equal(ok.error, null); assert.equal(ok.data, 27)
+  const items = await alice.from('event_items').select('diaper_size,quantity_requested').eq('event_id', id).not('diaper_size', 'is', null)
+  assert.deepEqual(Object.fromEntries(items.data.map(i => [i.diaper_size, i.quantity_requested])), { P: 3, M: 4, G: 19, XG: 6 })
+  assert.equal((await bob.rpc('prepare_family_list', { p_event_id: id })).error?.message.includes('EVENT_NOT_FOUND'), true)
+})

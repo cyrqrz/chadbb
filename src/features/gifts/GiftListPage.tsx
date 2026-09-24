@@ -11,7 +11,8 @@ import { EmptyState, ErrorState, LoadingState, RefreshStatus, SuccessMessage } f
 import { Button, ConfirmDialog, Pagination, QuantityField, Skeleton, StatusBadge } from '../../components/ui'
 import { EventNotFound } from '../events/EventLayout'
 import { StepCompletion } from '../events/SetupDock'
-import { addCustomTreat, addItem, CATALOG_LIMIT, giftKeys, listedProducts, listItems, listProducts, PAGE_SIZE, prepareList, removeItem, setQuantity } from './api'
+import { addCustomTreat, addItem, CATALOG_LIMIT, DIAPER_SIZES, giftKeys, listDefaults, listedProducts, listItems, listProducts, PAGE_SIZE, prepareList, removeItem, setQuantity } from './api'
+import type { DiaperAmounts } from './api'
 import { parseQuantity, platformLabels, categoryLabels } from './model'
 import type { Category, DiaperSize, EventItem, Product } from './model'
 import type { ListedItem } from './api'
@@ -39,10 +40,10 @@ function GiftList({ eventId, closed, eventStatus, step }: { eventId: string; clo
   const [focusSummary, setFocusSummary] = useState(false)
   const cache = useQueryClient()
   const query = useQuery({ queryKey: [...giftKeys.items(eventId), session?.user.id, category, page], queryFn: () => listItems(eventId, page, category), ...live })
-  async function prepare() {
+  async function prepare(diapers?: DiaperAmounts) {
     setPreparing(true); setNotice(null); setFocusSummary(false)
     const fromEmpty = empty
-    try { const count = await prepareList(eventId); await cache.invalidateQueries({ queryKey: giftKeys.items(eventId) }); setFocusSummary(fromEmpty); setNotice({ ok: true, text: !count ? 'Os itens do chá já estão na lista.' : fromEmpty ? 'Lista do chá preparada.' : `${count} ${count === 1 ? 'item da lista pronta voltou' : 'itens da lista pronta voltaram'} para a lista.` }) }
+    try { const count = await prepareList(eventId, diapers); await cache.invalidateQueries({ queryKey: giftKeys.items(eventId) }); setFocusSummary(fromEmpty); setNotice({ ok: true, text: !count ? 'Os itens do chá já estão na lista.' : fromEmpty ? 'Lista do chá preparada.' : `${count} ${count === 1 ? 'item da lista pronta voltou' : 'itens da lista pronta voltaram'} para a lista.` }) }
     catch (cause) { setNotice({ ok: false, text: errorMessage(cause) }) } finally { setPreparing(false) }
   }
   // A11: o erro guardado é o desta categoria e página. A12: a última contagem
@@ -52,6 +53,12 @@ function GiftList({ eventId, closed, eventStatus, step }: { eventId: string; clo
   if (query.data && query.data.count !== total) setTotal(query.data.count)
   const listed = useQuery({ queryKey: [...giftKeys.items(eventId), 'listed', session?.user.id], queryFn: () => listedProducts(eventId), ...live })
   const empty = listed.data?.length === 0
+  // Padrões sugeridos pelo servidor viram o ponto de partida; cada evento ajusta os seus.
+  const defaults = useQuery({ queryKey: [...giftKeys.items(eventId), 'defaults'], queryFn: listDefaults, enabled: empty && !closed, staleTime: Infinity })
+  const [typed, setTyped] = useState<Partial<Record<DiaperSize, string>>>({})
+  const amountOf = (size: DiaperSize) => typed[size] ?? (defaults.data?.[size] !== undefined ? String(defaults.data[size]) : '')
+  const chosen = defaults.data ? DIAPER_SIZES.map(size => parseQuantity(amountOf(size))) : null
+  const amountsValid = chosen === null || chosen.every(amount => amount !== null)
   // O cartão removido some: o foco vai para o aviso, e não para o início da página.
   const [removed, setRemoved] = useState({ title: '', count: 0 })
   const removedNotice = useRef<HTMLParagraphElement>(null)
@@ -74,10 +81,11 @@ function GiftList({ eventId, closed, eventStatus, step }: { eventId: string; clo
       <div className="flex flex-wrap items-center justify-between gap-5">
         <div className="min-w-0 max-w-2xl">
           <h2 id="quick-start" className="text-2xl font-bold">Comece com a lista pronta do chá</h2>
-          <p className="mt-2 text-stone-600">Um toque inclui os quatro tamanhos de fralda com a quantidade de pacotes certa e os mimos sugeridos. Depois é só ajustar.</p>
-          <ul className="size-chips mt-4" aria-label="Pacotes por tamanho na lista pronta">{[['P', 6], ['M', 19], ['G', 19], ['XG', 6]].map(([size, amount]) => <li key={size}><strong>{size}</strong> · {amount} pacotes</li>)}<li>+ 23 mimos sem limite</li></ul>
+          <p className="mt-2 text-stone-600">Um toque inclui os quatro tamanhos de fralda e os mimos sugeridos. Ajuste os pacotes de cada tamanho para o seu chá; depois ainda dá para mudar item por item.</p>
+          {defaults.data && <div className="quick-start-sizes mt-4" role="group" aria-label="Pacotes por tamanho na lista pronta">{DIAPER_SIZES.map(size =>
+            <QuantityField key={size} label={`Tamanho ${size}`} unit={`pacotes do tamanho ${size}`} value={amountOf(size)} onChange={value => setTyped(current => ({ ...current, [size]: value }))} max={10000} disabled={preparing} />)}</div>}
         </div>
-        <button className="button" disabled={preparing} onClick={() => void prepare()}>{preparing ? 'Preparando…' : 'Preparar lista do chá'}</button>
+        <button className="button" disabled={preparing || !amountsValid} onClick={() => void prepare(chosen ? Object.fromEntries(DIAPER_SIZES.map((size, index) => [size, chosen[index]])) as DiaperAmounts : undefined)}>{preparing ? 'Preparando…' : 'Preparar lista do chá'}</button>
       </div>
       {notice && <div className="mt-4">{notice.ok ? <SuccessMessage>{notice.text}</SuccessMessage> : <ErrorState message={notice.text} />}</div>}
     </section>}

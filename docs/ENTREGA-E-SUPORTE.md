@@ -117,8 +117,9 @@ Na ordem em que as coisas acontecem. Os nomes entre aspas são os botões da tel
 4. **Conferir e publicar.** “Ver prévia” mostra o convite como o convidado vê.
    Estando certo, “Publicar evento”. Convites só podem ser criados depois disso.
 5. **Lista de presentes.** Em “Presentes”, “Comece com a lista pronta do chá”
-   inclui os quatro tamanhos de fralda e mimos sugeridos. Confira a quantidade
-   de pacotes de cada tamanho; mimos não têm limite.
+   inclui os quatro tamanhos de fralda e mimos sugeridos. Ajuste antes a
+   quantidade de pacotes de cada tamanho (os números vêm só como sugestão);
+   mimos não têm limite.
 6. **Convites.** Em “Convidados”, “Convidar alguém”: um convite por pessoa ou
    família, com o limite de pessoas. Toque em “Copiar convite” e envie pelo
    WhatsApp, **um por vez**. O link só aparece nessa hora: se perder, use

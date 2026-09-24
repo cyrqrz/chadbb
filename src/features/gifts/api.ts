@@ -57,8 +57,16 @@ export async function addCustomTreat(eventId: string, title: string, description
   if (error) throw error
   return data as Omit<EventItem, 'product'>
 }
-export async function prepareList(eventId: string) {
-  const { data, error } = await getClient().rpc('prepare_family_list', { p_event_id: eventId })
+export const DIAPER_SIZES = ['P', 'M', 'G', 'XG'] as const
+export type DiaperAmounts = Record<(typeof DIAPER_SIZES)[number], number>
+export async function prepareList(eventId: string, diapers?: DiaperAmounts) {
+  const { data, error } = await getClient().rpc('prepare_family_list', diapers ? { p_event_id: eventId, p_diapers: diapers } : { p_event_id: eventId })
   if (error) throw error
   return data as number
+}
+// Padrões sugeridos pelo servidor: a tela só os mostra como ponto de partida editável.
+export async function listDefaults() {
+  const { data, error } = await getClient().rpc('family_list_defaults').single()
+  if (error) throw error
+  return data as Partial<DiaperAmounts>
 }
