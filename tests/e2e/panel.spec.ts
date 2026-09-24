@@ -761,6 +761,38 @@ test.describe('G4b.2 · resumo da lista', () => {
     expect(await page.evaluate(() => document.activeElement?.tagName)).not.toBe('BODY')
   })
 
+  test('lista pronta: pacotes por tamanho vêm sugeridos, são editáveis e seguem no pedido', async ({ page }) => {
+    let sent: unknown = null
+    await backend(page, () => ({ status: 200, json: full }), undefined, {
+      '/rest/v1/event_items': () => ({ status: 200, json: [], headers: { 'content-range': '*/0' } }),
+      '/rest/v1/products': none,
+      '/rest/v1/rpc/family_list_defaults': () => ({ status: 200, json: { P: 6, M: 19, G: 19, XG: 6 } }),
+      '/rest/v1/rpc/prepare_family_list': ({ body }) => { sent = body; return { status: 200, json: 27 } },
+    })
+    await page.goto(`/eventos/${eventId}/presentes`)
+    const group = page.getByRole('group', { name: 'Pacotes por tamanho na lista pronta' })
+    await expect(group.getByRole('spinbutton', { name: 'Tamanho M' })).toHaveValue('19')
+    await group.getByRole('spinbutton', { name: 'Tamanho M' }).fill('12')
+    await group.getByRole('spinbutton', { name: 'Tamanho XG' }).fill('')
+    await expect(page.getByRole('button', { name: 'Preparar lista do chá' })).toBeDisabled()
+    await group.getByRole('spinbutton', { name: 'Tamanho XG' }).fill('4')
+    await page.getByRole('button', { name: 'Preparar lista do chá' }).click()
+    await expect.poll(() => sent).toEqual({ p_event_id: eventId, p_diapers: { P: 6, M: 12, G: 19, XG: 4 } })
+  })
+
+  test('lista pronta: se os padrões não carregam, ainda prepara com os do servidor', async ({ page }) => {
+    let sent: unknown = null
+    await backend(page, () => ({ status: 200, json: full }), undefined, {
+      '/rest/v1/event_items': () => ({ status: 200, json: [], headers: { 'content-range': '*/0' } }),
+      '/rest/v1/products': none,
+      '/rest/v1/rpc/prepare_family_list': ({ body }) => { sent = body; return { status: 200, json: 27 } },
+    })
+    await page.goto(`/eventos/${eventId}/presentes`)
+    await expect(page.getByRole('group', { name: 'Pacotes por tamanho na lista pronta' })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Preparar lista do chá' }).click()
+    await expect.poll(() => sent).toEqual({ p_event_id: eventId })
+  })
+
   test('QA · enquanto confere a lista, não oferece "Completar" a quem ainda não tem itens', async ({ page }) => {
     await backend(page, () => ({ status: 200, json: full }), undefined, { '/rest/v1/event_items': none, '/rest/v1/products': none })
     let release = () => {}

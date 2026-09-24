@@ -36,6 +36,11 @@ Fraldas entre si continuam identificadas pelo tamanho. A regra fica em
 `private.event_item_title_conflicts`, sem acesso direto pelos clientes.
 `prepare_family_list` pula homônimos já presentes, preserva itens, versões,
 reservas e cotas existentes e retorna só o número de inclusões efetivas.
+Desde a migration `20260924010000`, `prepare_family_list(p_event_id, p_diapers jsonb default null)`
+aceita os pacotes por tamanho (`{"P":n,"M":n,"G":n,"XG":n}`, inteiros de 1 a 10000); tamanho
+omitido usa `private.family_list_defaults`, que passam a ser só sugestão. Chave desconhecida ou
+valor inválido devolve `INVALID_QUANTITY` antes de qualquer escrita. `family_list_defaults()`
+entrega os padrões ao front, que os mostra como ponto de partida editável por evento.
 Duplicatas legadas não são apagadas nem impedem repetir o mesmo produto; novos
 homônimos são recusados. Renomeação administrativa de produtos não passa por
 esse protocolo de inclusão.
