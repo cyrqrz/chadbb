@@ -66,7 +66,7 @@ export async function prepareList(eventId: string, diapers?: DiaperAmounts) {
 }
 // Padrões sugeridos pelo servidor: a tela só os mostra como ponto de partida editável.
 export async function listDefaults() {
-  const { data, error } = await getClient().rpc('family_list_defaults')
+  const { data, error } = await getClient().rpc('family_list_defaults').single()
   if (error) throw error
   return data as Partial<DiaperAmounts>
 }
