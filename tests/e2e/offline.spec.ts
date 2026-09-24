@@ -1,3 +1,4 @@
+import { rsvpFixture } from './rsvp-fixture'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
@@ -18,7 +19,7 @@ const event: EventRecord = { id: eventId, owner_id: userId, type: 'baby_shower',
 async function organizerBackend(page: Page) {
   const calls: string[] = []
   let record = event
-  const dashboard: Dashboard = { invitations: [], items: [], reservations: [],
+  const dashboard: Dashboard = { rsvp: rsvpFixture, invitations: [], items: [], reservations: [],
     summary: { invitations: { total: 0, answered: 0, yes: 0, no: 0, maybe: 0, pending: 0, revoked: 0 }, people_confirmed: 0 } }
   await page.addInitScript(value => localStorage.setItem('sb-e2e-auth-token', JSON.stringify(value)), session())
   await page.route('https://e2e.supabase.co/**', async route => {
@@ -93,6 +94,7 @@ test('criar convite offline avisa sem chamar o servidor', async ({ page, context
 const guestToken = 'a'.repeat(64)
 function snapshot(): Snapshot {
   return {
+    rsvp: rsvpFixture,
     invitation: { name: 'Convidado fictício', kind: 'individual', capacity: 1, response: 'pending', attending: 0, version: 1 },
     event: { id: '60000000-0000-4000-8000-000000000006', title: 'Chá de teste', description: '', starts_at: '2035-09-10T17:30:00Z',
       address: '', instructions: '', cover_path: null, status: 'published' },

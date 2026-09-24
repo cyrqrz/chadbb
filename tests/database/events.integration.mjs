@@ -380,7 +380,7 @@ async function guestAction(token, action, payload = {}, client = admin) {
   return (await client.query('select public.guest_action($1,$2,$3) data', [token, action, payload])).rows[0].data
 }
 async function familyFixture(capacity = 3) {
-  const event = await transition(await save(await create()), 'published')
+  const event = await transition(await save(await create(), alice, { date: new Date(Date.now()+30*86400000).toISOString() }), 'published')
   assert.equal((await as(alice, 'select public.prepare_family_list($1) n', [event.id])).rows[0].n, 27)
   assert.equal((await as(alice, 'select public.prepare_family_list($1) n', [event.id])).rows[0].n, 0)
   const invite = await organizerAction(event, 'create', { name: 'Família fictícia', kind: capacity === 1 ? 'individual' : 'family', capacity })
@@ -620,7 +620,7 @@ test('3: RSVP rejeita resposta pendente/inválida e quantidade ausente sem erro 
   await assert.rejects(guestAction(f.token, 'rsvp', request({ response: 'yes', attending: 4, version: 1 })), /ATTENDING_ABOVE_CAPACITY/)
   assert.equal((await guestAction(f.token, 'read')).snapshot.invitation.version, 1)
   assert.equal((await admin.query('select count(*) n from private.guest_requests where invitation_id=$1', [f.invite.id])).rows[0].n, '0')
-  await guestAction(f.token, 'rsvp', request({ response: 'maybe', attending: 0, version: 1 }))
+  await guestAction(f.token, 'rsvp', request({ response: 'maybe', reminder_email: 'guest@example.test', attending: 0, version: 1 }))
 })
 
 const count = async (sql, values) => Number((await admin.query(sql, values)).rows[0].n)
@@ -1274,7 +1274,7 @@ test('T-B7: resumo vazio, respostas, revogação e isolamento calculados no serv
   for (const response of ['no', 'maybe', 'pending']) {
     const inv = await organizerAction(f.event, 'create', { name: 'Homônimo fictício', kind: 'individual', capacity: 1 })
     const token = (await guestAction(inv.token, 'exchange')).session_token
-    if (response !== 'pending') await guestAction(token, 'rsvp', request({ response, attending: 0, version: 1 }))
+    if (response !== 'pending') await guestAction(token, 'rsvp', request({ response, attending: 0, version: 1, ...(response === 'maybe' ? { reminder_email: 'guest@example.test' } : {}) }))
   }
   await organizerAction(f.event, 'revoke', { id: f.invite.id })
   await admin.query("update private.invitations set expires_at=now()-interval '1 day' where id=$1", [f.invite.id])

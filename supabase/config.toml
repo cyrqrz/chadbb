@@ -433,3 +433,7 @@ verify_jwt = false
 # O JWT do organizador é validado pelo PostgREST na RPC delete_event.
 [functions.delete-event]
 verify_jwt = false
+
+# Autenticação própria por x-rsvp-secret; nenhuma chamada do navegador.
+[functions.rsvp-reminders]
+verify_jwt = false

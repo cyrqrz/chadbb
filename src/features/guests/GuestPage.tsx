@@ -133,9 +133,11 @@ export function GuestEvent({ access, preview = false }: { access: { token: strin
   return <div className="page invite">
     <header className="invite-hero">
       <div className="invite-hero-text">
-        <p className="eyebrow">Chá de bebê · convite</p>
-        <h1 className="invite-title">{event.title}</h1>
-        <p className="invite-lead">{invitation.name}, este convite é para você{invitation.kind === 'family' ? ' e sua família' : ''}.</p>
+        <div className="invite-heading">
+          <p className="eyebrow">Chá de bebê · convite</p>
+          <h1 className="invite-title">{event.title}</h1>
+          <p className="invite-lead">{invitation.name}, este convite é para você{invitation.kind === 'family' ? ' e sua família' : ''}.</p>
+        </div>
         <dl className="invite-facts">
           <div><dt>Quando</dt><dd>{eventDate(event.starts_at, { dateStyle: 'full', timeStyle: 'short' })}<span className="hint block">Horário de Brasília</span></dd></div>
           <div><dt>Onde</dt><dd>{place || 'Local a combinar com a organização.'}</dd></div>
@@ -146,9 +148,15 @@ export function GuestEvent({ access, preview = false }: { access: { token: strin
           {answered && <StatusBadge tone={invitation.response === 'yes' ? 'success' : invitation.response === 'maybe' ? 'warning' : 'neutral'}>{responseLabels[invitation.response]}</StatusBadge>}
         </div>
       </div>
-      {event.cover_path
-        ? <img className="invite-cover" src={coverUrl(event.cover_path)} alt="Capa do chá de bebê" />
-        : <CalendarCard eventId={event.id} title={event.title} startsAt={event.starts_at} address={event.address} />}
+      <div className="invite-hero-side">
+        {event.cover_path
+          ? <img className="invite-cover" src={coverUrl(event.cover_path)} alt="Capa do chá de bebê" />
+          : <CalendarCard eventId={event.id} title={event.title} startsAt={event.starts_at} address={event.address} />}
+        {event.instructions && <aside className="guest-notice" aria-labelledby="invite-aviso">
+          <h2 id="invite-aviso" className="guest-notice-title">Instruções para o convidado</h2>
+          <p className="guest-notice-text whitespace-pre-line">{event.instructions}</p>
+        </aside>}
+      </div>
     </header>
 
     {closed && <p className="state state-warning mt-8">O evento foi encerrado. Você ainda pode consultar suas escolhas, cancelar ou informar uma compra enquanto seu convite estiver válido.</p>}
@@ -167,20 +175,16 @@ export function GuestEvent({ access, preview = false }: { access: { token: strin
       <div key={tab} className="fade-swap flex flex-col gap-4">
         <p className="font-bold">{tab === 'fralda' ? 'Qual tamanho você vai levar?' : 'Um mimo, se quiser'}</p>
         <p className="section-description">{tab === 'fralda' ? 'Escolha um ou mais pacotes. As quantidades disponíveis ajudam a equilibrar os tamanhos para o bebê.' : 'Escolha os mimos e informe quantas unidades. Não há limite de mimos.'}</p>
-        <div className="stagger grid gap-4 md:grid-cols-2 lg:grid-cols-3">{data.items.filter(item => item.category === tab).map(item => <GuestGift key={item.id} item={item} alternatives={data.items.filter(candidate => candidate.category === 'fralda' && candidate.id !== item.id)} busy={busy} closed={closed} save={mutate} feedback={feedback(item.id)} />)}</div>
+        <div className={tab === 'mimo' ? 'guest-treat-list' : 'stagger grid gap-4 md:grid-cols-2 lg:grid-cols-3'}>{data.items.filter(item => item.category === tab).map(item => <GuestGift key={item.id} item={item} alternatives={data.items.filter(candidate => candidate.category === 'fralda' && candidate.id !== item.id)} busy={busy} closed={closed} save={mutate} feedback={feedback(item.id)} />)}</div>
         {!data.items.some(item => item.category === tab) && <EmptyState title="A organização está preparando esta lista.">Volte em breve para escolher.</EmptyState>}
       </div>
     </InviteSection>
 
-    <InviteSection id="local" title="Local e instruções">
+    <InviteSection id="local" title="Como chegar">
       <div className="venue-card">
         <p className="whitespace-pre-line font-semibold">{event.address || 'Local a combinar com a organização.'}</p>
         {event.address && <VenueMap address={event.address} />}
         {event.address && <a className="secondary self-start" href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(event.address)}`} target="_blank" rel="noopener noreferrer">Como chegar<span className="sr-only"> (abre em nova aba)</span></a>}
-        {event.instructions && <aside className="guest-notice" aria-labelledby="local-aviso">
-          <p id="local-aviso" className="guest-notice-title"><span aria-hidden="true">ⓘ </span>Informação importante</p>
-          <p className="whitespace-pre-line">{event.instructions}</p>
-        </aside>}
       </div>
     </InviteSection>
   </div>
@@ -214,6 +218,9 @@ function withCompletion(text: string, action: string, payload: Record<string, un
 type Save = (action: string, payload: Record<string, unknown>, success?: string, where?: string) => Promise<boolean>
 function Presence({ data, busy, closed, save }: { data: Snapshot; busy: boolean; closed: boolean; save: Save }) {
   const inv = data.invitation
+  const policy = data.rsvp
+  const [email, setEmail] = useState('')
+  const emailHint = useId()
   const [draft, setDraft] = useState<{ response: ResponseChoice; attending: number; version: number } | null>(null)
   const [keepGifts, setKeepGifts] = useState(false)
   // Quantas reservas já saíram quando o cancelamento em série para no meio.
@@ -250,17 +257,22 @@ function Presence({ data, busy, closed, save }: { data: Snapshot; busy: boolean;
     // certa. O aviso é desenhado dentro do cartão, logo acima desta mensagem.
     const keeping = value.response === 'no' && reserved.length > 0
     const message = keeping ? 'Resposta salva. Você ainda tem presente reservado: escolha logo acima se quer manter ou cancelar.' : undefined
-    if (await save('rsvp', { response: value.response, attending: value.response === 'yes' ? value.attending || 1 : 0, version: value.version }, message)) { setDraft(null); setKeepGifts(false); setCancelled(0) }
+    if (await save('rsvp', { response: value.response, attending: value.response === 'yes' ? value.attending || 1 : 0, version: value.version, ...(value.response === 'maybe' && email.trim() ? { reminder_email: email.trim() } : {}) }, message)) { setDraft(null); setEmail(''); setKeepGifts(false); setCancelled(0) }
   }
   return <div ref={card} tabIndex={-1} className="card invite-card">
     <p className="text-muted">Resposta atual: {responseLabels[inv.response]}{inv.response === 'yes' ? ` · ${inv.attending} pessoa(s)` : ''}.</p>
     {closed ? <p>As respostas foram encerradas. Para mudar algo, fale com a organização.</p> : <form className="flex flex-col gap-5" onSubmit={submit}>
       <fieldset disabled={busy}><legend className="font-semibold">Sua confirmação</legend>
-        <div className="mt-3 grid gap-3 sm:grid-cols-3">{(['yes', 'no', 'maybe'] as ResponseChoice[]).map(response => <label key={response} className="choice"><input type="radio" name="presence" checked={value.response === response} onChange={() => setDraft({ ...value, response, attending: value.attending || 1 })} />{responseLabels[response]}</label>)}</div>
+        <div className={`mt-3 grid gap-3 ${policy.maybe_allowed ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>{(['yes', 'no', ...(policy.maybe_allowed ? ['maybe'] : [])] as ResponseChoice[]).map(response => <label key={response} className="choice"><input type="radio" name="presence" checked={value.response === response} onChange={() => setDraft({ ...value, response, attending: value.attending || 1 })} />{responseLabels[response]}</label>)}</div>
       </fieldset>
+      {value.response === 'maybe' && policy.maybe_allowed && <label className="field">E-mail para o lembrete
+        <input type="email" autoComplete="email" maxLength={254} required={!policy.reminder_email_set} disabled={busy} value={email} onChange={e => setEmail(e.target.value)} aria-describedby={emailHint} />
+        <span id={emailHint} className="hint">{policy.reminder_email_set ? 'Seu e-mail já está salvo. Preencha apenas se quiser trocar. ' : ''}Usaremos este endereço apenas para lembrar você de confirmar. O lembrete será enviado a partir de {eventDate(policy.maybe_closes_at, { dateStyle: 'short', timeStyle: 'short' })} (Brasília). Depois, você terá três dias para decidir; sem resposta, será marcado como “Não poderá ir”.</span>
+      </label>}
+      {!policy.maybe_allowed && <p role="status" className="state state-warning">A opção “Talvez” não está mais disponível. Escolha se vai participar ou se não poderá ir.{inv.response === 'maybe' && policy.reminder_sent && <> Confirme até {eventDate(policy.confirmation_due_at, { dateStyle: 'short', timeStyle: 'short' })} (Brasília); depois desse prazo, sua resposta passará para “Não poderá ir”.</>}</p>}
       {value.response === 'yes' && inv.kind === 'family' && <label className="field">Quantas pessoas vão?<input type="number" min={1} max={inv.capacity} step={1} required disabled={busy} value={value.attending || 1} onChange={e => setDraft({ ...value, attending: Number(e.target.value) })} /><span className="hint">Este convite inclui até {inv.capacity} pessoas.</span></label>}
       {draft && inv.version !== draft.version && <p role="status">Sua resposta mudou em outra sessão. <button type="button" className="text-link" onClick={() => setDraft(null)}>Usar resposta atual</button></p>}
-      <Button type="submit" className="self-start" busy={busy} disabled={value.response === 'pending'}>{busy ? 'Aguarde…' : 'Confirmar presença'}</Button>
+      <Button type="submit" className="self-start" busy={busy} disabled={value.response === 'pending' || value.response === 'maybe' && !policy.maybe_allowed}>{busy ? 'Aguarde…' : 'Confirmar presença'}</Button>
     </form>}
     {stale && <div role="group" aria-labelledby={warning} className="state state-warning">
       <p id={warning}>Você marcou que não poderá ir e ainda tem presente reservado neste convite:</p>
@@ -308,10 +320,10 @@ function GuestGift({ item, alternatives, busy, closed, save, feedback }: { item:
     void save('swap', { from_item_id: item.id, item_id: target.id, version: own.version, destination_version: target.own?.version ?? null })
       .then(done => { if (done) { setDraft(null); setDestination(''); setSwapOpen(false) } })
   }
-  return <article className={`card card-stack invite-gift ${full ? 'product-listed' : ''}`}>
+  return <article className={`${diaper ? 'card card-stack invite-gift' : 'guest-treat-row'} ${full ? 'product-listed' : ''}`}>
     <header className="card-header">
       <div className="card-badges">
-        <StatusBadge tone="neutral">{diaper ? `Tamanho ${item.diaper_size}` : 'Mimo opcional'}</StatusBadge>
+        {diaper && <StatusBadge tone="neutral">Tamanho {item.diaper_size}</StatusBadge>}
         {full && <StatusBadge tone="success">Completo</StatusBadge>}
         {active && <StatusBadge tone={purchased ? 'success' : 'brand'}>{purchased ? 'Compra informada' : 'Reservado'}</StatusBadge>}
       </div>
@@ -319,11 +331,11 @@ function GuestGift({ item, alternatives, busy, closed, save, feedback }: { item:
       {item.description && <p className="card-description">{item.description}</p>}
     </header>
     {available === null
-      ? <p className="availability-text">{item.committed} {units(item.committed)} {item.committed === 1 ? 'prometida' : 'prometidas'} · sem limite</p>
+      ? item.committed > 0 && <p className="availability-text">{item.committed} {units(item.committed)} {item.committed === 1 ? 'prometida' : 'prometidas'}</p>
       : <Availability available={available} limit={item.limit ?? 0} committed={item.committed} unit="pacotes" />}
     {active && <p className="card-reservation"><span>Sua reserva</span> <strong>{own.quantity} {units(own.quantity)}</strong></p>}
     {purchased && <p className="hint">Compra informada por você. Para mudar a quantidade ou o tamanho, cancele a reserva e escolha de novo.</p>}
-    {!purchased && !full && !closed && <form onSubmit={submit} className="flex flex-col gap-3">
+    {!purchased && !full && !closed && <form onSubmit={submit} className={diaper ? 'flex flex-col gap-3' : 'guest-treat-form'}>
       <QuantityField context={item.title} unit={diaper ? 'pacotes' : 'unidades'} value={quantity} busy={busy}
         max={available === null ? 1000 : Math.min(1000, available + (active ? own.quantity : 0))} onChange={text => setDraft(previous => ({ text, version: previous ? previous.version : own?.version ?? null }))} />
       <Button type="submit" className="self-start" busy={busy}>{active ? 'Atualizar quantidade' : 'Escolher presente'}</Button>

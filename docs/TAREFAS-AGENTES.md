@@ -1,5 +1,13 @@
 # Tarefas e combinados entre agentes
 
+## Em andamento — 2026-09-24
+
+Codex na branch temporária `codex/convite-rsvp-mimos`: instruções no cabeçalho
+do convite, mimos compactos e prazo de Talvez com lembrete por e-mail. G1:
+contrato e testes locais; G2: implementação e revisão; G3: evidências locais;
+G4: revisão do diff antes de commit/push e aprovação de migration, segredos,
+agendamento e deploy remotos. Nenhuma publicação faz parte dos gates locais.
+
 Quadro compartilhado entre o Claude e o Codex. **Desde 2026-09-21 os dois
 trabalham na mesma branch, a `clone-main`** — as antigas `claude/front` e
 `codex/back` foram unificadas nela e apagadas, e o remoto tem só `main` e
