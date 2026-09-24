@@ -1,3 +1,4 @@
+import { rsvpFixture } from './rsvp-fixture'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
@@ -30,6 +31,7 @@ const reservation = (n: number, invitation: number, fields: Omit<DashboardReserv
   ({ id: `60000000-0000-4000-8000-00000000000${n}`, invitation_id: `30000000-0000-4000-8000-00000000000${invitation}`,
     name: `Convidado fictício ${invitation}`, ...fields })
 const full: Dashboard = {
+  rsvp: rsvpFixture,
   invitations: [
     invitation(1, { response: 'yes', attending: 3 }),
     invitation(2, { response: 'no', kind: 'individual', capacity: 1 }),
@@ -113,7 +115,7 @@ test('painel usa o resumo e o saldo enviados pelo servidor', async ({ page }) =>
 })
 
 test('painel vazio orienta o próximo passo', async ({ page }) => {
-  await backend(page, () => ({ status: 200, json: { invitations: [], items: [], reservations: [],
+  await backend(page, () => ({ status: 200, json: { rsvp: rsvpFixture, invitations: [], items: [], reservations: [],
     summary: { invitations: { total: 0, answered: 0, yes: 0, no: 0, maybe: 0, pending: 0, revoked: 0 }, people_confirmed: 0 } } }))
   await page.goto(`/eventos/${eventId}/convites`)
   await expect(page.getByRole('article', { name: 'Pessoas' })).toContainText('0pessoas confirmadas')

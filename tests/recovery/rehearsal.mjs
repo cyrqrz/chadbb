@@ -46,7 +46,7 @@ try {
   assert.equal((await send('reserve', { item_id: treat.id, quantity: 1, version: null })).status, 200)
   assert.equal((await send('cancel', { item_id: treat.id, version: 1 })).status, 200)
   const secondAccess = (await edge(source, second.token, 'exchange')).data
-  assert.equal((await edge(source, secondAccess.session_token, 'rsvp', { response: 'maybe', attending: 0, version: 1, request_id: randomUUID() })).status, 200)
+  assert.equal((await edge(source, secondAccess.session_token, 'rsvp', { response: 'maybe', reminder_email: 'guest@example.test', attending: 0, version: 1, request_id: randomUUID() })).status, 200)
   const cover = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=', 'base64')
   coverPath = `${f.userId}/${f.event.id}/recovery.png`
   assert.equal((await f.admin.storage.from('event-public').upload(coverPath, cover, { contentType: 'image/png' })).error, null)

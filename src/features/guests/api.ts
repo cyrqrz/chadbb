@@ -7,7 +7,9 @@ export type Reservation = { id: string; quantity: number; version: number; statu
 // `available` vem do servidor (fonte única em `private.item_available`): saldo nas
 // fraldas e `null` nos mimos, que não têm cota. O front não recalcula.
 export type GuestItem = { id: string; title: string; description: string; category: Category; diaper_size: DiaperSize | null; limit: number | null; committed: number; available: number | null; own: Reservation | null }
+export type RsvpPolicy = { maybe_allowed: boolean; maybe_closes_at: string; confirmation_due_at: string; reminder_sent: boolean; reminder_email_set: boolean }
 export type Snapshot = {
+  rsvp: RsvpPolicy
   invitation: { name: string; kind: 'individual' | 'family'; capacity: number; response: ResponseChoice; attending: number; version: number }
   event: { id: string; title: string; description: string; starts_at: string; address: string; instructions: string; cover_path: string | null; status: string }
   items: GuestItem[]
@@ -18,7 +20,7 @@ export type PanelSummary = {
   people_confirmed: number
 }
 export type DashboardReservation = { id: string; invitation_id: string; name: string; title: string; category: Category; diaper_size: DiaperSize | null; quantity: number; status: string }
-export type Dashboard = { invitations: Invitation[]; items: Omit<GuestItem, 'description' | 'own'>[]; reservations: DashboardReservation[]; summary: PanelSummary }
+export type Dashboard = { rsvp: RsvpPolicy; invitations: Invitation[]; items: Omit<GuestItem, 'description' | 'own'>[]; reservations: DashboardReservation[]; summary: PanelSummary }
 export const responseLabels: Record<ResponseChoice, string> = { pending: 'Sem resposta', yes: 'Vai participar', no: 'Não poderá ir', maybe: 'Talvez' }
 
 export async function invitations(eventId: string, action = 'list', payload: Record<string, unknown> = {}) {
@@ -50,6 +52,8 @@ export function guestMessage(error: unknown) {
     RESPONSE_VERSION_CONFLICT: 'Sua resposta mudou em outra sessão. Revise os dados antes de confirmar.',
     EVENT_CLOSED: 'O evento está encerrado. Novas confirmações e reservas não estão disponíveis.',
     RATE_LIMITED: 'Muitas tentativas. Aguarde um minuto e tente novamente.',
+    RSVP_MAYBE_CLOSED: 'O prazo para responder Talvez terminou. Confirme se vai participar ou se não poderá ir.',
+    RSVP_EMAIL_REQUIRED: 'Informe um e-mail válido para receber o lembrete de confirmação.',
     RSVP_INVALID_RESPONSE: 'Escolha uma resposta e informe a quantidade de pessoas que vão participar.',
     ATTENDING_ABOVE_CAPACITY: 'A quantidade de pessoas ultrapassa o limite deste convite.',
     INVALID_PAYLOAD: 'Confira os campos e a quantidade de pessoas permitida no convite.',

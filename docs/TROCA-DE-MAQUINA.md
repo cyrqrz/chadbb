@@ -1,5 +1,12 @@
 # Retomar o chadbb em outra máquina
 
+## Retomada em 24/09/2026 — trabalho em andamento com Claude
+
+Leia primeiro [HANDOFF-CLAUDE-2026-09-24.md](HANDOFF-CLAUDE-2026-09-24.md).
+Branch local `codex/convite-rsvp-mimos`, mudanças sem commit incluindo arquivos
+novos. Migration de RSVP já aplicada só no Supabase local. Validação interrompida
+para troca de sessão; nenhuma publicação remota. As seções abaixo são históricas.
+
 ## Retomada depois de 2026-09-23, no PC pessoal — esta seção é a mais recente
 
 **Toda a parte dos agentes está feita.** O que falta depende do titular.

@@ -1,3 +1,4 @@
+import { rsvpFixture } from './rsvp-fixture'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
@@ -14,6 +15,7 @@ test.beforeEach(async ({ page }) => {
 const token = 'a'.repeat(64)
 function snapshot(items: GuestItem[]): Snapshot {
   return {
+    rsvp: rsvpFixture,
     invitation: { name: 'Convidado fictício', kind: 'family', capacity: 3, response: 'pending', attending: 0, version: 1 },
     event: { id: '60000000-0000-4000-8000-000000000006', title: 'Chá de teste', description: 'Texto fictício.', starts_at: '2035-09-10T17:30:00Z',
       address: 'Endereço fictício', instructions: '', cover_path: null, status: 'published' },
@@ -29,9 +31,9 @@ const diaper: GuestItem = { id: '70000000-0000-4000-8000-000000000007', title: '
 const priced = (snap: Snapshot): Snapshot => ({ ...snap,
   items: snap.items.map(item => ({ ...item, available: item.limit === null ? null : Math.max(0, item.limit - item.committed) })) })
 
-async function backend(page: Page, options: { items?: GuestItem[]; failReads?: () => boolean; event?: Partial<Snapshot['event']>; invitation?: Partial<Snapshot['invitation']>; refuseExchange?: boolean } = {}) {
+async function backend(page: Page, options: { items?: GuestItem[]; failReads?: () => boolean; event?: Partial<Snapshot['event']>; invitation?: Partial<Snapshot['invitation']>; refuseExchange?: boolean; rsvp?: Partial<Snapshot['rsvp']> } = {}) {
   let current = snapshot(options.items ?? [diaper])
-  current = { ...current, event: { ...current.event, ...options.event }, invitation: { ...current.invitation, ...options.invitation } }
+  current = { ...current, rsvp: { ...current.rsvp, ...options.rsvp }, event: { ...current.event, ...options.event }, invitation: { ...current.invitation, ...options.invitation } }
   await page.route('https://e2e.supabase.co/functions/v1/guest', async route => {
     const body = route.request().postDataJSON()
     const reply = (status: number, json: unknown) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(json) })
@@ -319,7 +321,7 @@ test.describe('G3 · convite', () => {
   test('local com mapa embutido e rota em nova aba', async ({ page }) => {
     await backend(page)
     await page.goto(`/convite#${token}`)
-    const local = page.getByRole('region', { name: 'Local e instruções' })
+    const local = page.getByRole('region', { name: 'Como chegar' })
     await expect(local).toContainText('Endereço fictício')
     const map = local.getByRole('link', { name: /Como chegar/ })
     await expect(map).toHaveAttribute('href', 'https://www.google.com/maps/dir/?api=1&destination=Endere%C3%A7o%20fict%C3%ADcio')
@@ -384,6 +386,7 @@ test.describe('G3 · convite', () => {
       await route.fallback()
     })
     await page.getByRole('radio', { name: 'Talvez' }).check()
+    await page.getByRole('textbox', { name: 'E-mail para o lembrete' }).fill('guest@example.test')
     const submit = page.getByRole('button', { name: 'Confirmar presença', exact: true })
     await submit.focus()
     await page.keyboard.press('Enter')
@@ -1008,4 +1011,52 @@ test('tamanho completa enquanto a pessoa digita explica que o formulário sumiu'
   await expect(card.getByText('Este tamanho completou enquanto você escolhia.')).toBeVisible()
   await expect(card.getByRole('spinbutton')).toHaveCount(0)
   await expect(card.locator('.badge', { hasText: 'Completo' })).toBeVisible()
+})
+
+test('instruções aparecem no cabeçalho antes da ação de responder', async ({ page }) => {
+  await backend(page, { event: { instructions: 'Vir de branco. Instruções de teste.' } })
+  await page.goto(`/convite#${token}`)
+  const notice = page.getByRole('complementary', { name: 'Instruções para o convidado' })
+  await expect(notice).toContainText('Vir de branco.')
+  expect(await notice.evaluate(el => el.closest('.invite-hero') !== null)).toBe(true)
+  await expect(page.getByText('Vir de branco. Instruções de teste.', { exact: true })).toHaveCount(1)
+  await expectAccessible(page)
+})
+
+test('Talvez exige email e envia contato só ao confirmar', async ({ page }) => {
+  await backend(page)
+  await page.goto(`/convite#${token}`)
+  await page.getByRole('radio', { name: 'Talvez' }).check()
+  const email = page.getByRole('textbox', { name: 'E-mail para o lembrete' })
+  await expect(email).toHaveAttribute('required', '')
+  await expect(email).toHaveAccessibleDescription(/apenas para lembrar/)
+  await email.fill('guest@example.test')
+  const sent = page.waitForRequest(req => req.url().endsWith('/guest') && req.postDataJSON().action === 'rsvp')
+  await page.getByRole('button', { name: 'Confirmar presença', exact: true }).click()
+  expect((await sent).postDataJSON().payload).toMatchObject({ response: 'maybe', reminder_email: 'guest@example.test' })
+})
+
+test('servidor fecha Talvez mesmo com data do evento distante; resposta atual continua legível', async ({ page }) => {
+  await backend(page, { invitation: { response: 'maybe' }, rsvp: { maybe_allowed: false, reminder_sent: true } })
+  await page.goto(`/convite#${token}`)
+  await expect(page.getByRole('radio', { name: 'Talvez' })).toHaveCount(0)
+  await expect(page.getByText('Resposta atual: Talvez.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Confirmar presença', exact: true })).toBeDisabled()
+  await page.getByRole('radio', { name: 'Vai participar' }).check()
+  await expect(page.getByRole('button', { name: 'Confirmar presença', exact: true })).toBeEnabled()
+  await expectAccessible(page)
+})
+
+test('mimos em linhas compactas mantêm quantidade e ações acessíveis', async ({ page }) => {
+  const items = Array.from({ length: 18 }, (_, n): GuestItem => ({ id: `mimo-${n}`, title: `Mimo fictício ${n + 1}`, description: 'Uma lembrança para o bebê.', category: 'mimo', diaper_size: null, limit: null, committed: 0, available: null, own: null }))
+  await backend(page, { items })
+  await page.goto(`/convite#${token}`)
+  await page.getByRole('button', { name: 'Mimos', exact: true }).click()
+  const row = page.getByRole('article').first()
+  await expect(row.getByRole('heading', { name: 'Mimo fictício 1', exact: true })).toBeVisible()
+  expect((await row.boundingBox())!.height).toBeLessThan(250)
+  await row.getByRole('spinbutton').fill('2')
+  await row.getByRole('button', { name: 'Escolher presente' }).click()
+  await expect(row.getByText('2 unidades', { exact: true })).toBeVisible()
+  await expectAccessible(page)
 })

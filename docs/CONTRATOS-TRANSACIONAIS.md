@@ -241,6 +241,41 @@ encerrar, mutações bloqueadas, compra/cancelamento, replay e expiração. Os t
 de concorrência existentes verificam a ordem dos bloqueios contra encerramento.
 Este registro descreve o comportamento existente; não altera a política remota.
 
+## Talvez com prazo e lembrete — decisão de 24/09/2026
+
+- Fonte única: `private.rsvp_policy(starts_at, due_at)`. Talvez é permitido
+  somente antes de `starts_at - 10 days`, em evento publicado. O snapshot traz
+  `rsvp: { maybe_allowed, maybe_closes_at, confirmation_due_at, reminder_sent }`.
+  O navegador não calcula prazos. Para 01/11 às 12h: corte em 22/10 às 12h,
+  prazo nominal em 25/10 às 12h (Brasília). O texto antigo de 18/10 não é gate.
+- RSVP `maybe` exige `reminder_email`, informado pelo convidado, validado no
+  servidor e guardado só na fila privada. Snapshot expõe apenas
+  `reminder_email_set`, nunca o endereço. `yes`/`no` eliminam o contato da fila.
+- No corte, novos `maybe` retornam `RSVP_MAYBE_CLOSED`; `yes`/`no` continuam
+  possíveis enquanto publicado. Replay anterior permanece idempotente.
+- Worker protegido por segredo próprio envia lembrete com o prazo e orienta
+  reabrir o convite original. Não cria/rotaciona links nem guarda token claro.
+  E-mail é usado somente para esse lembrete. Não há marketing ou rastreamento.
+- Sem decisão após o prazo, somente `maybe` com lembrete aceito pelo provedor
+  passa para `no`, `attending=0`, com incremento de versão. Reservas permanecem
+  disponíveis para cancelamento/envio, conforme a regra de RSVP manual.
+  Falha de envio não produz ausência automática. Envio atrasado garante três
+  dias a partir do aceite registrado. O e-mail orienta confirmar em três dias e
+  consultar o prazo no convite. Retries não alteram o corpo do e-mail; o aceite
+  pode ampliar o prazo, nunca reduzi-lo. Aceite não comprova entrega na caixa.
+- Fila por convite, lease de 5 minutos, revalidação antes de envio, chave de
+  idempotência por ciclo. Tentativas ambíguas só repetem na janela de 24h do
+  provedor; depois exigem investigação, sem nova mensagem automática.
+- Mudança da data do evento reinicia o ciclo e invalida leases antigos;
+  confirmação, revogação e exclusão descartam a fila. `closed` não recebe
+  lembretes nem conversões. Convites antigos sem contato não são convertidos.
+- Lock evento → convite → fila, com versão/lease conferidos. Job não substitui
+  `yes` concorrente. Email/fila seguem exclusão em cascata do convite, inclusive
+  retenção. Auditoria/logs guardam só contagens, nunca email ou payload pessoal.
+- RPCs do worker exclusivas de `service_role`; fila privada com RLS e sem grants
+  de acesso às funções privadas. Agendamento a cada 15 minutos e configuração
+  do provedor dependem do gate remoto; não são ativados pela validação local.
+
 ## Extensão planejada — fraldas e mimos
 
 A [especificação familiar](FRALDAS-E-MIMOS.md) exige categoria explícita e saldos

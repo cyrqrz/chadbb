@@ -1,3 +1,4 @@
+import { rsvpFixture } from './rsvp-fixture'
 // Quantidade no convite: bloqueio durante o envio e versão do rascunho
 // diante de mudança concorrente (revisão do Codex, 2026-09-17).
 import { expect, test } from '@playwright/test'
@@ -10,6 +11,7 @@ test.beforeEach(async ({ page }) => {
 
 const token = 'b'.repeat(64)
 const makeSnapshot = (version: number | null): Snapshot => ({
+  rsvp: rsvpFixture,
   invitation: { name: 'Pessoa fictícia', kind: 'individual', capacity: 1, response: 'pending', attending: 0, version: 1 },
   event: { id: '60000000-0000-4000-8000-000000000006', title: 'Evento fictício', description: '', starts_at: '2035-09-10T17:30:00Z', address: '', instructions: '', cover_path: null, status: 'published' },
   items: [{ id: '70000000-0000-4000-8000-000000000007', title: 'Fralda fictícia P', description: '', category: 'fralda', diaper_size: 'P', limit: 10, committed: version === null ? 0 : 1,

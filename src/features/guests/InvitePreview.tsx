@@ -32,6 +32,7 @@ export function InvitePreview() {
   const record = event.data
   if (!record.starts_at) return state(<div className="state state-empty"><p>Defina a data do evento em “Dados do evento” para ver a prévia.</p><Link className="secondary" to={`/eventos/${id}/dados`}>Dados do evento</Link></div>)
   const snapshot: Snapshot = {
+    rsvp: panel.data!.rsvp,
     invitation: { name: 'Convidado de exemplo', kind: 'family', capacity: 4, response: 'pending', attending: 0, version: 0 },
     event: { id: record.id, title: record.title || 'Evento sem título', description: record.public_description, starts_at: record.starts_at,
       address: record.private_address, instructions: record.private_instructions, cover_path: record.cover_path, status: record.status },
