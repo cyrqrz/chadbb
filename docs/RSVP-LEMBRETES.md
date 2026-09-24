@@ -23,6 +23,17 @@ A execução é a cada 15 minutos, em lotes de dez. A conversão ocorre na prime
 execução após o prazo. Reagendamento reinicia o ciclo. Eventos encerrados e
 convites revogados/expirados não são processados.
 
+Correções de 24/09 (migration `20260924020000`, após revisão):
+- Sem lembrete com menos de três dias até o início; o prazo final nunca passa do
+  início. Nesses casos, e com o evento iniciado, o contato é apagado e o convite
+  continua em Talvez.
+- Resposta 422 do Resend (destinatário recusado) encerra a tentativa e apaga o
+  contato (`rsvp_reminder_reject`). Tentativa sem aceite há 24 h também é apagada.
+- Encerrar o evento apaga os contatos na hora; o histórico guarda o hash do
+  e-mail com o convite como sal. Apóstrofo é aceito no e-mail.
+- O e-mail traz a data-limite em horário de Brasília. O retorno da Edge conta
+  também `rejected`, e o claim devolve `dropped` (contatos apagados na limpeza).
+
 ## Gates para publicação
 
 - **G1/G2, locais:** contrato, migration, handler e regressões/revisão.

@@ -226,6 +226,53 @@ test('envio ambíguo não ganha nova chave nem retry depois da janela de 23 hora
   await admin.query(`update private.rsvp_reminders set first_attempt_at=clock_timestamp()-interval '23 hours 1 minute',
     lease_until=clock_timestamp()-interval '1 minute', next_attempt_at=clock_timestamp()-interval '1 minute',
     confirmation_due_at=clock_timestamp()-interval '1 minute' where invitation_id=$1`, [f.invite.id])
-  assert.deepEqual(await claim(), { jobs: [], expired: 0 })
+  assert.deepEqual(await claim(), { jobs: [], expired: 0, dropped: 0 })
   assert.equal((await invitation(f)).response, 'maybe')
+})
+
+test('correções: sem lembrete com menos de 3 dias; prazo limitado ao início; evento iniciado apaga o contato', async () => {
+  const f = await fixture(); await maybe(f)
+  await admin.query("update public.events set starts_at=clock_timestamp()+interval '2 days', ends_at=clock_timestamp()+interval '2 days 4 hours' where id=$1", [f.event.id])
+  const tooLate = await claim()
+  assert.deepEqual(tooLate.jobs, []); assert.equal(tooLate.dropped, 1)
+  assert.equal((await admin.query('select count(*)::int n from private.rsvp_reminders')).rows[0].n, 0)
+  assert.equal((await invitation(f)).response, 'maybe')
+
+  const g = await fixture(); await maybe(g)
+  await admin.query("update public.events set starts_at=clock_timestamp()+interval '3 days 1 hour', ends_at=clock_timestamp()+interval '3 days 5 hours' where id=$1", [g.event.id])
+  const job = (await claim()).jobs[0]
+  assert.ok(job)
+  const starts = (await admin.query('select starts_at from public.events where id=$1', [g.event.id])).rows[0].starts_at
+  assert.ok(new Date(job.confirmation_due_at) <= starts)
+  await admin.query("update private.rsvp_reminders set lease_until=lease_until where id=$1", [job.id])
+  assert.equal(await complete(job), true)
+  const due = (await admin.query('select confirmation_due_at from private.rsvp_reminders where id=$1', [job.id])).rows[0].confirmation_due_at
+  assert.ok(due <= starts, 'prazo nunca passa do início')
+})
+
+test('correções: recusa permanente apaga o contato; fila presa há 24 horas também', async () => {
+  const f = await fixture(); await maybe(f); await cut(f)
+  const job = (await claim()).jobs[0]
+  assert.equal((await admin.query('select public.rsvp_reminder_reject($1,$2) data', [job.id, job.lease])).rows[0].data, true)
+  assert.equal((await admin.query('select count(*)::int n from private.rsvp_reminders where invitation_id=$1', [f.invite.id])).rows[0].n, 0)
+  assert.equal((await invitation(f)).response, 'maybe')
+  const worker = await connection('authenticated')
+  try { await assert.rejects(worker.query('select public.rsvp_reminder_reject($1,$2)', [job.id, job.lease]), /permission denied/) } finally { await worker.end() }
+
+  const g = await fixture(); await maybe(g); await cut(g)
+  await claim()
+  await admin.query(`update private.rsvp_reminders set first_attempt_at=clock_timestamp()-interval '25 hours', lease_until=clock_timestamp()-interval '1 minute' where invitation_id=$1`, [g.invite.id])
+  assert.equal((await claim()).dropped, 1)
+})
+
+test('correções: encerrar evento apaga contatos; hash do histórico tem sal; apóstrofo aceito', async () => {
+  const f = await fixture()
+  await action(f.token, 'rsvp', payload('maybe', 1, { reminder_email: "O'Brien@Example.test" }))
+  assert.equal((await admin.query('select email from private.rsvp_reminders where invitation_id=$1', [f.invite.id])).rows[0].email, "o'brien@example.test")
+  const stored = (await admin.query("select payload->'payload'->>'reminder_email' h from private.guest_requests where invitation_id=$1 and payload->>'action'='rsvp'", [f.invite.id])).rows[0].h
+  const unsalted = (await admin.query("select encode(sha256(convert_to($1,'UTF8')),'hex') h", ["o'brien@example.test"])).rows[0].h
+  assert.notEqual(stored, unsalted)
+  assert.match(stored, /^[0-9a-f]{64}$/)
+  await admin.query("update public.events set status='closed' where id=$1", [f.event.id])
+  assert.equal((await admin.query('select count(*)::int n from private.rsvp_reminders where invitation_id=$1', [f.invite.id])).rows[0].n, 0)
 })
