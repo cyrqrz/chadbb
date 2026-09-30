@@ -472,6 +472,30 @@
   .confirm-dialog::backdrop { background: rgb(41 35 38 / 0.4); animation: fade var(--duration-fast) var(--ease-standard) both; }
   .confirm-dialog-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--action-gap); }
 
+  /* Privacidade e termos: a promessa em Fraunces é o único destaque; o resto é pergunta e resposta. */
+  /* scroll-margin: o cabeçalho fixo cobriria o título ao pular para a âncora. */
+  .legal-promise { max-width: 32ch; margin-top: 1rem; text-wrap: balance; font-family: var(--font-display); font-size: clamp(1.375rem, 1.1rem + 1.2vw, 1.875rem); line-height: 1.3; font-weight: 450; }
+  .legal { display: grid; gap: 1.5rem; margin-top: 2rem; }
+  .legal-nav ul { display: flex; flex-wrap: wrap; margin-inline-start: -0.5rem; }
+  .legal-nav .nav-link { padding-inline: 0.5rem; }
+  .legal-body { display: flex; min-width: 0; flex-direction: column; gap: 3rem; }
+  /* 9rem: no celular estreito o cabeçalho fixo ocupa duas linhas (~130 px). */
+  .legal-section, .legal-contact { scroll-margin-top: 9rem; }
+  .legal-qa, .legal-terms { max-width: 65ch; margin-top: 1rem; }
+  .legal-qa > div { display: grid; gap: 0.25rem; border-top: 1px solid var(--color-line); padding-block: 1rem; }
+  .legal-qa dt { font-weight: 700; }
+  .legal-terms > li { border-top: 1px solid var(--color-line); padding-block: 0.875rem; }
+  .legal-contact { display: flex; flex-direction: column; align-items: flex-start; gap: 0.75rem; max-width: 65ch; border-radius: var(--radius-panel); background: var(--color-brand-soft); padding: clamp(1.25rem, 4vw, 2rem); }
+  @media (min-width: 40rem) {
+    .legal-qa > div { grid-template-columns: 11rem minmax(0, 1fr); column-gap: 1.5rem; }
+  }
+  @media (min-width: 64rem) {
+    .legal { grid-template-columns: 11rem minmax(0, 1fr); column-gap: 4rem; margin-top: 3rem; }
+    .legal-nav { position: sticky; top: 6rem; align-self: start; }
+    .legal-nav ul { flex-direction: column; margin-inline-start: -0.9rem; }
+    .legal-nav .nav-link { padding-inline: 0.9rem; }
+  }
+
   /* Página de amostras (só em desenvolvimento) */
   .specimen-swatch { display: flex; flex-direction: column; border: 1px solid var(--color-border-subtle); border-radius: var(--radius-surface); background: var(--color-surface); padding: 0.5rem; font-size: var(--text-caption); }
 }
@@ -496,6 +520,7 @@
   .meter > span { background: Highlight; }
   .notice { border: 1px solid CanvasText; }
   .setup-dock-inner, .step-card, .venue-map, .guest-notice, .confirm-dialog { border-color: CanvasText; }
+  .legal-contact { border: 1px solid CanvasText; }
   :focus-visible { outline-color: Highlight; }
 }
 

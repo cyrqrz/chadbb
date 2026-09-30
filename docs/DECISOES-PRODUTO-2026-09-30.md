@@ -58,6 +58,25 @@ Substitui as menções a 18/10. Nenhuma data fica fixa em código ou documento.
 - Em 02/11: copiar o resumo com presentes e encerrar o evento da Liz. Os
   dados pessoais são excluídos 30 dias depois, conforme a política vigente.
 
+## Ações sem volta (E1–E5)
+
+Hoje encerrar é irreversível, excluir apaga na hora e de vez, e não há como
+baixar os dados antes do expurgo de 30 dias.
+
+- **Lixeira (E1):** excluir move o evento para a lixeira por **7 dias**, com
+  "Restaurar"; depois apaga de vez. Na lixeira, convites mostram "convite
+  indisponível". Os termos passam a citar os 7 dias.
+- **Reabrir (E2):** evento encerrado pode ser reaberto até o **início** do
+  evento. E-mails de lembrete de quem está em Talvez ficam preservados enquanto
+  o evento está encerrado ou na lixeira e voltam a valer ao reabrir/restaurar.
+- **Baixar dados (E3):** "Baixar dados do evento" (CSV com convidados, respostas
+  e presentes) até o expurgo, e aviso no painel "Os dados deste evento serão
+  apagados em dd/mm". Junto com "Copiar resumo".
+- **Limite (E4):** o expurgo de 30 dias após o fim continua definitivo.
+- **Quando (E5):** lixeira e reabertura com a T9; planilha e aviso com a T10.
+  A frase "Encerrar um evento não pode ser desfeito." da página de privacidade
+  só muda quando a E2 for publicada.
+
 ## Operação (Q5–Q7)
 
 - Cópia cifrada de `~/.config/chadbb/` em um segundo local do titular, com a
@@ -80,8 +99,8 @@ Substitui as menções a 18/10. Nenhuma data fica fixa em código ou documento.
 | 02–04/10 | T7 Ensaio familiar (um Talvez com e-mail real) e leitor de tela | — |
 | **até 08/10** | **Envio dos convites da Liz** (Q24) | — |
 | após o envio | T8 Restauração com dados reais e medição do RTO (T-B6) | dry-run e aprovação |
-| 06–15/10 | T9 Prazo configurável, trava, Talvez sem lembrete em prazo curto, destaque no painel | contrato → testes RED → migration com dry-run → banco antes do front; revisão independente |
-| 16–20/10 | T10 "Copiar resumo" com opção de presentes por pessoa | commit/PR |
+| 06–15/10 | T9 Prazo configurável, trava, Talvez sem lembrete em prazo curto, destaque no painel; lixeira de 7 dias e reabrir encerrado (E1–E2) | contrato → testes RED → migration com dry-run → banco antes do front; revisão independente |
+| 16–20/10 | T10 "Copiar resumo" com opção de presentes por pessoa; "Baixar dados do evento" e aviso de expurgo (E3) | commit/PR |
 | 22–25/10 | T11 Acompanhar o primeiro lembrete real | — |
 | 02/11 | T12 Copiar resumo com presentes e encerrar o evento da Liz | irreversível: confirmação do titular |
 | após 01/11 | T13 Reabrir cadastro, grupo fechado, cobrança, lembrete de 45 dias | — |
