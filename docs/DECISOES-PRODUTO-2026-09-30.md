@@ -15,6 +15,12 @@ Este documento decide e registra; não autoriza escrita remota, commit ou deploy
   Cadastro público fechado em produção; reabre depois do evento.
 - **Termos e privacidade (Q9):** antes do envio dos convites da Liz: página
   `/privacidade`, aviso no convite e termos na criação do evento.
+  Detalhes da T4 (30/09): página única `/privacidade` com seções para
+  convidados e organizadores; contato `contato@chadbb.online` via Cloudflare
+  Email Routing (precisa funcionar antes da publicação); "mantido por Leonardo
+  Martins"; aceite por frase com link na criação do evento, sem registro no
+  banco até abrir ao público. Links no convite e no rodapé abrem em nova aba,
+  porque o convite guarda a sessão só na memória da página.
 - **Catálogo (Q10):** curado pelo titular, via migration. Sem painel admin
   enquanto o catálogo mudar menos de uma vez por mês.
 - **Custos (Q21):** planos gratuitos até haver família pagante ou limite que

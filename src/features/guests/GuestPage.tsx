@@ -187,6 +187,7 @@ export function GuestEvent({ access, preview = false }: { access: { token: strin
         {event.address && <a className="secondary self-start" href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(event.address)}`} target="_blank" rel="noopener noreferrer">Como chegar<span className="sr-only"> (abre em nova aba)</span></a>}
       </div>
     </InviteSection>
+    <p className="hint mt-10">Seus dados servem só para este evento e são apagados 30 dias depois dele. <a className="text-link" href="/privacidade#convidados" target="_blank" rel="noopener">Privacidade<span className="sr-only"> (abre em nova aba)</span></a></p>
   </div>
 }
 

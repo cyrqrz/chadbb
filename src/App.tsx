@@ -20,6 +20,7 @@ const GuestPage = lazy(() => import('./features/guests/GuestPage').then(m => ({ 
 const SpecimensPage = import.meta.env.DEV ? lazy(() => import('./features/specimens/SpecimensPage').then(m => ({ default: m.SpecimensPage }))) : null
 const InvitePreview = lazy(() => import('./features/guests/InvitePreview').then(m => ({ default: m.InvitePreview })))
 const InvitationsPage = lazy(() => import('./features/guests/InvitationsPage').then(m => ({ default: m.InvitationsPage })))
+const PrivacyPage = lazy(() => import('./features/legal/PrivacyPage').then(m => ({ default: m.PrivacyPage })))
 
 export function App() {
   return <QueryClientProvider client={queryClient}><BrowserRouter><AuthProvider>
@@ -28,6 +29,7 @@ export function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/convite" element={<GuestPage />} />
         <Route path="/entrar" element={<LoginPage />} />
+        <Route path="/privacidade" element={<PrivacyPage />} />
         {SpecimensPage && <Route path="/amostras" element={<SpecimensPage />} />}
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route element={<RequireAuth />}>
