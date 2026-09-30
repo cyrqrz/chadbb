@@ -221,6 +221,7 @@ function Presence({ data, busy, closed, save }: { data: Snapshot; busy: boolean;
   const policy = data.rsvp
   const [email, setEmail] = useState('')
   const emailHint = useId()
+  const deadline = useId()
   const [draft, setDraft] = useState<{ response: ResponseChoice; attending: number; version: number } | null>(null)
   const [keepGifts, setKeepGifts] = useState(false)
   // Quantas reservas já saíram quando o cancelamento em série para no meio.
@@ -262,7 +263,9 @@ function Presence({ data, busy, closed, save }: { data: Snapshot; busy: boolean;
   return <div ref={card} tabIndex={-1} className="card invite-card">
     <p className="text-muted">Resposta atual: {responseLabels[inv.response]}{inv.response === 'yes' ? ` · ${inv.attending} pessoa(s)` : ''}.</p>
     {closed ? <p>As respostas foram encerradas. Para mudar algo, fale com a organização.</p> : <form className="flex flex-col gap-5" onSubmit={submit}>
-      <fieldset disabled={busy}><legend className="font-semibold">Sua confirmação</legend>
+      {/* O prazo é do servidor (rsvp_policy); o convite só exibe. */}
+      <fieldset disabled={busy} aria-describedby={policy.maybe_allowed ? deadline : undefined}><legend className="font-semibold">Sua confirmação</legend>
+        {policy.maybe_allowed && <p id={deadline} className="hint mt-1">Confirme até {eventDate(policy.maybe_closes_at, { dateStyle: 'short', timeStyle: 'short' })} (Brasília).</p>}
         <div className={`mt-3 grid gap-3 ${policy.maybe_allowed ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>{(['yes', 'no', ...(policy.maybe_allowed ? ['maybe'] : [])] as ResponseChoice[]).map(response => <label key={response} className="choice"><input type="radio" name="presence" checked={value.response === response} onChange={() => setDraft({ ...value, response, attending: value.attending || 1 })} />{responseLabels[response]}</label>)}</div>
       </fieldset>
       {value.response === 'maybe' && policy.maybe_allowed && <label className="field">E-mail para o lembrete

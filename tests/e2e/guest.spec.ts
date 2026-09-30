@@ -1036,9 +1036,19 @@ test('Talvez exige email e envia contato só ao confirmar', async ({ page }) => 
   expect((await sent).postDataJSON().payload).toMatchObject({ response: 'maybe', reminder_email: 'guest@example.test' })
 })
 
+test('prazo de confirmação vem do servidor e descreve a escolha', async ({ page }) => {
+  await backend(page)
+  await page.goto(`/convite#${token}`)
+  const deadline = 'Confirme até 31/08/2035, 14:30 (Brasília).'
+  await expect(page.getByText(deadline, { exact: true })).toBeVisible()
+  await expect(page.getByRole('group', { name: 'Sua confirmação' })).toHaveAccessibleDescription(deadline)
+  await expectAccessible(page)
+})
+
 test('servidor fecha Talvez mesmo com data do evento distante; resposta atual continua legível', async ({ page }) => {
   await backend(page, { invitation: { response: 'maybe' }, rsvp: { maybe_allowed: false, reminder_sent: true } })
   await page.goto(`/convite#${token}`)
+  await expect(page.getByText('Confirme até 31/08/2035, 14:30 (Brasília).', { exact: true })).toHaveCount(0)
   await expect(page.getByRole('radio', { name: 'Talvez' })).toHaveCount(0)
   await expect(page.getByText('Resposta atual: Talvez.')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Confirmar presença', exact: true })).toBeDisabled()
