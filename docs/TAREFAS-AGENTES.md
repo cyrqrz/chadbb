@@ -1,6 +1,20 @@
 # Tarefas e combinados entre agentes
 
-## Em andamento — 2026-09-24
+## Em andamento — 2026-09-30
+
+Troca de sessão solicitada pelo titular: continuar pelo
+[handoff para Claude de 30/09](HANDOFF-CLAUDE-2026-09-30.md). Implementação e
+testes locais concluídos; sem autorização de commit/push ou publicação.
+
+Codex na `clone-main`: avisos de lembretes no painel, solicitados pelo titular.
+G1: contrato e testes novos com falha antes da implementação. G2: migration
+`20260930000000_panel_rsvp_reminders.sql`, tipos e painel implementados; revisão
+independente sem achados. G3: validação local, evidências em
+[revisão de 30/09](reviews/2026-09-30-panel-rsvp-reminders.md).
+G4: revisar diff antes de commit/push e aprovar aplicação da migration em
+produção antes de publicar o front. Nenhuma escrita remota nesta tarefa.
+
+## Histórico — 2026-09-24 (integrado até o PR #31)
 
 Codex na branch temporária `codex/convite-rsvp-mimos`: instruções no cabeçalho
 do convite, mimos compactos e prazo de Talvez com lembrete por e-mail. G1:

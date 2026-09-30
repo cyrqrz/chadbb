@@ -18,7 +18,7 @@ const event: EventRecord = { id: eventId, owner_id: userId, type: 'baby_shower',
   personal_data_purged_at: null, guests_done_at: '2026-01-02T00:00:00Z', gifts_done_at: '2026-01-02T00:00:00Z', cover_path: null, version: 3, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' }
 function invitation(n: number, fields: Partial<Invitation>): Invitation {
   return { id: `30000000-0000-4000-8000-00000000000${n}`, name: `Convidado fictício ${n}`, kind: 'family', capacity: 4, response: 'pending',
-    attending: 0, version: 1, revoked: false, expires_at: '2035-09-17T17:30:00Z', ...fields }
+    attending: 0, version: 1, revoked: false, auto_declined: false, expires_at: '2035-09-17T17:30:00Z', ...fields }
 }
 const diaper = (n: number, size: 'P' | 'M' | 'G' | 'XG', limit: number, committed: number) =>
   ({ id: `40000000-0000-4000-8000-00000000000${n}`, title: `Fraldas tamanho ${size}`, category: 'fralda' as const, diaper_size: size,
@@ -45,8 +45,31 @@ const full: Dashboard = {
     reservation(2, 1, { title: 'Mamadeira fictícia', category: 'mimo', diaper_size: null, quantity: 2, status: 'purchase_declared' }),
   ],
   // Contagens conferidas com os convites acima; o front só exibe o que chega.
-  summary: { invitations: { total: 5, answered: 4, yes: 2, no: 1, maybe: 1, pending: 1, revoked: 1 }, people_confirmed: 5 },
+  summary: { reminders: { pending: 0, attention: 0 }, invitations: { total: 5, answered: 4, yes: 2, no: 1, maybe: 1, pending: 1, revoked: 1 }, people_confirmed: 5 },
 }
+
+test('lembretes no painel: origem automática, contagens do servidor e atualização', async ({ page }) => {
+  let updated = false
+  await backend(page, () => ({ status: 200, json: { ...full,
+    invitations: [invitation(1, { response: 'no', auto_declined: !updated }), invitation(2, { response: 'no' })],
+    summary: { ...full.summary, reminders: updated ? { pending: 0, attention: 0 } : { pending: 7, attention: 2 } },
+  } }))
+  await page.setViewportSize({ width: 320, height: 800 })
+  await page.goto(`/eventos/${eventId}/convites`)
+  const reminders = page.getByRole('region', { name: 'Lembretes de confirmação' })
+  await expect(reminders.getByText('Aguardando envio', { exact: true }).locator('..')).toContainText('7')
+  await expect(reminders.getByText('Precisam de atenção').locator('..')).toContainText('2')
+  await expect(reminders).toContainText('Fale com o suporte')
+  await expect(page.locator('.badge').filter({ hasText: 'Não poderá ir (automático)' })).toHaveCount(1)
+  await expect(page.getByText('Não houve nova resposta após o prazo do lembrete.')).toBeVisible()
+  await expectAccessible(page)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  updated = true
+  await expect(reminders.getByText('Aguardando envio', { exact: true }).locator('..')).toContainText('0', { timeout: 12_000 })
+  await expect(reminders.getByText('Precisam de atenção').locator('..')).toContainText('0')
+  await expect(reminders.getByText('Fale com o suporte', { exact: false })).toHaveCount(0)
+  await expect(page.locator('.badge').filter({ hasText: 'Não poderá ir (automático)' })).toHaveCount(0)
+})
 
 type Reply = (request: { url: URL; body: Record<string, unknown> }) => { status: number; json: unknown; headers?: Record<string, string> }
 const none: Reply = () => ({ status: 200, json: [], headers: { 'content-range': '*/0' } })
@@ -103,7 +126,7 @@ test('painel separa convites, pessoas, fraldas por tamanho e mimos', async ({ pa
 
 test('painel usa o resumo e o saldo enviados pelo servidor', async ({ page }) => {
   const fromServer = { ...full,
-    summary: { invitations: { total: 5, answered: 3, yes: 1, no: 1, maybe: 1, pending: 2, revoked: 1 }, people_confirmed: 3 },
+    summary: { reminders: { pending: 0, attention: 0 }, invitations: { total: 5, answered: 3, yes: 1, no: 1, maybe: 1, pending: 2, revoked: 1 }, people_confirmed: 3 },
     items: full.items.map(item => ({ ...item, available: item.diaper_size === 'M' ? 11 : item.limit === null ? null : 0 })) }
   await backend(page, () => ({ status: 200, json: fromServer }))
   await page.goto(`/eventos/${eventId}/convites`)
@@ -116,7 +139,7 @@ test('painel usa o resumo e o saldo enviados pelo servidor', async ({ page }) =>
 
 test('painel vazio orienta o próximo passo', async ({ page }) => {
   await backend(page, () => ({ status: 200, json: { rsvp: rsvpFixture, invitations: [], items: [], reservations: [],
-    summary: { invitations: { total: 0, answered: 0, yes: 0, no: 0, maybe: 0, pending: 0, revoked: 0 }, people_confirmed: 0 } } }))
+    summary: { reminders: { pending: 0, attention: 0 }, invitations: { total: 0, answered: 0, yes: 0, no: 0, maybe: 0, pending: 0, revoked: 0 }, people_confirmed: 0 } } }))
   await page.goto(`/eventos/${eventId}/convites`)
   await expect(page.getByRole('article', { name: 'Pessoas' })).toContainText('0pessoas confirmadas')
   await expect(page.getByText('Nenhum tamanho de fralda na lista.')).toBeVisible()

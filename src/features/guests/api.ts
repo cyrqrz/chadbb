@@ -14,8 +14,9 @@ export type Snapshot = {
   event: { id: string; title: string; description: string; starts_at: string; address: string; instructions: string; cover_path: string | null; status: string }
   items: GuestItem[]
 }
-export type Invitation = Snapshot['invitation'] & { id: string; revoked: boolean; expires_at: string }
+export type Invitation = Snapshot['invitation'] & { id: string; revoked: boolean; expires_at: string; auto_declined: boolean }
 export type PanelSummary = {
+  reminders: { pending: number; attention: number }
   invitations: { total: number; answered: number; yes: number; no: number; maybe: number; pending: number; revoked: number }
   people_confirmed: number
 }

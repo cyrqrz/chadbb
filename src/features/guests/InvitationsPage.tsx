@@ -100,6 +100,7 @@ export function InvitationsPage() {
     <RefreshStatus fetching={query.isFetching} failed={query.isError} onRetry={() => void query.refetch()} label="Atualizando painel…" />
     {event.data && <StepCompletion event={event.data} step="guests" />}
     <Summary summary={data.summary} />
+    <ReminderSummary reminders={data.summary.reminders} />
 
     <section className="mt-10" aria-labelledby="invites-title">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -169,8 +170,9 @@ function GuestCard({ invitation: inv, sending, canEdit, canRevoke, onEdit, onRot
       </div>
       <h3 className="card-title">{inv.name}</h3>
     </header>
-    <p className="card-badges"><StatusBadge tone={responseTones[inv.response]} icon={responseIcons[inv.response]}>{responseLabels[inv.response]}{inv.response === 'yes' ? ` · ${inv.attending} pessoa(s)` : ''}</StatusBadge>
+    <p className="card-badges"><StatusBadge tone={responseTones[inv.response]} icon={responseIcons[inv.response]}>{inv.auto_declined ? 'Não poderá ir (automático)' : responseLabels[inv.response]}{inv.response === 'yes' ? ` · ${inv.attending} pessoa(s)` : ''}</StatusBadge>
       {sending && <StatusBadge tone="brand">Vai enviar presente</StatusBadge>}</p>
+    {inv.auto_declined && <p className="hint">Não houve nova resposta após o prazo do lembrete.</p>}
     {inv.revoked && <p className="hint">O link antigo não funciona mais; as respostas e escolhas foram preservadas.</p>}
     <div className="card-actions">
       <Button variant="secondary" size="sm" disabled={!canEdit} onClick={onEdit}>Editar convite<span className="sr-only"> de {inv.name}</span></Button>
@@ -218,6 +220,19 @@ function Summary({ summary }: { summary: PanelSummary }) {
         {inv.revoked > 0 && <p className="hint">{inv.revoked} {inv.revoked === 1 ? 'convite está' : 'convites estão'} com acesso revogado.</p>}
       </article>
     </div>
+  </section>
+}
+
+function ReminderSummary({ reminders }: { reminders: PanelSummary['reminders'] }) {
+  return <section className="mt-6" aria-labelledby="reminders-title">
+    <h2 id="reminders-title" className="text-xl font-semibold">Lembretes de confirmação</h2>
+    <p className="hint mt-2">Acompanhamento dos convites com resposta “Talvez”.</p>
+    <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+      <div className="flex justify-between gap-3 border-b border-stone-200 py-2"><dt>Aguardando envio</dt><dd className="font-semibold">{reminders.pending}</dd></div>
+      <div className="flex justify-between gap-3 border-b border-stone-200 py-2"><dt>Precisam de atenção</dt><dd className="font-semibold">{reminders.attention}</dd></div>
+    </dl>
+    <p className="hint mt-2">Aguardando envio inclui lembretes agendados e novas tentativas. Lembretes já enviados não entram nessas contagens.</p>
+    {reminders.attention > 0 && <p className="state state-warning mt-3">Há convites sem lembrete ativo ou com envio atrasado. Fale com o suporte para conferir antes de reenviar. Falha no envio não muda a resposta para “Não poderá ir”.</p>}
   </section>
 }
 

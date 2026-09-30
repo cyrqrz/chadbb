@@ -1266,6 +1266,7 @@ test('R2/R3: helper privado e mutações da lista continuam restritos ao proprie
 test('T-B7: resumo vazio, respostas, revogação e isolamento calculados no servidor', async () => {
   const empty = await create()
   assert.deepEqual((await organizerAction(empty, 'list')).summary, {
+    reminders: { pending: 0, attention: 0 },
     invitations: { total: 0, answered: 0, yes: 0, no: 0, maybe: 0, pending: 0, revoked: 0 },
     people_confirmed: 0, diapers: { committed: 0, limit: 0 },
   })
@@ -1281,6 +1282,7 @@ test('T-B7: resumo vazio, respostas, revogação e isolamento calculados no serv
   await familyFixture() // Outro evento não participa das contagens.
   const summary = (await organizerAction(f.event, 'list')).summary
   assert.deepEqual(summary, {
+    reminders: { pending: 1, attention: 0 },
     invitations: { total: 4, answered: 3, yes: 1, no: 1, maybe: 1, pending: 1, revoked: 1 },
     people_confirmed: 3, diapers: { committed: 0, limit: 50 },
   })

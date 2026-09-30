@@ -1,5 +1,13 @@
 # Retomar o chadbb em outra máquina
 
+## Retomada em 30/09/2026 — Claude após Codex
+
+Leia primeiro [HANDOFF-CLAUDE-2026-09-30.md](HANDOFF-CLAUDE-2026-09-30.md).
+Avisos de lembretes no painel implementados e testados na `clone-main`, em
+`C:\Users\leonardo.martins\chadbb`, **sem commit/push**. Há arquivos novos não
+rastreados. G4 de publicação aguarda autorização; preservar o diff local.
+As seções abaixo são históricas.
+
 ## Retomada em 24/09/2026 — trabalho em andamento com Claude
 
 Leia primeiro [HANDOFF-CLAUDE-2026-09-24.md](HANDOFF-CLAUDE-2026-09-24.md).
