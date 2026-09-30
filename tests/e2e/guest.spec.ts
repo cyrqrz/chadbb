@@ -1079,3 +1079,11 @@ test('mimos em linhas compactas mantêm quantidade e ações acessíveis', async
   await expect(row.getByText('2 unidades', { exact: true })).toBeVisible()
   await expectAccessible(page)
 })
+
+// O banco ordena `diaper_size` como texto (G, M, P, XG); o convite mostra do menor ao maior.
+test('fraldas aparecem do menor ao maior tamanho: P, M, G, XG', async ({ page }) => {
+  const size = (n: number, s: 'P' | 'M' | 'G' | 'XG'): GuestItem => ({ ...diaper, id: `70000000-0000-4000-8000-00000000001${n}`, title: `Fraldas tamanho ${s}`, diaper_size: s })
+  await backend(page, { items: [size(1, 'G'), size(2, 'M'), size(3, 'P'), size(4, 'XG')] })
+  await page.goto(`/convite#${token}`)
+  await expect(page.locator('.invite-gift').getByRole('heading')).toHaveText(['Fraldas tamanho P', 'Fraldas tamanho M', 'Fraldas tamanho G', 'Fraldas tamanho XG'])
+})

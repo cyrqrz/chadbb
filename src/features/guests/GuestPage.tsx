@@ -9,6 +9,7 @@ import { buildIcs, googleCalendarUrl } from '../../lib/ics'
 import { coverUrl } from '../events/api'
 import { EmptyState, ErrorState, LoadingState, RefreshStatus, SuccessMessage } from '../../components/States'
 import { Availability, Button, QuantityField, Skeleton, StatusBadge, Tabs } from '../../components/ui'
+import { bySize } from '../../lib/diapers'
 
 // O efeito reutiliza a promessa no StrictMode, sem compartilhar credenciais
 // entre montagens. Abrir outro fragmento invalida o acesso anterior imediatamente.
@@ -175,7 +176,7 @@ export function GuestEvent({ access, preview = false }: { access: { token: strin
       <div key={tab} className="fade-swap flex flex-col gap-4">
         <p className="font-bold">{tab === 'fralda' ? 'Qual tamanho você vai levar?' : 'Um mimo, se quiser'}</p>
         <p className="section-description">{tab === 'fralda' ? 'Escolha um ou mais pacotes. As quantidades disponíveis ajudam a equilibrar os tamanhos para o bebê.' : 'Escolha os mimos e informe quantas unidades. Não há limite de mimos.'}</p>
-        <div className={tab === 'mimo' ? 'guest-treat-list' : 'stagger grid gap-4 md:grid-cols-2 lg:grid-cols-3'}>{data.items.filter(item => item.category === tab).map(item => <GuestGift key={item.id} item={item} alternatives={data.items.filter(candidate => candidate.category === 'fralda' && candidate.id !== item.id)} busy={busy} closed={closed} save={mutate} feedback={feedback(item.id)} />)}</div>
+        <div className={tab === 'mimo' ? 'guest-treat-list' : 'stagger grid gap-4 md:grid-cols-2 lg:grid-cols-3'}>{bySize(data.items.filter(item => item.category === tab)).map(item => <GuestGift key={item.id} item={item} alternatives={bySize(data.items.filter(candidate => candidate.category === 'fralda' && candidate.id !== item.id))} busy={busy} closed={closed} save={mutate} feedback={feedback(item.id)} />)}</div>
         {!data.items.some(item => item.category === tab) && <EmptyState title="A organização está preparando esta lista.">Volte em breve para escolher.</EmptyState>}
       </div>
     </InviteSection>

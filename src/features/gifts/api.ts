@@ -57,7 +57,8 @@ export async function addCustomTreat(eventId: string, title: string, description
   if (error) throw error
   return data as Omit<EventItem, 'product'>
 }
-export const DIAPER_SIZES = ['P', 'M', 'G', 'XG'] as const
+import { DIAPER_SIZES } from '../../lib/diapers'
+export { DIAPER_SIZES }
 export type DiaperAmounts = Record<(typeof DIAPER_SIZES)[number], number>
 export async function prepareList(eventId: string, diapers?: DiaperAmounts) {
   const { data, error } = await getClient().rpc('prepare_family_list', diapers ? { p_event_id: eventId, p_diapers: diapers } : { p_event_id: eventId })
