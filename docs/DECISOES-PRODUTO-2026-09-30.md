@@ -74,8 +74,9 @@ baixar os dados antes do expurgo de 30 dias.
   apagados em dd/mm". Junto com "Copiar resumo".
 - **Limite (E4):** o expurgo de 30 dias após o fim continua definitivo.
 - **Quando (E5):** lixeira e reabertura com a T9; planilha e aviso com a T10.
-  A frase "Encerrar um evento não pode ser desfeito." da página de privacidade
-  só muda quando a E2 for publicada.
+  A frase "Encerrar um evento não pode ser desfeito." saiu da página de
+  privacidade em 30/09, a pedido do titular; a T9 acrescenta o texto sobre
+  reabrir e lixeira quando publicar a E1–E2.
 
 ## Operação (Q5–Q7)
 

@@ -21,7 +21,6 @@ const organizerTerms = [
   'Cadastre só quem você convidaria de qualquer forma e só o necessário. Não coloque dados sensíveis nas instruções.',
   'Você responde pelo conteúdo do evento. A imagem de capa fica acessível a quem tiver o endereço dela; use só imagens autorizadas.',
   'Seu e-mail é guardado para o login. Do evento, 30 dias depois do fim, ficam só o título e as datas. Para apagar sua conta, use o contato.',
-  'Encerrar um evento não pode ser desfeito.',
   'Fazemos backup diário, mas não garantimos disponibilidade contínua.',
   'O chadbb não vende nem intermedia pagamentos. As compras de presentes são feitas diretamente nas lojas.',
 ]
