@@ -289,3 +289,19 @@ async function expectAccessible(page: Page) {
   expect(report.violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.target) }))).toEqual([])
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
 }
+
+// Com todos os tamanhos do catálogo na lista, "Adicionar à lista" não teria o que
+// oferecer: a seção vazia e o atalho do cabeçalho saem, e uma linha diz o que fazer.
+test('fraldas completas: sem seção vazia de adicionar, com orientação para ajustar quantidades', async ({ page }) => {
+  await open(page, { catalog: () => fourSizes.map(row => row.product) })
+  const region = diapersRegion(page)
+  await expect(region.getByText('4 itens', { exact: true })).toBeVisible()
+  await expect(page.getByText('Todos os tamanhos de fralda já estão na lista. Para pedir mais ou menos pacotes, ajuste a quantidade de cada tamanho acima.')).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Adicionar à lista' })).toHaveCount(0)
+  await expect(region.getByRole('link', { name: 'Adicionar à lista' })).toHaveCount(0)
+  expect(await page.locator('a[href="#adicionar"]').count()).toBe(0)
+  // Na aba Mimos a seção continua: o mimo próprio sempre pode entrar.
+  await page.getByRole('button', { name: 'Mimos', exact: true }).click()
+  await expect(page.getByRole('region', { name: 'Adicionar à lista' })).toBeVisible()
+  await expectAccessible(page)
+})

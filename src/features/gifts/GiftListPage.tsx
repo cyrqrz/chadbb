@@ -61,6 +61,8 @@ function GiftList({ eventId, closed, eventStatus, step }: { eventId: string; clo
   const amountsValid = chosen === null || chosen.every(amount => amount !== null)
   // O cartão removido some: o foco vai para o aviso, e não para o início da página.
   const [removed, setRemoved] = useState({ title: '', count: 0 })
+  // Todos os tamanhos já na lista: o atalho de adicionar levaria a uma seção sem o que oferecer.
+  const [catalogComplete, setCatalogComplete] = useState(false)
   const removedNotice = useRef<HTMLParagraphElement>(null)
   useEffect(() => { if (removed.count) removedNotice.current?.focus() }, [removed])
   function onRemoved(title: string) {
@@ -106,7 +108,7 @@ function GiftList({ eventId, closed, eventStatus, step }: { eventId: string; clo
         <h2 id="list-title" className="text-2xl font-bold">{categoryLabels[category]} na lista</h2>
         {/* Some enquanto carrega e na lista vazia: lá o próprio estado vazio já diz o que há. */}
         {count > 0 && <span className="badge badge-neutral list-count">{count} {count === 1 ? 'item' : 'itens'}</span>}
-        {!closed && <a className="secondary btn-sm list-toolbar-cta" href="#adicionar" onClick={event => {
+        {!closed && !catalogComplete && <a className="secondary btn-sm list-toolbar-cta" href="#adicionar" onClick={event => {
           const target = document.getElementById('adicionar')
           if (!target) return
           // Sem entrada no histórico: no celular o primeiro "voltar" só tiraria o `#adicionar`.
@@ -125,7 +127,7 @@ function GiftList({ eventId, closed, eventStatus, step }: { eventId: string; clo
       {/* Fora dos ramos de estado: a paginação continua montada ao carregar e na falha, e o foco não cai. */}
       {total !== null && <Pagination page={page} count={total} pageSize={PAGE_SIZE} onChange={setPage} label="Paginação da lista" />}
     </section>
-    {!closed && <Catalog key={category} eventId={eventId} category={category} listed={listed.data} listedFailed={listed.errorUpdatedAt > listed.dataUpdatedAt} listedFetching={listed.isFetching} retryListed={() => void listed.refetch()} />}
+    {!closed && <Catalog key={category} eventId={eventId} category={category} listed={listed.data} listedFailed={listed.errorUpdatedAt > listed.dataUpdatedAt} listedFetching={listed.isFetching} retryListed={() => void listed.refetch()} onComplete={setCatalogComplete} />}
   </div>
 }
 // §10: enquanto a lista carrega, o espaço reservado tem a forma das linhas. O anúncio
@@ -335,8 +337,8 @@ function CustomTreatForm({ eventId }: { eventId: string }) {
 }
 // Uma seção só para incluir: mimo próprio (na aba Mimos) e as sugestões do catálogo
 // que ainda não estão na lista. O catálogo é pequeno e vem inteiro, sem busca.
-function Catalog({ eventId, category, listed, listedFailed, listedFetching, retryListed }: {
-  eventId: string; category: Category; listed?: { product_id: string; diaper_size: DiaperSize | null }[]; listedFailed: boolean; listedFetching: boolean; retryListed: () => void
+function Catalog({ eventId, category, listed, listedFailed, listedFetching, retryListed, onComplete }: {
+  eventId: string; category: Category; listed?: { product_id: string; diaper_size: DiaperSize | null }[]; listedFailed: boolean; listedFetching: boolean; retryListed: () => void; onComplete: (complete: boolean) => void
 }) {
   const { session } = useAuth()
   const query = useQuery({ queryKey: [...giftKeys.catalog, session?.user.id, category], queryFn: () => listProducts('', 0, category, CATALOG_LIMIT) })
@@ -350,6 +352,12 @@ function Catalog({ eventId, category, listed, listedFailed, listedFetching, retr
   // Sem saber o que já está na lista (falha), mostra tudo: o banco recusa repetição.
   const suggestions = query.data?.products.filter(product => listedFailed || !isListed(product)) ?? []
   const noun = category === 'fralda' ? 'tamanhos de fralda' : 'mimos'
+  // Fraldas completas: sem sugestão e sem mimo próprio, a seção inteira ficaria vazia.
+  // O aviso de inclusão segura a seção até o fim, para o foco não cair no vazio.
+  const complete = category === 'fralda' && !!listed && !listedFailed && !added.title && !!query.data?.count
+    && !suggestions.length && query.data.count <= query.data.products.length
+  useEffect(() => { onComplete(complete) }, [complete, onComplete])
+  if (complete) return <p className="mt-10 text-muted">Todos os tamanhos de fralda já estão na lista. Para pedir mais ou menos pacotes, ajuste a quantidade de cada tamanho acima.</p>
   // `tabIndex` no alvo do atalho: o “Adicionar à lista” do cabeçalho leva o foco para cá,
   // e não só a rolagem — quem usa teclado continua de onde a página parou.
   return <section id="adicionar" tabIndex={-1} aria-labelledby="catalog-title" className="mt-14 border-t border-stone-300 pt-10">
@@ -362,7 +370,7 @@ function Catalog({ eventId, category, listed, listedFailed, listedFetching, retr
       {(query.isPending && !(failedLast(query) && catalogError)) || (!listed && !listedFailed) ? <LoadingState>Carregando sugestões…</LoadingState>
         : !query.data ? <div className="mt-4"><ErrorState message={errorMessage(catalogError)} busy={query.isFetching} onRetry={() => void query.refetch()} retryLabel="Recarregar sugestões" /></div>
         : !query.data.count ? <p className="mt-3 text-muted">O catálogo ainda não tem {noun}.</p>
-        : !suggestions.length && query.data.count <= query.data.products.length ? <p className="mt-3 text-muted">Todos os {noun} do catálogo já estão na lista.</p>
+        : !suggestions.length && query.data.count <= query.data.products.length ? <p className="mt-3 text-muted">{category === 'mimo' ? 'Você já adicionou todas as sugestões. Para incluir outros mimos, use o formulário acima.' : `Todos os ${noun} do catálogo já estão na lista.`}</p>
         : <>{query.data.count > query.data.products.length && <p className="mt-3 text-muted">Mostrando {query.data.products.length} de {query.data.count} sugestões do catálogo.</p>}<ul className="catalog-rows stagger mt-4">{suggestions.map(product => <li key={product.id}><ProductCard product={product} eventId={eventId} onAdded={title => setAdded(current => ({ title, count: current.count + 1 }))} /></li>)}</ul></>}
     </section>
   </section>
