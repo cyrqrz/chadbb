@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { Link, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { backend, supabase } from '../../lib/supabase'
 import { errorMessage } from '../../lib/errors'
+import { CONTACT } from '../../lib/contact'
 import { LINK_FAILED, useAuth } from './context'
 import { rememberDestination, safeInternalPath, takeDestination } from './destination'
 import { ErrorState, LoadingState, SuccessMessage } from '../../components/States'
@@ -37,6 +38,10 @@ function sendFailure(cause: unknown): { text: string; wait: number } {
   // boa — o problema é o endereço ou o remetente.
   if (failure.status === 500 || failure.code === 'unexpected_failure') {
     return { text: 'Não conseguimos enviar o e-mail para este endereço. Confira se ele está escrito certo ou fale com a organização.', wait: 0 }
+  }
+  // Cadastro público fechado (T3): o Auth recusa criar conta para e-mail novo.
+  if (failure.code === 'otp_disabled' || failure.code === 'signup_disabled' || /signups? not allowed/i.test(failure.message ?? '')) {
+    return { text: `Este e-mail ainda não tem acesso. Nesta fase, o chadbb funciona por convite: peça acesso em ${CONTACT}.`, wait: 0 }
   }
   if (failure.status !== 429) return { text: errorMessage(cause), wait: 0 }
   const seconds = Number(/after (\d+) seconds?/i.exec(failure.message ?? '')?.[1])

@@ -1,9 +1,9 @@
 import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
+import { CONTACT } from '../../lib/contact'
 
 // Texto aprovado pelo titular em 30/09 (T4 de docs/DECISOES-PRODUTO-2026-09-30.md).
 // Descreve o que o sistema faz: mudar retenção, dados ou fornecedores exige mudar aqui.
-export const CONTACT = 'contato@chadbb.online'
 const UPDATED = '30 de setembro de 2026'
 
 // Pergunta e resposta: quem chega pelo convite procura uma dúvida, não lê de cima a baixo.
