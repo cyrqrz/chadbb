@@ -2,6 +2,21 @@
 
 ## Em andamento — 2026-09-30
 
+**Retomada Codex após Claude (base `898ec1f`).** PRs #32–#37 mergeados,
+conforme informado pelo titular. Preservadas as alterações locais de dois
+assuntos: fraldas sem seção vazia e login por código sem link. Evidências e gates em
+[revisão da retomada](reviews/2026-09-30-login-code-only.md).
+G1: os dois testes de e-mail local passaram; revisão independente sem defeito
+funcional. G2 autorizado pelo titular nesta retomada: fraldas no commit
+`d287bc7` e texto de Mimos em `0a10a73`,
+[PR #38](https://github.com/cyrqrz/chadbb/pull/38) mergeado pelo titular.
+`clone-main` atualizada por fast-forward para `a4e0d6a` antes do commit de
+login `891b136`; documentação em commit separado, no PR seguinte de acesso.
+G3: prévia do Auth executada, sem escrita; aplicação remota aguarda aprovação.
+Inventário DNS acrescentado em `ENTREGA-E-SUPORTE.md`, com valores conhecidos
+do handoff e pendências de conferência explicitadas. Sem reset, checkout ou
+aplicação remota no Auth nesta retomada.
+
 **Decisões de produto de 30/09** (entrevista com o titular, Claude): ver
 [DECISOES-PRODUTO-2026-09-30](DECISOES-PRODUTO-2026-09-30.md). Próximas
 tarefas: T1–T7 até 04/10, envio dos convites da Liz até 08/10, T9 (prazo

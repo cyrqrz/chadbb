@@ -15,13 +15,37 @@ assumirá o suporte técnico.
    chave de servidor fica somente no backend. O build Workers órfão foi
    desconectado em 23/09; Pages e CI passaram no PR #23 e na `main`.
 3. Configurar no Auth a URL do site e o callback HTTPS `/auth/callback`, envio de
-   e-mail e remetente. Validar solicitação, recebimento, PKCE no mesmo navegador,
+   e-mail e remetente. Validar solicitação, recebimento, código de 8 dígitos,
    persistência, logout e proteção de rotas nesse ambiente.
 4. Publicar a função `guest` e definir `GUEST_ALLOWED_ORIGINS` com a origem HTTPS
    exata. Testar origem permitida e proibida, revogação e sessão expirada.
 5. Conferir o job `personal-data-retention` (único agendado) e a disponibilidade das páginas.
    Uma resposta OPTIONS não comprova banco, Auth ou RSVP; usar um evento fictício
    para testar a jornada completa antes de cadastrar conteúdo real.
+
+## Registros DNS do site e do e-mail
+
+Inventário baseado no relato do titular em 30/09/2026; não substitui uma
+conferência da zona no painel. Antes de alterar DNS, identificar o serviço de
+cada registro. Registros do site, recebimento e envio precisam coexistir.
+Não apagar registros de outro serviço ao corrigir a configuração do Resend.
+
+| Nome | Tipo / valor de referência | Finalidade e cuidado |
+|---|---|---|
+| `@` (`chadbb.online`) | CNAME → `chadbb.pages.dev`, proxied | Site no domínio principal. Foi apagado por engano e recriado em 30/09; o titular informou HTTP 200 após a correção. Preservar. |
+| `www` | Configuração do domínio no Cloudflare Pages; conferir o destino no painel | Endereço alternativo do site. O titular informou HTTP 522 em 30/09; cadastro em Pages → Custom domains ainda precisa ser conferido e o uso de `www` decidido por ele. Não considerar validado. |
+| `@` | MX do Cloudflare Email Routing; manter todos os destinos e prioridades indicados no painel | Recebimento e encaminhamento de `contato@chadbb.online`. Não substituir por registros de envio do Resend. |
+| `@` | TXT SPF do Email Routing; preservar o valor indicado no painel | Política SPF da raiz usada pelo Email Routing. Não criar um segundo registro SPF no mesmo nome. |
+| `cf2024-1._domainkey` | TXT DKIM do Cloudflare; preservar o valor do painel | Autenticação DKIM do Email Routing. É independente do seletor do Resend. |
+| `resend._domainkey` | TXT DKIM do Resend; preservar o valor do painel | Autenticação das mensagens enviadas pelo Resend, inclusive acesso do organizador. |
+| `_dmarc` | TXT; preservar a política existente | Política de autenticação do domínio. Não alterar como tentativa isolada de resolver spam. |
+| `send` | CNAME → `send.forge.rmta.net`, DNS only | Registro de envio exigido pelo Resend na configuração corrigida em 30/09. Preservar sem proxy. |
+| `rsend` | CNAME → `rsend-sae1.forge.rmta.net`, DNS only | Registro complementar exigido pelo Resend na mesma configuração. Preservar sem proxy. |
+
+Os valores completos de MX, SPF, DKIM e DMARC não foram copiados nesta
+retomada: consultar os painéis de Cloudflare e Resend antes de qualquer mudança,
+sem inventar destinos, prioridades ou chaves. Alterações remotas continuam
+sujeitas à prévia e aprovação do titular.
 
 ## Backup e restauração
 
