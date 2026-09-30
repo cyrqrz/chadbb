@@ -348,3 +348,18 @@ test('sessão expirada retorna ao acesso sem carregar eventos privados', async (
   await expect(page.getByLabel('Seu e-mail')).toBeVisible()
   expect(mock.calls).not.toContain('/rest/v1/events')
 })
+
+// Pedido do titular (30/09): deixar evidente onde começam os dados que só o convidado vê.
+test('dados do evento separam o que é público do que é só para convidados', async ({ page }) => {
+  await backend(page, true)
+  await createInBrowser(page)
+  const shared = page.getByRole('group', { name: 'Para compartilhar' })
+  const private_ = page.getByRole('group', { name: 'Só para convidados' })
+  await expect(shared).toContainText('Visível na prévia pública')
+  await expect(private_).toContainText('Privado')
+  await expect(private_).toContainText('Data, endereço e instruções só aparecem para quem abre o convite pelo link recebido.')
+  await expect(private_.getByLabel('Endereço privado')).toBeVisible()
+  // O bloco privado se distingue do público pelo fundo, não só pelo texto.
+  const background = (group: typeof shared) => group.evaluate(el => getComputedStyle(el).backgroundColor)
+  expect(await background(private_)).not.toBe(await background(shared))
+})

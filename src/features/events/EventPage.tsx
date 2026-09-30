@@ -10,7 +10,7 @@ import { failedLast, live } from '../../lib/query'
 import { useLastError } from '../../lib/useLastError'
 import { useAuth } from '../auth/context'
 import { ErrorState, LoadingState, RefreshStatus, SlowRefresh, SuccessMessage } from '../../components/States'
-import { Button, ConfirmDialog } from '../../components/ui'
+import { Button, ConfirmDialog, StatusBadge } from '../../components/ui'
 import { EventNotFound } from './EventLayout'
 import type { EventLayoutContext } from './EventLayout'
 
@@ -116,18 +116,21 @@ function EventEditor({ server, created, refreshing, refreshFailed, retry }: { se
     {purged ? <p className="notice mt-6">Os dados pessoais deste evento foram excluídos conforme a política de retenção. Restam apenas título e datas.</p> :
       closed && <p className="notice mt-6">Este evento foi encerrado. Os detalhes estão disponíveis apenas para consulta.</p>}
     <form onSubmit={save} className="mt-8 space-y-8">
-      <fieldset disabled={busy || closed} className="space-y-5">
-        <legend className="mb-5 text-xl font-semibold">Para compartilhar</legend>
-        <p className="text-sm text-stone-600">Título, descrição e imagem podem aparecer na prévia pública quando o evento for publicado.</p>
+      {/* Dois blocos com fundos diferentes: onde começa o que só o convidado vê não pode depender de ler a legenda. */}
+      <fieldset disabled={busy || closed} className="form-section space-y-5">
+        <legend className="form-section-legend">Para compartilhar</legend>
+        <p><StatusBadge tone="neutral">Visível na prévia pública</StatusBadge></p>
+        <p className="text-sm text-muted">Título, descrição e imagem podem aparecer na prévia pública quando o evento for publicado.</p>
         <label className="field">Nome do evento<input maxLength={120} value={draft.title} onChange={e => update('title', e.target.value)} placeholder="Chá de bebê" /></label>
         <label className="field">Descrição pública<textarea rows={4} maxLength={2000} value={draft.public_description} onChange={e => update('public_description', e.target.value)} /></label>
         {draft.cover_path && <div><img className="max-h-64 w-full rounded-surface object-cover" src={coverUrl(draft.cover_path)} alt="Capa do evento" />{!closed && <Button variant="danger" size="sm" className="mt-3" onClick={() => setDraft({ ...draft, cover_path: null })}>Remover capa do evento</Button>}</div>}
         {!closed && <label className="field">Imagem de capa (opcional)<input key={imageFile ? 'selected' : 'empty'} type="file" accept="image/jpeg,image/png,image/webp" onChange={e => { const file = e.target.files?.[0] ?? null; setError(file ? validateImage(file) : null); setImageFile(file); setPublicConsent(false) }} /><span className="hint">JPEG, PNG ou WebP, até 5 MB.</span></label>}
         {imageFile && <label className="flex items-start gap-3 text-sm"><input type="checkbox" className="mt-1" checked={publicConsent} onChange={e => setPublicConsent(e.target.checked)} /><span>Tenho autorização para usar esta imagem e entendo que ela ficará acessível por link assim que for enviada, mesmo com o evento em rascunho.</span></label>}
       </fieldset>
-      <fieldset disabled={busy || closed} className="space-y-5 border-t border-stone-300 pt-6">
-        <legend className="pr-4 text-xl font-semibold">Só para convidados</legend>
-        <p className="text-sm text-stone-600">Estes dados não entram na prévia pública.</p>
+      <fieldset disabled={busy || closed} className="form-section form-section-private space-y-5">
+        <legend className="form-section-legend">Só para convidados</legend>
+        <p><StatusBadge icon="🔒">Privado</StatusBadge></p>
+        <p className="text-sm">Data, endereço e instruções só aparecem para quem abre o convite pelo link recebido. Não entram na prévia pública.</p>
         <label className="field">Data e horário<input type="datetime-local" value={draft.localDate} onChange={e => update('localDate', e.target.value)} /><span className="hint">Horário de Brasília. Obrigatório para publicar.</span></label>
         <label className="field">Término<input type="datetime-local" value={draft.localEndDate} onChange={e => update('localEndDate', e.target.value)} /><span className="hint">Horário de Brasília. Obrigatório para publicar. Os dados pessoais dos convidados são excluídos 30 dias após o término.</span></label>
         <label className="field">Endereço privado<textarea rows={2} maxLength={500} value={draft.private_address} onChange={e => update('private_address', e.target.value)} /></label>
