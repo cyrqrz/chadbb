@@ -276,3 +276,129 @@ test('correções: encerrar evento apaga contatos; hash do histórico tem sal; a
   await admin.query("update public.events set status='closed' where id=$1", [f.event.id])
   assert.equal((await admin.query('select count(*)::int n from private.rsvp_reminders where invitation_id=$1', [f.invite.id])).rows[0].n, 0)
 })
+
+async function panel(f, client = admin) {
+  return (await client.query("select public.organizer_invitations($1,'list') data", [f.event.id])).rows[0].data
+}
+
+test('painel: agendado, retry e lease ativo pendentes; envio aceito sai das contagens', async () => {
+  const f = await fixture(); await maybe(f)
+  assert.deepEqual((await panel(f)).summary.reminders, { pending: 1, attention: 0 })
+  await cut(f)
+  const job = (await claim()).jobs[0]
+  await complete(job, false)
+  assert.deepEqual((await panel(f)).summary.reminders, { pending: 1, attention: 0 })
+  await admin.query("update private.rsvp_reminders set next_attempt_at=clock_timestamp()-interval '1 minute' where invitation_id=$1", [f.invite.id])
+  const retry = (await claim()).jobs[0]
+  await admin.query(`update private.rsvp_reminders set first_attempt_at=clock_timestamp()-interval '24 hours',
+    next_attempt_at=clock_timestamp()-interval '2 hours', lease_until=clock_timestamp()+interval '5 minutes'
+    where invitation_id=$1`, [f.invite.id])
+  assert.deepEqual((await panel(f)).summary.reminders, { pending: 1, attention: 0 })
+  // Volta à janela de aceite sem modificar a chave da tentativa.
+  await admin.query("update private.rsvp_reminders set first_attempt_at=clock_timestamp()-interval '1 minute' where invitation_id=$1", [f.invite.id])
+  assert.equal(await complete(retry), true)
+  assert.deepEqual((await panel(f)).summary.reminders, { pending: 0, attention: 0 })
+})
+
+test('painel: cron atrasado, janela de 23h, rejeição e ausência de fila exigem atenção', async () => {
+  const f = await fixture(); await maybe(f); await cut(f)
+  await admin.query("update private.rsvp_reminders set next_attempt_at=clock_timestamp()-interval '31 minutes' where invitation_id=$1", [f.invite.id])
+  assert.deepEqual((await panel(f)).summary.reminders, { pending: 0, attention: 1 })
+  // A próxima tentativa prevalece sobre o corte passado.
+  await admin.query("update private.rsvp_reminders set next_attempt_at=clock_timestamp()-interval '29 minutes' where invitation_id=$1", [f.invite.id])
+  assert.deepEqual((await panel(f)).summary.reminders, { pending: 1, attention: 0 })
+  const job = (await claim()).jobs[0]
+  await admin.query(`update private.rsvp_reminders set first_attempt_at=clock_timestamp()-interval '23 hours',
+    next_attempt_at=clock_timestamp()+interval '1 hour', lease_until=clock_timestamp()-interval '1 minute'
+    where invitation_id=$1`, [f.invite.id])
+  assert.deepEqual((await panel(f)).summary.reminders, { pending: 0, attention: 1 })
+  await admin.query("update private.rsvp_reminders set lease_until=clock_timestamp()+interval '5 minutes' where invitation_id=$1", [f.invite.id])
+  assert.equal((await admin.query('select public.rsvp_reminder_reject($1,$2) data', [job.id, job.lease])).rows[0].data, true)
+  assert.deepEqual((await panel(f)).summary.reminders, { pending: 0, attention: 1 })
+  const missing = await fixture(); await maybe(missing)
+  await admin.query('delete from private.rsvp_reminders where invitation_id=$1', [missing.invite.id])
+  assert.deepEqual((await panel(missing)).summary.reminders, { pending: 0, attention: 1 })
+})
+
+test('painel: tolerância respeita fim do lease e reagendamento futuro', async () => {
+  const f = await fixture(); await maybe(f); await cut(f); await claim()
+  await admin.query(`update private.rsvp_reminders set next_attempt_at=clock_timestamp()-interval '2 hours',
+    lease_until=clock_timestamp()-interval '29 minutes' where invitation_id=$1`, [f.invite.id])
+  assert.deepEqual((await panel(f)).summary.reminders, { pending: 1, attention: 0 })
+  await admin.query("update private.rsvp_reminders set lease_until=clock_timestamp()-interval '31 minutes' where invitation_id=$1", [f.invite.id])
+  assert.deepEqual((await panel(f)).summary.reminders, { pending: 0, attention: 1 })
+  await admin.query("update public.events set starts_at=clock_timestamp()+interval '20 days', ends_at=clock_timestamp()+interval '20 days 4 hours' where id=$1", [f.event.id])
+  assert.deepEqual((await panel(f)).summary.reminders, { pending: 1, attention: 0 })
+})
+
+test('painel: revogados, expirados, fechados e eventos iniciados não contam', async () => {
+  for (const excluded of ['revoked', 'expired', 'closed', 'started']) {
+    const f = await fixture(); await maybe(f)
+    if (excluded === 'revoked') await admin.query("select public.organizer_invitations($1,'revoke',$2)", [f.event.id, { id: f.invite.id }])
+    if (excluded === 'expired') await admin.query("update private.invitations set expires_at=clock_timestamp()-interval '1 minute' where id=$1", [f.invite.id])
+    if (excluded === 'closed') await admin.query("update public.events set status='closed' where id=$1", [f.event.id])
+    if (excluded === 'started') await admin.query("update public.events set starts_at=clock_timestamp()-interval '1 minute',ends_at=clock_timestamp()+interval '4 hours' where id=$1", [f.event.id])
+    assert.deepEqual((await panel(f)).summary.reminders, { pending: 0, attention: 0 }, excluded)
+  }
+})
+
+test('painel: contagens isoladas por evento, acesso somente do dono e nenhum contato/lease', async () => {
+  for (const role of ['anon', 'authenticated', 'service_role']) {
+    assert.equal((await admin.query("select has_function_privilege($1,'private.rsvp_reminder_counts(uuid)','execute') ok", [role])).rows[0].ok, false, role)
+  }
+  const f = await fixture(); await maybe(f)
+  const g = await fixture(); await maybe(g)
+  await admin.query('delete from private.rsvp_reminders where invitation_id=$1', [g.invite.id])
+  const client = await connection('authenticated')
+  try {
+    await client.query("select set_config('request.jwt.claim.sub',$1,false)", [owner])
+    const result = await panel(f, client)
+    assert.deepEqual(result.summary.reminders, { pending: 1, attention: 0 })
+    assert.deepEqual((await panel(g, client)).summary.reminders, { pending: 0, attention: 1 })
+    assert.equal(JSON.stringify(result).includes('guest@example.test'), false)
+    assert.equal(/"(?:email|lease|lease_until|first_attempt_at)"/.test(JSON.stringify(result)), false)
+    await client.query("select set_config('request.jwt.claim.sub',$1,false)", [randomUUID()])
+    await assert.rejects(panel(f, client), { code: '42501' })
+  } finally { await client.end() }
+})
+
+test('painel: marca automática só após vencimento, replay preserva e resposta manual no→no limpa', async () => {
+  const f = await fixture()
+  const row = async () => (await panel(f)).invitations.find(i => i.id === f.invite.id)
+  assert.equal((await row()).auto_declined, false)
+  const request = await maybe(f); await cut(f)
+  const job = (await claim()).jobs[0]; await complete(job)
+  assert.equal((await row()).auto_declined, false)
+  await overdue(f); await claim()
+  assert.equal((await row()).response, 'no')
+  assert.equal((await row()).auto_declined, true)
+  await action(f.token, 'rsvp', request)
+  assert.equal((await row()).auto_declined, true)
+  await action(f.token, 'rsvp', payload('no', 3))
+  assert.equal((await row()).response, 'no')
+  assert.equal((await row()).auto_declined, false)
+  const manual = await fixture()
+  await action(manual.token, 'rsvp', payload('no'))
+  assert.equal((await panel(manual)).invitations[0].auto_declined, false)
+})
+
+test('painel: editar, revogar e reemitir preservam a origem automática', async () => {
+  const f = await fixture(); await maybe(f); await cut(f)
+  await complete((await claim()).jobs[0]); await overdue(f); await claim()
+  const row = async () => (await panel(f)).invitations.find(i => i.id === f.invite.id)
+  assert.equal((await row()).auto_declined, true)
+  await admin.query("select public.organizer_invitations($1,'update',$2)", [f.event.id,
+    { id: f.invite.id, name: 'Convidado fictício editado', kind: 'family', capacity: 4, version: 3 }])
+  let current = await row()
+  assert.equal(current.name, 'Convidado fictício editado')
+  assert.equal(current.auto_declined, true)
+  await admin.query("select public.organizer_invitations($1,'revoke',$2)", [f.event.id, { id: f.invite.id }])
+  current = await row()
+  assert.equal(current.revoked, true)
+  assert.equal(current.auto_declined, true)
+  await admin.query("select public.organizer_invitations($1,'rotate',$2)", [f.event.id, { id: f.invite.id }])
+  current = await row()
+  assert.equal(current.revoked, false)
+  assert.equal(current.response, 'no')
+  assert.equal(current.auto_declined, true)
+})

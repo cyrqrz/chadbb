@@ -248,6 +248,32 @@ Este registro descreve o comportamento existente; não altera a política remota
 
 ## Talvez com prazo e lembrete — decisão de 24/09/2026
 
+### Observabilidade no painel — 30/09/2026
+
+- `organizer_invitations` devolve `invitations[].auto_declined` (booleano)
+  e `summary.reminders: { pending, attention }` (contagens do servidor).
+  Não expõe contatos, leases ou erros do provedor. Mesma autorização por dono.
+- `auto_declined` fica verdadeiro apenas na conversão automática de `maybe`
+  para `no` após o prazo de um lembrete aceito. Uma nova resposta manual,
+  inclusive `no` → `no`, limpa a marca. Replay não muda o estado atual.
+  Convites anteriores começam com falso: não é possível inferir a origem
+  das respostas antigas. Revogar, reemitir e editar nome preservam a origem.
+- As contagens consideram apenas `maybe` não revogado/não expirado em evento
+  publicado e futuro. Lembretes já aceitos pelo provedor ficam fora delas.
+- `attention`: convite sem fila ativa; ou fila sem envio, sem lease ativo,
+  cuja primeira tentativa já completou 23 horas; ou fila sem envio e sem
+  lease ativo atrasada mais de 30 minutos após o maior entre corte do Talvez,
+  próxima tentativa e fim do lease. Essa tolerância cobre dois ciclos do cron.
+  Rejeições e descartes continuam visíveis como ausência de fila enquanto a
+  resposta permanecer `maybe`; o painel não presume a causa específica.
+- `pending`: demais filas sem envio, incluindo agendamento futuro, envio em
+  andamento e retentativa normal. Categorias disjuntas, calculadas em um único
+  instante no servidor. O painel não recalcula contagens ou prazos.
+- Publicação: aplicar a migration antes do front. Validação local não aplica
+  migration nem publica a mudança em produção.
+
+### Fluxo de confirmação
+
 - Fonte única: `private.rsvp_policy(starts_at, due_at)`. Talvez é permitido
   somente antes de `starts_at - 10 days`, em evento publicado. O snapshot traz
   `rsvp: { maybe_allowed, maybe_closes_at, confirmation_due_at, reminder_sent }`.

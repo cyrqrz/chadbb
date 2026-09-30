@@ -2,6 +2,38 @@
 
 Branch de trabalho: `clone-main`. Começar com `git pull` e ler este arquivo.
 
+## Atualização em 30/09/2026 — Codex
+
+Esta seção atualiza o estado histórico abaixo.
+
+- PR #31 mergeado em 24/09; `main` e `clone-main` alinhadas em `6718b06`.
+- Titular confirmou domínio `chadbb.online` como **Verified** no Resend.
+- Cron `rsvp-reminders` conferido diretamente no banco: ativo, a cada 15
+  minutos; execuções de 11:00, 11:15 e 11:30 UTC de 30/09 com `succeeded`.
+- Smoke remoto autorizado pelo titular: convite fictício com “Talvez” e
+  destinatário de teste `delivered@resend.dev`. Edge publicada retornou 401 sem
+  segredo e, com segredo, 200 com `claimed=1`, `sent=1`, `failed=0` e
+  `rejected=0`. Banco registrou aceite às 11:38:27 UTC e prazo de três dias.
+  Segunda chamada enviou zero mensagens, sem alterar aceite ou tentativas.
+  Vencimento simulado apenas nesse convite converteu a resposta para `no` e
+  removeu o contato. Organizador, evento, convite e fila fictícios removidos;
+  contagens finais dos IDs criados iguais a zero.
+- Limite do smoke: destinatário de teste não comprova caixa postal humana.
+  Consulta ao histórico do Resend com a chave local retornou 401; a credencial
+  usada pela Edge funcionou. Não houve rotação de segredos.
+- Backups: captura de 27/09 falhou na etapa `dump roles`, antes da publicação
+  no R2. Log não informa a causa específica (diagnóstico detalhado desativado).
+  Execuções de 28 e 29/09 passaram, incluindo publicação/verificação no R2.
+  Saúde da produção passou em 30/09 às 11:43 UTC. A sequência não foi contínua;
+  resta acompanhar recorrência e realizar restauração com conteúdo real.
+  Evidências: [falha de 27/09](https://github.com/cyrqrz/chadbb/actions/runs/36321378918),
+  [backup de 29/09](https://github.com/cyrqrz/chadbb/actions/runs/36580559658),
+  [saúde de 30/09](https://github.com/cyrqrz/chadbb/actions/runs/36710295039).
+- Titular informou que o evento ainda contém dados de teste. Cadastro do
+  conteúdo real, restauração com dados/Storage reais e ensaio familiar seguem
+  pendentes. Avisos de painel implementados localmente em 30/09, aguardando
+  publicação (ver quadro de tarefas). Entrevista de produto continua aberta.
+
 ## Em produção (chadbb-cha, domínio chadbb.online)
 
 - Migrations até `20260924020000_rsvp_reminders_fixes.sql` aplicadas (29/29 iguais).
