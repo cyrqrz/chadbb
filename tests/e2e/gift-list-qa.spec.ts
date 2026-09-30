@@ -305,3 +305,8 @@ test('fraldas completas: sem seção vazia de adicionar, com orientação para a
   await expect(page.getByRole('region', { name: 'Adicionar à lista' })).toBeVisible()
   await expectAccessible(page)
 })
+
+test('lista de presentes mostra as fraldas do menor ao maior tamanho', async ({ page }) => {
+  await open(page, { diapers: () => [fourSizes[2], fourSizes[1], fourSizes[0], fourSizes[3]] })
+  await expect(diapersRegion(page).getByRole('heading', { level: 3 })).toHaveText(['Fraldas tamanho P', 'Fraldas tamanho M', 'Fraldas tamanho G', 'Fraldas tamanho XG'])
+})

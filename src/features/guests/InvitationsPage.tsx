@@ -13,6 +13,7 @@ import { EmptyState, ErrorState, LoadingState, RefreshStatus, SuccessMessage } f
 import { Button, ConfirmDialog, Progress, Skeleton, StatusBadge } from '../../components/ui'
 import type { StatusTone } from '../../components/ui'
 import { EventNotFound } from '../events/EventLayout'
+import { bySize } from '../../lib/diapers'
 import { StepCompletion } from '../events/SetupDock'
 
 export function InvitationsPage() {
@@ -136,7 +137,7 @@ export function InvitationsPage() {
         onRevoke={() => void act('revoke', { id: inv.id })} />)}</ul>}
     </section>
 
-    <Diapers items={data.items.filter(item => item.category === 'fralda')} eventId={id} />
+    <Diapers items={bySize(data.items.filter(item => item.category === 'fralda'))} eventId={id} />
     <Treats items={data.items.filter(item => item.category === 'mimo')} />
     <Choices reservations={data.reservations} />
     <ConfirmDialog open={confirmClose !== null} title="Fechar o formulário?"

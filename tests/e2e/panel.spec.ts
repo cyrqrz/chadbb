@@ -1998,3 +1998,9 @@ test.describe('entrada em cascata sem sobra', () => {
     for (const state of states) expect(state).toEqual({ fill: 'backwards', opacity: '1', transform: 'none' })
   })
 })
+
+test('painel lista as fraldas do menor ao maior tamanho, mesmo vindo em ordem alfabética', async ({ page }) => {
+  await backend(page, () => ({ status: 200, json: { ...full, items: [diaper(1, 'G', 19, 0), diaper(2, 'M', 19, 0), diaper(3, 'P', 6, 0), diaper(4, 'XG', 6, 0), ...full.items.filter(item => item.category === 'mimo')] } }))
+  await page.goto(`/eventos/${eventId}/convites`)
+  await expect(page.getByRole('region', { name: 'Fraldas por tamanho' }).getByRole('heading', { level: 3 })).toHaveText(['Tamanho P', 'Tamanho M', 'Tamanho G', 'Tamanho XG'])
+})

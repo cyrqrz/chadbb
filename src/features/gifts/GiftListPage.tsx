@@ -16,6 +16,7 @@ import type { DiaperAmounts } from './api'
 import { parseQuantity, platformLabels, categoryLabels } from './model'
 import type { Category, DiaperSize, EventItem, Product } from './model'
 import type { ListedItem } from './api'
+import { bySize } from '../../lib/diapers'
 
 export function GiftListPage() {
   const { id = '' } = useParams()
@@ -121,7 +122,7 @@ function GiftList({ eventId, closed, eventStatus, step }: { eventId: string; clo
         {!query.data.count ? <div className="mt-3"><EmptyState title={category === 'fralda' ? 'Nenhum tamanho de fralda na lista.' : 'Nenhum mimo na lista.'}>{closed ? 'Nenhum presente foi incluído nesta categoria.' : 'Use a lista pronta do chá acima ou o atalho “Adicionar à lista”.'}</EmptyState></div> : <>
           {/* G4b.3: "sem limite" é regra da categoria, e aparece uma vez no topo — não em cada linha. */}
           {category === 'mimo' && !closed && <p className="mt-3 text-muted">Sem limite de quantidade. Cada convidado informa quantos vai levar.</p>}
-          <ul className="card item-rows stagger mt-3">{query.data.items.map(item => <li key={item.id}><ItemRow item={item} closed={closed} onRemoved={onRemoved} /></li>)}</ul>
+          <ul className="card item-rows stagger mt-3">{(category === 'fralda' ? bySize(query.data.items) : query.data.items).map(item => <li key={item.id}><ItemRow item={item} closed={closed} onRemoved={onRemoved} /></li>)}</ul>
         </>}
       </>}
       {/* Fora dos ramos de estado: a paginação continua montada ao carregar e na falha, e o foco não cai. */}
