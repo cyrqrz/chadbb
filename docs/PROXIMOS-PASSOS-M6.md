@@ -26,7 +26,16 @@ Duas correções foram necessárias no `scripts/backup/remote.mjs`:
 - **`CHADBB_BACKUP_DEBUG=1`.** Modo de diagnóstico opcional que guarda os
   últimos 4 KB do stderr do processo filho e a mensagem da exceção, com a senha
   do banco substituída por `***`. Desligado por padrão; o comportamento de não
-  relatar saída do filho continua sendo o normal.
+  relatar saída do filho continua sendo o normal. **Não ligar no CI:** o
+  repositório é público, e a redação cobre só a senha, não linhas de dados.
+- **Diagnóstico seguro e imagem antes do snapshot (30/09).** Após a falha de
+  27/09 em `dump roles`, sem causa visível: o script baixa a imagem do Postgres
+  em etapa própria (`imagem Docker`, até 3 tentativas) antes de abrir o
+  snapshot, porque o primeiro `docker run` era também o primeiro download.
+  Toda falha imprime só `Diagnóstico: código N, causa <rótulo>, erro <código>`,
+  com rótulos de uma lista fechada em `remote.mjs`; nunca o texto do processo
+  filho. A contagem de 7 dias seguidos reinicia na primeira execução com essa
+  versão.
 
 ### Validações já executadas
 

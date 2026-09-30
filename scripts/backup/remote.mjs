@@ -18,12 +18,24 @@ const config = join(homedir(), '.config/chadbb')
 const debug = process.env.CHADBB_BACKUP_DEBUG === '1'
 let secret = null
 const redact = text => secret ? text.split(secret).join('***') : text
+// Public CI logs get only one of these labels; the stderr text itself stays in memory unless debug.
+const causes = [
+  ['imagem Docker', /pull access denied|manifest unknown|toomanyrequests|TLS handshake timeout|error pulling|Unable to find image/i],
+  ['Docker indisponível', /Cannot connect to the Docker daemon/i],
+  ['versão do servidor', /server version mismatch/i],
+  ['senha do banco', /password authentication failed/i],
+  ['conexão com o banco', /could not connect|connection refused|timeout expired|timed out|could not translate host name|server closed the connection/i],
+  ['TLS', /SSL|certificate/i],
+  ['snapshot', /snapshot/i],
+  ['permissão', /permission denied|EACCES|EPERM/i],
+]
+const classify = text => causes.find(([, pattern]) => pattern.test(text))?.[0] ?? 'não identificada'
 const run = (bin, args, env = process.env) => new Promise((resolveRun, reject) => {
   const p = spawn(bin, args, { env, stdio: ['ignore', 'pipe', 'pipe'] })
   let stdout = '', stderr = ''
   let discardLine = false
   p.stdout.on('data', b => { stdout += b })
-  if (debug) p.stderr.on('data', b => {
+  p.stderr.on('data', b => {
     let chunk = String(b)
     if (discardLine) {
       const newline = chunk.indexOf('\n')
@@ -39,11 +51,11 @@ const run = (bin, args, env = process.env) => new Promise((resolveRun, reject) =
       discardLine = boundary < 0
     }
   })
-  else p.stderr.resume()
   p.on('error', () => reject(new Error(`Não foi possível iniciar ${bin}`)))
   p.on('close', code => code === 0
     ? resolveRun(stdout)
-    : reject(new Error(`${bin} encerrou com código ${code}${debug && stderr ? `\n--- stderr ---\n${redact(stderr)}` : ''}`)))
+    : reject(Object.assign(new Error(`${bin} encerrou com código ${code}${debug && stderr ? `\n--- stderr ---\n${redact(stderr)}` : ''}`),
+      { exitCode: code, failure: classify(stderr) })))
 })
 const digest = async path => {
   const hash = createHash('sha256')
@@ -74,6 +86,12 @@ try {
   assert.ok(fingerprints.length > 0, 'Chave pública de backup ausente')
   const recipient = fingerprints[0]
   if (process.env.CHADBB_BACKUP_RECIPIENT) assert.equal(recipient, process.env.CHADBB_BACKUP_RECIPIENT)
+  stage = 'imagem Docker'
+  // Pull before the snapshot: a slow or throttled registry must not hold the transaction or pass for a dump failure.
+  for (let attempt = 1; ; attempt++) {
+    try { await run('docker', ['pull', '--quiet', IMAGE]); break }
+    catch (error) { if (attempt === 3) throw error; await new Promise(wait => setTimeout(wait, 15000 * attempt)) }
+  }
   stage = 'conexão TLS e snapshot'
   db = new pg.Client({ host, port: 5432, user, password, database: 'postgres', ssl: { ca, rejectUnauthorized: true }, connectionTimeoutMillis: 15000 })
   await db.connect()
@@ -130,6 +148,13 @@ try {
   console.log(JSON.stringify({ status: 'encrypted', capturedAt, project: REF, archive, sha256: await digest(archive), storageObjects: storage.length, migrations: migrationHistory.length }))
 } catch (error) {
   console.error(`Backup falhou na etapa: ${stage}. Nenhuma cópia parcial deve ser publicada.`)
+  // Only codes and allowlisted labels: safe for public logs, unlike messages from pg or the child.
+  const detail = [
+    error?.exitCode != null && `código ${error.exitCode}`,
+    error?.failure && `causa ${error.failure}`,
+    typeof error?.code === 'string' && /^(E[A-Z]+|ERR_[A-Z_]+|[0-9A-Z]{5})$/.test(error.code) && `erro ${error.code}`,
+  ].filter(Boolean)
+  if (detail.length) console.error(`Diagnóstico: ${detail.join(', ')}.`)
   if (debug) console.error(redact(String(error?.message ?? error)))
   process.exitCode = 1
 } finally {
