@@ -343,3 +343,18 @@ test.describe('voltar à página pedida depois de entrar', () => {
     await expect(page.getByRole('heading', { name: 'Seus eventos' })).toBeVisible()
   })
 })
+
+// T3 (30/09): cadastro público fechado até 01/11. Para e-mail sem conta, o Auth
+// responde 422 (`otp_disabled`/`signup_disabled`); a tela explica o convite.
+for (const code of ['otp_disabled', 'signup_disabled']) {
+  test(`e-mail sem conta com cadastro fechado (${code}) explica como pedir acesso`, async ({ page }) => {
+    await auth(page, { otp: () => ({ status: 422, json: { code, error_code: code, msg: 'Signups not allowed for otp' } }) })
+    await request(page, 'nova@example.test')
+    const alert = page.getByRole('alert')
+    await expect(alert).toContainText('Este e-mail ainda não tem acesso.')
+    await expect(alert).toContainText('contato@chadbb.online')
+    await expect(page.getByLabel('Código de 8 dígitos')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Receber código de acesso' })).toBeEnabled()
+    await accessible(page)
+  })
+}

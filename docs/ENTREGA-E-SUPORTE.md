@@ -145,6 +145,26 @@ Situações comuns:
 - **Mudou a data?** Edite em “Dados do evento”; a validade dos convites
   acompanha sozinha (novo início + 7 dias).
 
+## Acesso de organizadores (cadastro fechado até 01/11)
+
+Decisão Q8 de [DECISOES-PRODUTO-2026-09-30](DECISOES-PRODUTO-2026-09-30.md):
+só famílias convidadas pelo titular criam eventos. Com `disable_signup = true`
+no Auth de produção, o código de acesso só é enviado a e-mails que já têm
+conta; para os demais, a tela de entrada responde "Este e-mail ainda não tem
+acesso…" com o contato. Convidados não usam o Auth e não são afetados.
+
+Para liberar uma família:
+
+1. No painel do Supabase (`chadbb-cha`): **Authentication → Users → Add user →
+   Create new user**.
+2. E-mail da pessoa, **Auto Confirm User** marcado. A senha exigida pelo
+   formulário pode ser qualquer valor longo e aleatório, sem guardar nem
+   compartilhar: o login do chadbb é só por código.
+3. Avisar a pessoa para entrar em `/entrar` com esse e-mail.
+
+Reabrir o cadastro público (T13, depois de 01/11) é a mesma alteração com
+`disable_signup = false`, com o mesmo gate de escrita remota.
+
 ## Retenção e exclusão
 
 Decisão fechada em 2026-09-14 pelo solicitante.
