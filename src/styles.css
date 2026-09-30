@@ -472,6 +472,12 @@
   .confirm-dialog::backdrop { background: rgb(41 35 38 / 0.4); animation: fade var(--duration-fast) var(--ease-standard) both; }
   .confirm-dialog-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--action-gap); }
 
+  /* Dados do evento: bloco público neutro e bloco privado tingido, com a barra da marca. */
+  /* Legenda flutuante: sem isso o <legend> se encaixa na borda do fieldset. */
+  .form-section { border: 1px solid var(--color-border-subtle); border-radius: var(--radius-surface); background: var(--color-surface); padding: clamp(1rem, 3vw, 1.5rem); }
+  .form-section-private { border-left: 5px solid var(--color-brand); background: var(--color-brand-soft); }
+  .form-section-legend { float: left; width: 100%; margin-bottom: 0.75rem; font-size: var(--text-h3); font-weight: 650; }
+  .form-section-legend + p { clear: both; }
   /* Privacidade e termos: a promessa em Fraunces é o único destaque; o resto é pergunta e resposta. */
   /* scroll-margin: o cabeçalho fixo cobriria o título ao pular para a âncora. */
   .legal-promise { max-width: 32ch; margin-top: 1rem; text-wrap: balance; font-family: var(--font-display); font-size: clamp(1.375rem, 1.1rem + 1.2vw, 1.875rem); line-height: 1.3; font-weight: 450; }
