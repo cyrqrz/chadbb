@@ -1,6 +1,7 @@
 # Entrega e suporte do chá
 
-Evento: 01/11/2026 às 12h (Brasília). Confirmação solicitada até 18/10/2026.
+Evento: 01/11/2026 às 12h (Brasília). O convite exibe o prazo de confirmação
+vindo do servidor (22/10, 12h); não há data fixa a escrever.
 Regras: limites globais P 6 / M 19 / G 19 / XG 6; vários pacotes por convite;
 mimos opcionais. O contato impresso no convite não identifica, por si só, quem
 assumirá o suporte técnico.
@@ -110,9 +111,9 @@ Na ordem em que as coisas acontecem. Os nomes entre aspas são os botões da tel
    no site o código de 8 dígitos que chegar.
 2. **Criar o evento.** Em “Seus eventos”, dê o nome e toque em “Criar evento”.
 3. **Dados do evento.** Preencha início às 12h e término (sempre horário de
-   Brasília), endereço privado e instruções aos convidados. Escreva nas
-   instruções o prazo de confirmação (**18/10**): o site não encerra as
-   respostas sozinho. A capa é opcional e só entra com imagem autorizada.
+   Brasília), endereço privado e instruções aos convidados. Não escreva o
+   prazo de confirmação nas instruções: o convite já mostra "Confirme até"
+   com a data do servidor. A capa é opcional e só entra com imagem autorizada.
    Toque em “Salvar alterações”.
 4. **Conferir e publicar.** “Ver prévia” mostra o convite como o convidado vê.
    Estando certo, “Publicar evento”. Convites só podem ser criados depois disso.

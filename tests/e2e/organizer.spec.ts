@@ -104,6 +104,13 @@ async function createInBrowser(page: Page) {
   await expect(page.getByRole('heading', { name: 'Dados do evento' })).toBeVisible()
 }
 
+test('criar evento informa os termos de uso', async ({ page }) => {
+  await backend(page, true)
+  await page.goto('/eventos')
+  await expect(page.getByText('Ao criar um evento, você concorda com os termos de uso.')).toBeVisible()
+  await expect(page.getByRole('link', { name: 'termos de uso' })).toHaveAttribute('href', '/privacidade#organizadores')
+})
+
 // Jornada do organizador sem mouse: criar, preencher, salvar, publicar e concluir etapa.
 // Data e hora usam o controle nativo do navegador, que já é operável por teclado:
 // o foco chega nele pelo Tab e o valor é preenchido direto.

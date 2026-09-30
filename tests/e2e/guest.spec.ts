@@ -1045,6 +1045,15 @@ test('prazo de confirmação vem do servidor e descreve a escolha', async ({ pag
   await expectAccessible(page)
 })
 
+test('aviso de privacidade abre em nova aba: o convite guarda a sessão só nesta página', async ({ page }) => {
+  await backend(page)
+  await page.goto(`/convite#${token}`)
+  await expect(page.getByText('Seus dados servem só para este evento e são apagados 30 dias depois dele.')).toBeVisible()
+  const link = page.getByRole('main').getByRole('link', { name: 'Privacidade (abre em nova aba)' })
+  await expect(link).toHaveAttribute('href', '/privacidade#convidados')
+  await expect(link).toHaveAttribute('target', '_blank')
+})
+
 test('servidor fecha Talvez mesmo com data do evento distante; resposta atual continua legível', async ({ page }) => {
   await backend(page, { invitation: { response: 'maybe' }, rsvp: { maybe_allowed: false, reminder_sent: true } })
   await page.goto(`/convite#${token}`)
