@@ -370,7 +370,7 @@ function Catalog({ eventId, category, listed, listedFailed, listedFetching, retr
       {(query.isPending && !(failedLast(query) && catalogError)) || (!listed && !listedFailed) ? <LoadingState>Carregando sugestões…</LoadingState>
         : !query.data ? <div className="mt-4"><ErrorState message={errorMessage(catalogError)} busy={query.isFetching} onRetry={() => void query.refetch()} retryLabel="Recarregar sugestões" /></div>
         : !query.data.count ? <p className="mt-3 text-muted">O catálogo ainda não tem {noun}.</p>
-        : !suggestions.length && query.data.count <= query.data.products.length ? <p className="mt-3 text-muted">Todos os {noun} do catálogo já estão na lista.</p>
+        : !suggestions.length && query.data.count <= query.data.products.length ? <p className="mt-3 text-muted">{category === 'mimo' ? 'Você já adicionou todas as sugestões. Para incluir outros mimos, use o formulário acima.' : `Todos os ${noun} do catálogo já estão na lista.`}</p>
         : <>{query.data.count > query.data.products.length && <p className="mt-3 text-muted">Mostrando {query.data.products.length} de {query.data.count} sugestões do catálogo.</p>}<ul className="catalog-rows stagger mt-4">{suggestions.map(product => <li key={product.id}><ProductCard product={product} eventId={eventId} onAdded={title => setAdded(current => ({ title, count: current.count + 1 }))} /></li>)}</ul></>}
     </section>
   </section>
