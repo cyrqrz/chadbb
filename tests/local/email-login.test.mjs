@@ -9,7 +9,7 @@ import pg from 'pg'
 
 // Sem traces, screenshots ou logs de URLs que contenham credenciais.
 // Usa somente Supabase e Mailpit locais; não envia e-mails externos.
-test('login por e-mail local: PKCE real, sessão persistente e logout', { timeout: 90000 }, async () => {
+test('login por código de e-mail local: sessão persistente e logout', { timeout: 90000 }, async () => {
   const config = JSON.parse(execFileSync('node_modules/.bin/supabase', ['status', '--output', 'json'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }))
   function localUrl(value, port) {
     const url = new URL(value)
@@ -54,13 +54,13 @@ test('login por e-mail local: PKCE real, sessão persistente e logout', { timeou
     const response = await fetch(`${mail.origin}/api/v1/message/${encodeURIComponent(messageId)}`)
     assert.ok(response.ok)
     const body = await response.json()
-    const links = [...body.HTML.matchAll(/href=["']([^"']+)["']/g)].map(match => match[1].replaceAll('&amp;', '&'))
-    const link = links.find(value => {
-      try { const url = new URL(value); return url.origin === api.origin && url.pathname === '/auth/v1/verify' } catch { return false }
-    })
-    assert.ok(link, 'mensagem precisa conter link de verificação local')
-    phase = 'troca PKCE e retorno ao painel'
-    await page.goto(link)
+    // E-mail só com o código (30/09): nenhum link, nem para o Supabase.
+    assert.equal(/href=/i.test(body.HTML), false, 'mensagem sem link')
+    const codes = [...body.HTML.matchAll(/>(\d{8})</g)].map(match => match[1])
+    assert.equal(codes.length, 1, 'mensagem precisa conter um código de 8 dígitos')
+    phase = 'código digitado e retorno ao painel'
+    await page.getByLabel('Código de 8 dígitos').fill(codes[0])
+    await page.getByRole('button', { name: 'Entrar', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Seus eventos' })).toBeVisible()
     assert.equal(page.url(), 'http://127.0.0.1:5173/eventos')
     phase = 'sessão após recarregar'
@@ -73,7 +73,7 @@ test('login por e-mail local: PKCE real, sessão persistente e logout', { timeou
     await expect(page.getByLabel('Seu e-mail')).toBeVisible()
     assert.equal(page.url(), 'http://127.0.0.1:5173/entrar')
   } catch {
-    // Erros Playwright podem incluir o link secreto completo; registrar só a fase.
+    // Erros Playwright podem incluir o código; registrar só a fase.
     throw new Error(`Falha no ensaio de e-mail local: ${phase}`)
   } finally {
     await browser?.close()

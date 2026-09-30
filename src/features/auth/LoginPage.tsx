@@ -125,14 +125,14 @@ export function LoginPage() {
   return <section className="login-shell">
     <div className="login-form">
       <p className="eyebrow">Seu encontro começa aqui</p><h1 className="page-title">Entre para organizar</h1>
-      <p className="mt-3 text-stone-600">Sem senha: enviamos para o seu e-mail um código de 8 dígitos e um link de acesso. O código funciona em qualquer navegador.</p>
+      <p className="mt-3 text-stone-600">Sem senha: enviamos um código de 8 dígitos para o seu e-mail. Ele funciona em qualquer navegador.</p>
       {backend.status !== 'ready' ? <div role="status" className="notice mt-8">O acesso ainda não está disponível neste ambiente. {backend.message}</div> : <>
         <form onSubmit={submit} className="mt-8 flex flex-col gap-5">
           <label className="field">Seu e-mail<input ref={emailField} type="email" autoComplete="email" inputMode="email" placeholder="voce@exemplo.com" required maxLength={254} value={email} readOnly={Boolean(codeFor)} aria-invalid={error?.at === 'email' || undefined} aria-describedby={codeFor ? 'login-email-locked' : error?.at === 'email' ? 'login-email-error' : undefined} onChange={e => setEmail(e.target.value)} /></label>
           {codeFor && <p id="login-email-locked" className="hint -mt-3">O código vale para este e-mail. <button type="button" className="text-link inline-flex min-h-11 items-center" onClick={otherEmail}>Usar outro e-mail</button></p>}
           <Button type="submit" className="w-full justify-center" busy={busy || left > 0}>{sendLabel}</Button>
           {!codeFor && <Button variant="ghost" className="self-start" onClick={haveCode}>Já tenho um código</Button>}
-          {sent > 0 && codeFor && <div id="login-sent"><SuccessMessage>{sent > 1 ? 'Enviamos um novo código' : 'Enviamos um código'} e um link para {codeFor}. Confira a caixa de entrada e o spam; pode levar alguns minutos.</SuccessMessage></div>}
+          {sent > 0 && codeFor && <div id="login-sent"><SuccessMessage>{sent > 1 ? 'Enviamos um novo código' : 'Enviamos um código'} para {codeFor}. Confira a caixa de entrada e o lixo eletrônico (spam); pode levar alguns minutos.</SuccessMessage></div>}
           {error?.at === 'email' && <div id="login-email-error"><ErrorState message={error.text} /></div>}
         </form>
         {codeFor && <form noValidate onSubmit={verify} className="card mt-6 flex flex-col gap-4" aria-labelledby="login-code-title">
@@ -140,7 +140,7 @@ export function LoginPage() {
           <label className="field">Código de 8 dígitos<input ref={codeField} inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{8}" required value={code}
             aria-invalid={error?.at === 'code' || undefined} aria-describedby={[sent > 0 && 'login-sent', error?.at === 'code' && 'login-code-error', 'login-code-hint'].filter(Boolean).join(' ')}
             onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 8))} /></label>
-          <p id="login-code-hint" className="hint">O código vale por 1 hora e só uma vez. Pedir outro invalida o anterior. O link do e-mail também funciona, se aberto neste mesmo navegador.</p>
+          <p id="login-code-hint" className="hint">O código vale por 1 hora e só uma vez. Pedir outro invalida o anterior.</p>
           <Button type="submit" className="w-full justify-center" busy={checking}>{checking ? 'Entrando…' : 'Entrar'}</Button>
           {error?.at === 'code' && <div id="login-code-error"><ErrorState message={error.text} /></div>}
         </form>}

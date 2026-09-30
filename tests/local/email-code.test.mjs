@@ -34,13 +34,10 @@ test('login por código: modelo em português e confirmação em outro navegador
     assert.equal(body.Subject, 'Seu código de acesso ao chadbb')
     assert.match(body.HTML, /lang="pt-BR"/)
     assert.match(body.HTML, /Digite este código na tela de entrada/)
-    assert.match(body.HTML, /no mesmo navegador em que você pediu o acesso/)
     const codes = [...body.HTML.matchAll(/>(\d{8})</g)].map(m => m[1])
     assert.equal(codes.length, 1, 'um código de 8 dígitos em destaque')
-    const link = [...body.HTML.matchAll(/href="([^"]+)"/g)].map(m => new URL(m[1].replaceAll('&amp;', '&')))
-      .find(url => url.pathname === '/auth/v1/verify')
-    assert.ok(link, 'link de acesso continua presente')
-    assert.equal(link.searchParams.get('type'), 'magiclink')
+    // Só o código (30/09): link para o domínio do Supabase era uma possível causa de spam.
+    assert.equal(/href=/i.test(body.HTML), false, 'e-mail sem link')
 
     // Outro "navegador": cliente novo, sem armazenamento do pedido.
     const other = () => createClient(config.API_URL, config.PUBLISHABLE_KEY, opts)

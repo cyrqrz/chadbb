@@ -32,7 +32,7 @@ const accessible = async (page: Page) => expect((await new AxeBuilder({ page }).
 test('depois do pedido, pede o código de 8 dígitos e preserva o e-mail', async ({ page }) => {
   await auth(page)
   await request(page)
-  await expect(page.getByRole('status')).toContainText('Enviamos um código e um link para organizer@example.test')
+  await expect(page.getByRole('status')).toContainText('Enviamos um código para organizer@example.test')
   const code = page.getByLabel('Código de 8 dígitos')
   await expect(code).toBeFocused()
   await expect(code).toHaveAttribute('inputmode', 'numeric')
@@ -214,7 +214,7 @@ test('erros ficam ligados ao campo e o foco volta para ele', async ({ page }) =>
 test('o campo do código já diz para onde o código foi enviado', async ({ page }) => {
   await auth(page)
   await request(page)
-  await expect(page.getByLabel('Código de 8 dígitos')).toHaveAccessibleDescription(/Enviamos um código e um link para organizer@example\.test/)
+  await expect(page.getByLabel('Código de 8 dígitos')).toHaveAccessibleDescription(/Enviamos um código para organizer@example\.test/)
 })
 
 test('pedir outro código confirma o novo envio', async ({ page }) => {
@@ -358,3 +358,15 @@ for (const code of ['otp_disabled', 'signup_disabled']) {
     await accessible(page)
   })
 }
+
+// E-mail só com o código (30/09): o link apontava para o domínio do Supabase, diferente
+// do remetente, uma possível causa de spam no Outlook. A tela não promete link.
+test('a tela de entrada fala só do código, sem prometer link no e-mail', async ({ page }) => {
+  await auth(page)
+  await request(page)
+  const main = page.getByRole('main')
+  await expect(main).not.toContainText('um link de acesso')
+  await expect(main).not.toContainText('e um link para')
+  await expect(main).not.toContainText('O link do e-mail')
+  await expect(page.getByRole('status')).toContainText('lixo eletrônico')
+})
