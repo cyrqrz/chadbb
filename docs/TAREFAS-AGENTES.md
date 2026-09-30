@@ -2,6 +2,15 @@
 
 ## Em andamento — 2026-09-30
 
+**Decisões de produto de 30/09** (entrevista com o titular, Claude): ver
+[DECISOES-PRODUTO-2026-09-30](DECISOES-PRODUTO-2026-09-30.md). Próximas
+tarefas: T1–T7 até 04/10, envio dos convites da Liz até 08/10, T9 (prazo
+configurável com trava) entre 06 e 15/10, T10 ("Copiar resumo") entre 16 e
+20/10. Claude começa por T2 e T5. As datas fixas 18/10 e 22/10 deixam de valer
+como regra: o prazo passa a ser escolhido pelo organizador.
+
+**Painel conferido em produção pelo titular após o merge do PR #32.**
+
 **Publicado no banco em 30/09 (Claude).** Com aprovação do titular: commit
 `9eab7d5` na `clone-main`; dry-run remoto só com a migration nova; `db push
 --skip-vault --project-ref fcykqrlnofmdtmewlejr` aplicado; `migration list`
