@@ -11,11 +11,19 @@ funcional. G2 autorizado pelo titular nesta retomada: fraldas no commit
 `d287bc7` e texto de Mimos em `0a10a73`,
 [PR #38](https://github.com/cyrqrz/chadbb/pull/38) mergeado pelo titular.
 `clone-main` atualizada por fast-forward para `a4e0d6a` antes do commit de
-login `891b136`; documentação em commit separado, no PR seguinte de acesso.
-G3: prévia do Auth executada, sem escrita; aplicação remota aguarda aprovação.
+login `891b136`; documentação em commit separado no
+[PR #39](https://github.com/cyrqrz/chadbb/pull/39). PR #39 mergeado com checks
+aprovados, por autorização do titular; `clone-main` sincronizada com `main`
+em `a8f182b`.
+G3 concluído após autorização do titular: duas tentativas retornaram HTTP 544;
+nova tentativa com os mesmos dois conteúdos recebeu HTTP 200. Releitura pelo
+script confirmou os dois modelos somente com Token, SHA-256 prefixo
+`2377935a3739`, e "Nada a alterar". Teste do titular no Hotmail: ainda no lixo
+eletrônico, com SPF, DKIM, DMARC e CompAuth aprovados e SCL 5. Causa específica
+não determinada. Titular decidiu manter o aviso de conferir o lixo eletrônico,
+já incluído no PR #39; nenhuma nova alteração DNS indicada por esses resultados.
 Inventário DNS acrescentado em `ENTREGA-E-SUPORTE.md`, com valores conhecidos
-do handoff e pendências de conferência explicitadas. Sem reset, checkout ou
-aplicação remota no Auth nesta retomada.
+do handoff e pendências de conferência explicitadas. Sem reset ou checkout.
 
 **Decisões de produto de 30/09** (entrevista com o titular, Claude): ver
 [DECISOES-PRODUTO-2026-09-30](DECISOES-PRODUTO-2026-09-30.md). Próximas

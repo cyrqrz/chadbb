@@ -38,7 +38,9 @@ e o teste QA. Correção textual de Mimos publicada em `0a10a73`, com lint e
 diff conferidos. PR #38 mergeado pelo titular; `clone-main` atualizada por
 fast-forward para `a4e0d6a`. Login no commit `891b136`; documentação em commit
 separado para o PR seguinte, mantendo a separação do PR de presentes.
-Os merges continuam com o titular.
+PR #39 mergeado por autorização explícita do titular, após todos os checks
+aprovados. `clone-main` sincronizada por fast-forward com `main` em `a8f182b`.
+Check Cloudflare Pages desse commit concluído com sucesso: publicação confirmada.
 
 ## G3 — Prévia de modelos do Auth
 
@@ -51,14 +53,32 @@ na retomada). Projeto `fcykqrlnofmdtmewlejr`: código de **8 dígitos**, validad
 | `mailer_templates_magic_link_content` | 1276 caracteres; SHA-256 prefixo `f7a2d46df7f0`; Token e ConfirmationURL | 986 caracteres; SHA-256 prefixo `2377935a3739`; somente Token |
 | `mailer_templates_confirmation_content` | 1276 caracteres; SHA-256 prefixo `f7a2d46df7f0`; Token e ConfirmationURL | 986 caracteres; SHA-256 prefixo `2377935a3739`; somente Token |
 
-Resultado: **“Prévia: nada foi alterado.”** Aplicação pendente de aprovação
-explícita, após os commits/PRs, na ordem solicitada:
+Resultado inicial: **“Prévia: nada foi alterado.”** Após a abertura do PR #39,
+o titular autorizou explicitamente o G3. Duas tentativas do comando abaixo
+foram recusadas pela API com **HTTP 544**. A releitura após cada tentativa
+confirmou os modelos antigos (prefixo SHA-256 `f7a2d46df7f0`, com Token e
+ConfirmationURL); nenhum dos dois conteúdos havia sido atualizado. O Supabase
+documenta [HTTP 544 como timeout do gateway](https://supabase.com/docs/guides/troubleshooting/http-status-codes).
+A causa interna desse timeout não foi determinada.
+
+Após o pedido do titular para resolver a falha, nova tentativa no mesmo endpoint,
+com o mesmo PATCH dos dois conteúdos aprovados, recebeu **HTTP 200**. Releitura
+independente com `node scripts/auth/email-templates.mjs`: **"Nada a alterar"**,
+ambos os modelos com 986 caracteres, SHA-256 prefixo `2377935a3739`, somente
+`{{ .Token }}`. Assuntos preservados; código de 8 dígitos e validade de 3600 s.
+**G3 concluído.** Não foi necessário alterar o script. Comando de aplicação:
 
 ```sh
 CHADBB_AUTH_REF=fcykqrlnofmdtmewlejr node scripts/auth/email-templates.mjs --apply
 ```
 
-Após aplicar, o titular solicita um código no Hotmail e informa a pasta de
-entrega. Se continuar no lixo eletrônico, pedir apenas `Authentication-Results`
-(SPF/DKIM/DMARC) e `X-MS-Exchange-Organization-SCL`. O Mailpit não comprova
-entrega na caixa de entrada externa; reputação do domínio permanece hipótese.
+O titular testou no Hotmail após aplicar: mensagem ainda no lixo eletrônico.
+Cabeçalhos fornecidos por ele: SPF, DKIM (incluindo `chadbb.online`), DMARC e
+CompAuth aprovados; SCL 5. Não se reproduzem aqui identificadores da mensagem
+ou dados pessoais. A autenticação passou, mas a causa específica da classificação
+como spam não foi determinada; reputação do domínio permanece hipótese.
+
+O titular decidiu manter a orientação para conferir o lixo eletrônico após
+solicitar o código, já implementada e coberta por teste no PR #39:
+"Confira a caixa de entrada e o lixo eletrônico (spam); pode levar alguns minutos."
+Nenhuma alteração adicional de DNS ou de filtro da conta foi executada.
