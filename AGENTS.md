@@ -5,7 +5,9 @@ Leia este arquivo antes de qualquer tarefa. Ele vale para os dois agentes.
 ## Projeto
 
 MVP para o chá de bebê da Liz: **01/11/2026, 12h (Brasília)**, cerca de 50
-convidados. A confirmação de presença vai até **18/10/2026**. As prioridades são
+convidados. O prazo de confirmação vem do servidor e é exibido no convite
+(hoje 22/10, 10 dias antes; configurável pelo organizador a partir da T9 de
+`docs/DECISOES-PRODUTO-2026-09-30.md`). As prioridades são
 uso simples no celular, design profissional, acessibilidade e dados confiáveis.
 Suporte técnico: o próprio usuário. Ele escreve em português; responda em português.
 

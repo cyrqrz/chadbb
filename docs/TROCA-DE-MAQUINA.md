@@ -43,8 +43,8 @@ O `gift-list.spec.ts:142` segue só em observação: não reproduziu em 123 exec
 
 ### O que falta, todo do titular
 
-1. Juntar e cadastrar o conteúdo real (local, instruções com o prazo de
-   18/10, imagem autorizada, lista), seguindo as instruções do organizador.
+1. Juntar e cadastrar o conteúdo real (local, instruções sem data de prazo
+   — o convite já exibe "Confirme até" —, imagem autorizada, lista), seguindo as instruções do organizador.
 2. No dia seguinte ao cadastro, a restauração com dados reais e a medição do
    RTO, pelo roteiro de seis passos — fecha a T-B6.
 3. Ensaio com o irmão e um convidado (meta: 2 a 4/10), pelo roteiro.
@@ -346,6 +346,8 @@ O repositório é só `git clone`. O que não está no Git são os segredos em
 | `r2.env` | Ler e escrever no bucket de backups |
 | `pages-production.env` | Variáveis públicas do Pages |
 | `retention-cron-secret` | Acionar a retenção manualmente |
+| `rsvp-cron-secret` | Acionar a fila de lembretes manualmente (desde 24/09) |
+| `resend-api-key` | Consultar o histórico do Resend (desde 16/09; deu 401 em 30/09, não investigado) |
 | `supabase-ca.crt` | Cópia da CA; também existe em `scripts/backup/` |
 
 ### Como transferir
@@ -382,7 +384,7 @@ obrigatórios e instala com permissão 600.
 ls -l ~/.config/chadbb/
 ```
 
-Devem existir sete entradas, todas `600` (ou `700` para `backup-gnupg/`). Se
+Devem existir as entradas da tabela acima, todas `600` (ou `700` para `backup-gnupg/`). Se
 `backup-private.asc` não estiver lá, pare: sem ela os backups são ilegíveis.
 
 ## Sessões de CLI a refazer
