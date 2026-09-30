@@ -2,6 +2,39 @@
 
 ## Em andamento — 2026-09-30
 
+**Retomada (Claude, fim de 30/09) — comece por aqui.**
+
+Feito nesta etapa:
+- PR #41 mergeado: fraldas em P, M, G, XG no convite, painel e lista
+  (`src/lib/diapers.ts`).
+- [PR #42](https://github.com/cyrqrz/chadbb/pull/42) **aberto, aguardando
+  merge do titular**: "Dados do evento" com bloco público e bloco "Só para
+  convidados" distintos. Sem migration.
+- Jornada completa no Supabase local (login por código → criar, publicar,
+  lista pronta, convite → convidado confirma → painel): aprovada. A migration
+  `20260930000000` foi aplicada no banco **local** com `migration up`, sem
+  reset. A função `guest` local só aceita as origens das portas 5173/4173.
+- **Evento real da Liz criado pelo titular na própria conta** (ele é o dono;
+  sem conta para o irmão). Prévia conferida: 01/11 12h, "Confirme até
+  22/10/2026, 12:00". Titular informou textos corrigidos, evento publicado e
+  lista preparada.
+
+**Pendente, na ordem:**
+1. **T7 — ensaio**, adiado a pedido do titular: 2–3 familiares com convites
+   reais pelo WhatsApp (um responde **Talvez com e-mail real** e mantém);
+   titular confere o painel e faz o teste com TalkBack/VoiceOver no convite.
+   Roteiro em `ENTREGA-E-SUPORTE.md` → "Ensaio com a família".
+2. Corrigir o que o ensaio mostrar; **envio dos convites a todos até 08/10**.
+3. **Excluir o evento de teste antigo** da conta do titular (encerrar →
+   excluir; definitivo, só com confirmação dele).
+4. Merge do PR #42 e fast-forward da `clone-main`.
+5. Decidir `www.chadbb.online` (hoje 522; não está nos domínios do Pages).
+6. T9 (06–15/10) e T10 (16–20/10), conforme `DECISOES-PRODUTO-2026-09-30.md`.
+7. 22–25/10: conferir o primeiro lembrete real do Talvez (T11).
+
+Em outra máquina: segredos pelo repositório `chadbb-secret-transfer`
+(atualizado em 30/09), conforme `TROCA-DE-MAQUINA.md`.
+
 **Retomada Codex após Claude (base `898ec1f`).** PRs #32–#37 mergeados,
 conforme informado pelo titular. Preservadas as alterações locais de dois
 assuntos: fraldas sem seção vazia e login por código sem link. Evidências e gates em
