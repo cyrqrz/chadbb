@@ -10,7 +10,7 @@ import { failedLast, live } from '../../lib/query'
 import { useLastError } from '../../lib/useLastError'
 import { ErrorState, LoadingState, RefreshStatus, SlowRefresh } from '../../components/States'
 import { useAuth } from '../auth/context'
-import { Button, Pagination, Skeleton, StatusBadge } from '../../components/ui'
+import { Button, Pagination, PencilIcon, PlusIcon, Skeleton, StatusBadge, TrashIcon } from '../../components/ui'
 
 // Exclusão com desfazer: o card some na hora, mas o pedido só vai ao servidor
 // depois de UNDO_MS. Desfazer dentro do prazo não chega ao servidor. Sair da tela
@@ -113,7 +113,7 @@ export function EventsPage() {
   const firstUse = query.data?.count === 0 && page === 0
   const form = (autoFocus: boolean) => <form onSubmit={submit} className="mt-6 space-y-4"><label className="field">Nome do evento<input autoFocus={autoFocus} maxLength={120} placeholder="Chá de bebê da família" value={title} onChange={e => setTitle(e.target.value)} /></label><p className="text-sm text-stone-600">Depois você completa os detalhes, vê a prévia e publica.</p><button className="button" disabled={create.isPending}>{create.isPending ? 'Criando…' : 'Criar evento'}</button><p className="text-sm text-stone-600">Ao criar um evento, você concorda com os <Link className="text-link" to="/privacidade#organizadores">termos de uso</Link>.</p>{create.error && <p role="alert" className="error">{errorMessage(create.error)}</p>}</form>
   return <section className="page">
-    <div className="flex flex-wrap items-center justify-between gap-6"><div><p className="eyebrow">Organize com carinho</p><h1 className="page-title">Seus eventos</h1><SlowRefresh fetching={query.isFetching} /></div>{!firstUse && <button className="button" onClick={() => setCreating(!creating)}>{creating ? 'Fechar formulário' : 'Novo evento'}</button>}</div>
+    <div className="flex flex-wrap items-center justify-between gap-6"><div><p className="eyebrow">Organize com carinho</p><h1 className="page-title">Seus eventos</h1><SlowRefresh fetching={query.isFetching} /></div>{!firstUse && <button className="button" onClick={() => setCreating(!creating)}>{!creating && <PlusIcon />}{creating ? 'Fechar formulário' : 'Novo evento'}</button>}</div>
     {creating && !firstUse && <div className="card mt-8">{form(true)}</div>}
     {query.isPending && !(failedLast(query) && loadError) ? <><LoadingState>Carregando eventos…</LoadingState><EventsSkeleton /></> : !query.data ? <div className="mt-10"><ErrorState title="Não foi possível carregar seus eventos." message={errorMessage(loadError)} busy={query.isFetching} onRetry={() => void query.refetch()} /></div> : <>
       {notice && <div className="state state-success undo-notice mt-8">
@@ -200,10 +200,10 @@ function EventCard({ event, onDelete, focus, onFocused }: { event: EventRecord; 
   return <article className="card card-stack" aria-labelledby={`${confirmId}-titulo`}>
     <Link ref={main} className="card-stack card-main" to={`/eventos/${event.id}`}>{content}</Link>
     <div className="card-actions card-shortcuts">
-      {editable && <Link className="btn-ghost btn-sm" to={`/eventos/${event.id}/dados`}>Editar dados<span className="sr-only"> de {title}</span></Link>}
+      {editable && <Link className="secondary btn-sm" to={`/eventos/${event.id}/dados`}><PencilIcon size={18} />Editar dados<span className="sr-only"> de {title}</span></Link>}
       {deletable && <button ref={trigger} type="button" className="btn-danger btn-sm" aria-expanded={event.status === 'closed' ? confirming : undefined}
         aria-controls={event.status === 'closed' ? confirmId : undefined} aria-label={`Excluir evento ${title}`}
-        onClick={() => event.status === 'closed' ? (confirming ? cancel() : setConfirming(true)) : remove()}>Excluir</button>}
+        onClick={() => event.status === 'closed' ? (confirming ? cancel() : setConfirming(true)) : remove()}><TrashIcon size={18} />Excluir</button>}
       {confirming && <div id={confirmId} className="card-disclosure">
         <p ref={question} tabIndex={-1}>Excluir “{title}”? Convites, respostas e reservas deste evento serão apagados. Você terá {UNDO_MS / 1000} segundos para desfazer.</p>
         <div className="flex flex-wrap gap-3">

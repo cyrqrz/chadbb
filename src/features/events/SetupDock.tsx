@@ -7,7 +7,7 @@ import { pendingSteps, setupStepInfo } from './model'
 import type { EventRecord, SetupStep } from './model'
 import { useAuth } from '../auth/context'
 import { errorMessage } from '../../lib/errors'
-import { Button } from '../../components/ui'
+import { Button, UndoIcon } from '../../components/ui'
 
 // Barra fixa no rodapé enquanto o evento publicado tem etapa pendente. Não prende
 // o organizador: é só um atalho, e some quando as duas etapas estão concluídas.
@@ -98,7 +98,7 @@ export function StepCompletion({ event, step }: { event: EventRecord; step: Setu
   if (done) return <div className="step-done">
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
       <p className="step-done-text"><span aria-hidden="true">✓ </span>Etapa concluída: {label.toLowerCase()}</p>
-      <Button variant="ghost" size="sm" busy={change.isPending} onClick={() => mark(false)}>{change.isPending ? 'Reabrindo…' : 'Reabrir etapa'}</Button>
+      <Button variant="ghost" size="sm" busy={change.isPending} onClick={() => mark(false)}><UndoIcon size={18} />{change.isPending ? 'Reabrindo…' : 'Reabrir etapa'}</Button>
     </div>
     {status}{error}
   </div>
