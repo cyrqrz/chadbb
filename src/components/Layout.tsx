@@ -14,8 +14,9 @@ export function Layout() {
   // O roteador não rola ao trocar de página: a nova abria na altura em que a
   // anterior estava (no celular, a política abria já no rodapé e parecia que o
   // link não funcionava). Link novo começa no topo; com âncora, a própria página
-  // rola até a seção; “voltar” do navegador (POP) mantém a posição.
-  useLayoutEffect(() => { if (navigation !== 'POP' && !hash) window.scrollTo(0, 0) }, [pathname, hash, navigation])
+  // rola até a seção; “voltar” do navegador (POP) mantém a posição. `instant`
+  // porque o CSS rola suave: a página nova apareceria no rodapé subindo animada.
+  useLayoutEffect(() => { if (navigation !== 'POP' && !hash) window.scrollTo({ top: 0, left: 0, behavior: 'instant' }) }, [pathname, hash, navigation])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(false)
   async function signOut() {

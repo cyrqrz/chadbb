@@ -55,3 +55,9 @@ repaginadas e benefícios. Só front; sem mudança de dados.
 - **Perguntas frequentes com resposta apagada:** a resposta usava o cinza
   secundário. Agora: resposta na cor do texto (15,41:1), pergunta aberta com
   cabeçalho rosado e divisor (8,07:1), seta num círculo que vira vinho ao abrir.
+- **Topo sem rolagem animada:** o `scrollTo(0, 0)` herdava o
+  `scroll-behavior: smooth` do CSS; sem "reduzir movimento", a página nova
+  aparecia no rodapé e subia animada por ~0,8 s (medido: 2633 → 0 px). Agora o
+  salto usa `behavior: 'instant'`. Os e2e rodam com movimento reduzido e não
+  pegavam; o teste novo usa `reducedMotion: 'no-preference'` e falhou antes da
+  correção.

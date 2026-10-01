@@ -52,3 +52,28 @@ test('trocar de página pelo rodapé começa no topo da página nova', async ({ 
   await page.getByRole('contentinfo').getByRole('link', { name: 'Termos de uso' }).click()
   await expect(page.getByRole('heading', { name: 'Termos para organizadores' })).toBeInViewport()
 })
+
+// O CSS rola suave (`scroll-behavior: smooth`), e os e2e rodam com movimento
+// reduzido: no celular comum a página nova aparecia no rodapé e subia animada.
+test.describe('troca de página sem movimento reduzido', () => {
+  test.use({ reducedMotion: 'no-preference' })
+
+  test('a página nova já abre no topo, sem rolar animada', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 740 })
+    await page.goto('/')
+    const footer = page.getByRole('contentinfo')
+    // Desce sem animação, para a rolagem do próprio teste não entrar na conta.
+    await page.evaluate(async () => {
+      scrollTo({ top: document.body.scrollHeight, behavior: 'instant' })
+      await new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)))
+      const w = window as unknown as { seen: number[] }
+      w.seen = []
+      addEventListener('scroll', () => w.seen.push(scrollY))
+    })
+    await footer.getByRole('link', { name: 'Política de Privacidade', exact: true }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Privacidade e termos' })).toBeInViewport()
+    await expect.poll(() => page.evaluate(() => scrollY)).toBe(0)
+    // Nenhuma posição intermediária: o salto ao topo é um só.
+    expect(await page.evaluate(() => (window as unknown as { seen: number[] }).seen.filter(y => y !== 0))).toEqual([])
+  })
+})
