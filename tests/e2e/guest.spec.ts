@@ -466,6 +466,16 @@ test.describe('G3 · página inicial e prévia', () => {
     await expect(page.getByText('Convites estão em preparação')).toHaveCount(0)
   })
 
+  // Fase 2: o link novo `/c/<evento>#token` abre o mesmo convite (no Pages, a função troca
+  // só a prévia; aqui o dev entrega convite.html) e o token sai da barra de endereço.
+  test('link com o id do evento abre o convite e o token some do endereço', async ({ page }) => {
+    await backend(page)
+    await page.goto(`/c/20000000-0000-4000-8000-000000000002#${token}`)
+    await expect(page.getByRole('button', { name: 'Confirmar presença' })).toBeVisible()
+    expect(new URL(page.url()).hash).toBe('')
+    expect(new URL(page.url()).pathname).toBe('/c/20000000-0000-4000-8000-000000000002')
+  })
+
   // Fase 1 do plano do WhatsApp (01/10): a home sai com prévia de produto e só o link do
   // convite sai com prévia de convite. O WhatsApp lê o HTML do servidor, sem rodar o app:
   // por isso a conferência é no HTML entregue, e não na página montada.

@@ -29,6 +29,15 @@ Pedidos do titular em 01/10, executados em plano a pedido dele.
   produto (`og-site.png`); `/convite` com prévia de convite (`og-convite.png`), por
   `convite.html`. Detalhes e evidência do simulador do Pages em
   [PLANO-CONVITE-WHATSAPP.md](../PLANO-CONVITE-WHATSAPP.md).
+- **Prévia do link por evento (fase 2)**, pedida pelo titular depois da fase 1: arte
+  gerada no navegador ao salvar/publicar (título, dia e horário, capa ou nuvem), link
+  `/c/<id>#token` e Pages Function que troca as meta tags pela projeção pública do
+  evento (migration `20261001020000`). Links antigos seguem com a prévia genérica.
+- **Botões padronizados** (pedido do titular): confirmações dentro de cards com o mesmo
+  tamanho dos atalhos, ação destrutiva com ícone; card estreito empilha os atalhos;
+  barra de seleção no padrão de ações em lote (caixa "Selecionar todos" com estado
+  parcial, contagem e ação na mesma linha); formulário de contato em uma coluna, com a
+  dica entre o rótulo e o campo (GOV.UK). Reaproveita `.flow-actions` e `.choice`.
 - **Ícones nas ações** (decorativos, `aria-hidden`; os nomes acessíveis não mudam):
   editar, excluir, adicionar, reemitir link, revogar, ver como convidado, reabrir
   etapa, enviar.
@@ -59,8 +68,8 @@ Pedidos do titular em 01/10, executados em plano a pedido dele.
 ## Gates pendentes (titular)
 
 1. Revisar os diffs e as capturas; commit e push só depois.
-2. `db push` no `chadbb-cha` das duas migrations (dry-run antes), **antes** do merge:
-   o front publicado chama `prepare_treat_list`.
+2. `db push` no `chadbb-cha` das três migrations (dry-run antes), **antes** do merge:
+   o front publicado chama `prepare_treat_list`, `set_event_preview` e `public_event_preview`.
 3. `functions deploy contact` no `chadbb-cha`. Usa `RSVP_RESEND_API_KEY` e
    `RSVP_EMAIL_FROM` já configurados; sem segredo novo, salvo se o titular preferir
    chave própria (`CONTACT_RESEND_API_KEY`).
@@ -68,3 +77,6 @@ Pedidos do titular em 01/10, executados em plano a pedido dele.
    Email Routing (e o lixo eletrônico).
 5. Conferir no preview do PR que `/convite` sai com a prévia de convite e a home com a
    de produto; depois, um link real no WhatsApp.
+6. Conferir no painel do Cloudflare Pages que `VITE_SUPABASE_URL` e
+   `VITE_SUPABASE_PUBLISHABLE_KEY` estão disponíveis também em tempo de execução
+   (Functions), não só no build; sem elas, `/c/<id>` sai com a prévia genérica.

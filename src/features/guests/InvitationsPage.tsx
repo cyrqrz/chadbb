@@ -3,7 +3,7 @@ import type { FormEvent, ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../auth/context'
-import { getEvent, eventKeys } from '../events/api'
+import { ensureEventPreview, getEvent, eventKeys } from '../events/api'
 import { invitations, responseLabels } from './api'
 import type { Dashboard, DashboardReservation, Invitation, PanelSummary } from './api'
 import { errorMessage } from '../../lib/errors'
@@ -23,6 +23,9 @@ export function InvitationsPage() {
   const key = ['invitations', session?.user.id, id]
   const query = useQuery<Dashboard>({ queryKey: key, queryFn: () => invitations(id), ...live })
   const event = useQuery({ queryKey: [...eventKeys.detail(id), session?.user.id], queryFn: () => getEvent(id), ...live })
+  // Os links saem daqui: garante a arte da prévia de quem publicou antes dela existir.
+  const eventData = event.data
+  useEffect(() => { if (eventData) void ensureEventPreview(eventData).catch(() => undefined) }, [eventData])
   const [editing, setEditing] = useState<Invitation | null>(null)
   const [name, setName] = useState('')
   const [kind, setKind] = useState('individual')
@@ -56,7 +59,7 @@ export function InvitationsPage() {
     setBusy(true); setError(''); setNotice(''); setCopyFailed(false); setFeedbackAt(action === 'update' ? 'edit' : 'create')
     try {
       const result = await invitations(id, action, payload)
-      if (result.token) { setCopied(false); setLink(`${window.location.origin}/convite#${result.token}`); setNotice('Convite pronto. Copie o link e envie pelo WhatsApp.') }
+      if (result.token) { setCopied(false); setLink(`${window.location.origin}/c/${id}#${result.token}`); setNotice('Convite pronto. Copie o link e envie pelo WhatsApp.') }
       else if (action === 'update') { setNotice('Convite atualizado.'); setEditing(null) }
       else setNotice('Convite revogado. O acesso anterior não funciona mais; as respostas e escolhas foram preservadas.')
       if (action === 'create') { setName(''); setInviting(false) }

@@ -7,11 +7,11 @@ perguntas frequentes): merge com o titular. Na `clone-main`, depois do #45: íco
 ações, lista pronta só de mimos (fraldas do zero) com os cards da lista no padrão dos
 cards de evento, formulário de contato (Edge `contact`), card de convite no mesmo
 padrão, encerrar e excluir no publicado, seleção de vários eventos com um só Desfazer
-e a fase 1 das prévias do WhatsApp. Com isso, os itens 2 a 5 da fila abaixo estão
-feitos; a fase 2 das prévias aguarda as decisões do plano. Decisões, evidências e
+e as fases 1 e 2 das prévias do WhatsApp (prévia por evento, link `/c/<id>#token`).
+Com isso, os itens 2 a 5 da fila abaixo estão feitos. Decisões, evidências e
 gates em [revisão da tarde](reviews/2026-10-01-lista-mimos-contato.md). Antes de
-publicar: `db push` das migrations `20261001000000` e `20261001010000` e `functions
-deploy contact`, com aprovação.
+publicar: `db push` das migrations `20261001000000`, `20261001010000` e
+`20261001020000` e `functions deploy contact`, com aprovação.
 
 **Retomada (Claude, fim de 01/10) — comece por aqui.**
 

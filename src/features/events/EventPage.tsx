@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useLocation, useOutletContext, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { coverUrl, eventKeys, getEvent, saveEvent, transitionEvent, uploadCover } from './api'
+import { coverUrl, eventKeys, getEvent, refreshEventPreview, saveEvent, transitionEvent, uploadCover } from './api'
 import { toDraft, validateDraft, validateImage } from './model'
 import type { EventDraft, EventRecord } from './model'
 import { errorMessage } from '../../lib/errors'
@@ -83,7 +83,10 @@ function EventEditor({ server, created, refreshing, refreshFailed, retry }: { se
         // Se salvar falhar, a retentativa reutiliza o upload já concluído.
         setDraft(nextDraft); setImageFile(null)
       }
-      await accept(await saveEvent(record, nextDraft)); setMessage('Alterações salvas.')
+      const saved = await saveEvent(record, nextDraft)
+      await accept(saved); setMessage('Alterações salvas.')
+      // A arte da prévia acompanha título, data e capa; em segundo plano e sem bloquear.
+      void refreshEventPreview(saved).catch(() => undefined)
     } catch (cause) { setError(errorMessage(cause)) } finally { setBusy(false) }
   }
   async function transition(status: 'published' | 'closed') {
@@ -93,7 +96,9 @@ function EventEditor({ server, created, refreshing, refreshFailed, retry }: { se
     if (!navigator.onLine) { setError(errorMessage(new Error('OFFLINE'))); return }
     setBusy(true); setError(null); setMessage('')
     try {
-      await accept(await transitionEvent(record, status)); setConfirmClose(false)
+      const changed = await transitionEvent(record, status)
+      await accept(changed); setConfirmClose(false)
+      if (status === 'published') void refreshEventPreview(changed).catch(() => undefined)
       if (status === 'published') setJustPublished(true); else setMessage('Evento encerrado.')
     }
     catch (cause) { setError(errorMessage(cause)) } finally { setBusy(false) }
@@ -120,7 +125,7 @@ function EventEditor({ server, created, refreshing, refreshFailed, retry }: { se
       <fieldset disabled={busy || closed} className="form-section space-y-5">
         <legend className="form-section-legend">Para compartilhar</legend>
         <p><StatusBadge tone="neutral">Visível na prévia pública</StatusBadge></p>
-        <p className="text-sm text-muted">Título, descrição e imagem podem aparecer na prévia pública quando o evento for publicado.</p>
+        <p className="text-sm text-muted">Título, descrição, imagem e o dia e horário do evento aparecem na prévia do link do convite (no WhatsApp, por exemplo) quando o evento é publicado.</p>
         <label className="field">Nome do evento<input maxLength={120} value={draft.title} onChange={e => update('title', e.target.value)} placeholder="Chá de bebê" /></label>
         <label className="field">Descrição pública<textarea rows={4} maxLength={2000} value={draft.public_description} onChange={e => update('public_description', e.target.value)} /></label>
         {draft.cover_path && <div><img className="max-h-64 w-full rounded-surface object-cover" src={coverUrl(draft.cover_path)} alt="Capa do evento" />{!closed && <Button variant="danger" size="sm" className="mt-3" onClick={() => setDraft({ ...draft, cover_path: null })}>Remover capa do evento</Button>}</div>}
@@ -130,7 +135,7 @@ function EventEditor({ server, created, refreshing, refreshFailed, retry }: { se
       <fieldset disabled={busy || closed} className="form-section form-section-private space-y-5">
         <legend className="form-section-legend">Só para convidados</legend>
         <p><StatusBadge icon="🔒">Privado</StatusBadge></p>
-        <p className="text-sm">Data, endereço e instruções só aparecem para quem abre o convite pelo link recebido. Não entram na prévia pública.</p>
+        <p className="text-sm">Endereço e instruções só aparecem para quem abre o convite pelo link recebido. Não entram na prévia do link, que mostra só o dia e o horário.</p>
         <label className="field">Data e horário<input type="datetime-local" value={draft.localDate} onChange={e => update('localDate', e.target.value)} /><span className="hint">Horário de Brasília. Obrigatório para publicar.</span></label>
         <label className="field">Término<input type="datetime-local" value={draft.localEndDate} onChange={e => update('localEndDate', e.target.value)} /><span className="hint">Horário de Brasília. Obrigatório para publicar. Os dados pessoais dos convidados são excluídos 30 dias após o término.</span></label>
         <label className="field">Endereço privado<textarea rows={2} maxLength={500} value={draft.private_address} onChange={e => update('private_address', e.target.value)} /></label>

@@ -2,7 +2,7 @@
 
 Pedido do titular: refatorar o visual do convite que chega no WhatsApp, com as
 características do evento. Também: a URL do site (home) não pode sair com prévia
-de convite — só o convite deve sair assim. **Fase 1 implementada em 01/10 (sem publicar); fase 2 aguarda as decisões abaixo.**
+de convite — só o convite deve sair assim. **Fases 1 e 2 implementadas em 01/10 (sem publicar); decisões abaixo tomadas pelo titular.**
 
 ## Restrição que manda em tudo
 
@@ -57,6 +57,17 @@ sai com `convite.html` sem mudar o `_redirects` (a regra `/*` não atropela o ar
 `/convite/` redireciona para `/convite` e os cabeçalhos de `_headers` valem nas duas.
 Falta: conferir no preview do PR e num WhatsApp real (G2).
 
+**Fase 2 — feito em 01/10 (na `clone-main`, aguardando revisão e merge).** Decisões do
+titular: fazer já, antes do congelamento; a prévia mostra **dia e horário** (endereço
+continua só para convidados); a arte é **gerada no navegador do organizador** ao salvar
+ou publicar (e ao abrir o painel de convites, se o evento publicado ainda não tiver arte),
+em vez de gerada na borda (G5 abaixo fica descartado). Peças: tabela `event_previews` e
+RPCs `set_event_preview`/`public_event_preview` (migration `20261001020000`), arte em
+`src/features/events/previewArt.ts` (canvas, JPEG 1200×630 < 300 KB, capa recortada ou
+nuvem com coração), link novo `/c/<id>#token` e Pages Function `functions/c/[id].ts`.
+Links antigos (`/convite#token`) seguem com a prévia genérica. Falta: `db push`, conferir
+no preview do PR e num WhatsApp real.
+
 **Fase 2 — prévia por evento (back + front)**
 - **G3 — contrato** em `CONTRATOS-TRANSACIONAIS.md`: leitura pública
   `public_event_preview(event_id)` só de evento **publicado**, só título,
@@ -78,12 +89,12 @@ Falta: conferir no preview do PR e num WhatsApp real (G2).
 **Depois de 01/11:** tema por evento (paleta + motivo: ursinhos, nuvens,
 flores…) escolhido pelo organizador e aplicado no convite e na imagem.
 
-## Decisões abertas (titular)
+## Decisões (titular, 01/10)
 
-1. **Prazo:** os convites da Liz saem até 08/10, depois do congelamento de 05/10.
+1. **Prazo (decidido: fazer já, antes de 05/10):** os convites da Liz saem até 08/10, depois do congelamento de 05/10.
    A fase 2 mexe em back, Pages Function e formato do link: fica para depois do
    chá da Liz (a Liz recebe a prévia genérica redesenhada da fase 1), ou abre-se
    uma exceção ao congelamento?
-2. **Data na prévia:** manter só título/descrição/capa, ou aceitar mostrar o
+2. **Data na prévia (decidido: dia e horário):** manter só título/descrição/capa, ou aceitar mostrar o
    **dia** do evento (sem endereço nem horário)? Hoje a data é "só para
    convidados".

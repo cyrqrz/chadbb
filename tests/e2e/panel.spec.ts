@@ -433,7 +433,7 @@ test('erro ao salvar fica na edição, não muda de lugar ao copiar e some ao ca
 
   await create.getByRole('button', { name: 'Copiar convite' }).click()
   await expect(create.getByRole('status')).toHaveText('Link copiado.')
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(`${new URL(page.url()).origin}/convite#${rotated.token}`)
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(`${new URL(page.url()).origin}/c/${eventId}#${rotated.token}`)
   await expect(page.getByRole('alert')).toHaveCount(0)
   await expect(edit.getByRole('status')).toHaveCount(0)
 
@@ -472,7 +472,8 @@ test('editar um convite com link não copiado em "Convidar alguém" pede confirm
   const create = page.getByRole('region', { name: 'Convide alguém especial' })
   await create.getByLabel('Nome da pessoa ou família').fill('Convidado fictício 9')
   await create.getByRole('button', { name: 'Criar convite' }).click()
-  await expect(create.getByLabel('Link para compartilhar')).toHaveValue(/token-ficticio/)
+  // Fase 2: o link leva o id público do evento no caminho (prévia do evento) e o token no #.
+  await expect(create.getByLabel('Link para compartilhar')).toHaveValue(new RegExp(`/c/${eventId}#token-ficticio`))
   await page.getByRole('button', { name: 'Editar convite de Convidado fictício 1' }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog).toContainText('O link deste convite não aparece de novo')

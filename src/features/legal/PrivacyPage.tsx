@@ -5,7 +5,7 @@ import { ContactForm } from './ContactForm'
 
 // Texto aprovado pelo titular em 30/09 (T4 de docs/DECISOES-PRODUTO-2026-09-30.md).
 // Descreve o que o sistema faz: mudar retenção, dados ou fornecedores exige mudar aqui.
-const UPDATED = '30 de setembro de 2026'
+const UPDATED = '1 de outubro de 2026'
 
 // Pergunta e resposta: quem chega pelo convite procura uma dúvida, não lê de cima a baixo.
 const guestAnswers = [
@@ -20,7 +20,7 @@ const guestAnswers = [
 const organizerTerms = [
   'O chadbb está em fase de testes: é gratuito e funciona por convite. Pode mudar ou parar, e você será avisado com antecedência.',
   'Cadastre só quem você convidaria de qualquer forma e só o necessário. Não coloque dados sensíveis nas instruções.',
-  'Você responde pelo conteúdo do evento. A imagem de capa fica acessível a quem tiver o endereço dela; use só imagens autorizadas.',
+  'Você responde pelo conteúdo do evento. A imagem de capa e a arte da prévia do link do convite (com título, dia e horário) ficam acessíveis a quem tiver o endereço delas; use só imagens autorizadas.',
   'Seu e-mail é guardado para o login. Do evento, 30 dias depois do fim, ficam só o título e as datas. Para apagar sua conta, use o contato.',
   'Fazemos backup diário, mas não garantimos disponibilidade contínua.',
   'O chadbb não vende nem intermedia pagamentos. As compras de presentes são feitas diretamente nas lojas.',

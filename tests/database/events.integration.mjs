@@ -1377,3 +1377,36 @@ test('cota do formulário de contato: 3 por minuto por rede e 30 no total, sem a
   // As chaves do convidado seguem com os limites de antes.
   for (let i = 0; i < 5; i++) assert.equal(await hit('ip:198.51.100.7'), true)
 })
+
+test('prévia pública do evento: arte do dono, leitura só de publicado e só dos campos públicos', async () => {
+  const draft = await save(await create(alice, 'Chá da prévia'), alice, { description: 'Venha celebrar', date: '2035-11-01T15:00:00Z' })
+  const art = `${alice}/${draft.id}/preview-1.jpg`
+  const other = `${alice}/${draft.id}/preview-2.jpg`
+  const register = (user, path) => as(user, 'select public.set_event_preview($1,$2) old', [draft.id, path])
+  // Só registra arte que já está na pasta do evento, no bucket público, e só o dono.
+  await assert.rejects(register(alice, art), /INVALID_PREVIEW/)
+  await as(alice, "insert into storage.objects(bucket_id,name) values ('event-public',$1),('event-public',$2)", [art, other])
+  await assert.rejects(register(bob, art), /EVENT_NOT_FOUND/)
+  await assert.rejects(register(alice, `${bob}/${draft.id}/x.jpg`), /INVALID_PREVIEW/)
+  assert.equal((await register(alice, art)).rows[0].old, null)
+  const read = (role = 'anon') => as(null, 'select * from public.public_event_preview($1)', [draft.id], role)
+  // Rascunho não aparece para ninguém de fora.
+  assert.equal((await read()).rowCount, 0)
+  const published = await transition(draft, 'published')
+  const { rows } = await read()
+  assert.deepEqual(Object.keys(rows[0]).sort(), ['image_path', 'public_description', 'starts_at', 'title'])
+  assert.equal(rows[0].title, 'Chá da prévia')
+  assert.equal(rows[0].image_path, art)
+  assert.equal(new Date(rows[0].starts_at).toISOString(), '2035-11-01T15:00:00.000Z')
+  // Trocar a arte devolve a anterior, para o front apagar o arquivo antigo.
+  assert.equal((await register(alice, other)).rows[0].old, art)
+  assert.equal((await read()).rows[0].image_path, other)
+  // Id inválido ou inexistente: vazio, sem erro.
+  assert.equal((await as(null, 'select * from public.public_event_preview($1)', ['00000000-0000-4000-8000-0000000000ff'], 'anon')).rowCount, 0)
+  await assert.rejects(as(null, 'select * from public.event_previews', [], 'anon'), /permission denied/)
+  await assert.rejects(as(alice, 'select * from public.event_previews'), /permission denied/)
+  // Encerrado sai da prévia; o registro some com o evento.
+  await transition(published, 'closed')
+  assert.equal((await read()).rowCount, 0)
+  await assert.rejects(register(alice, art), /EVENT_CLOSED/)
+})

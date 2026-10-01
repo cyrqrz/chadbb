@@ -6,5 +6,5 @@
     "strict": true, "skipLibCheck": true, "noUnusedLocals": true, "noUnusedParameters": true,
     "types": ["vite/client", "node"]
   },
-  "include": ["src", "tests", "vite.config.ts", "playwright.config.ts"]
+  "include": ["src", "tests", "functions", "vite.config.ts", "playwright.config.ts"]
 }
