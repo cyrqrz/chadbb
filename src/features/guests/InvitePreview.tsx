@@ -13,7 +13,7 @@ import { GuestEvent } from './GuestPage'
 import { errorMessage } from '../../lib/errors'
 import { live } from '../../lib/query'
 import { ErrorState, LoadingState } from '../../components/States'
-import { BackLink, Button } from '../../components/ui'
+import { advanceClass, BackLink, Button } from '../../components/ui'
 
 // G4: o convite como o convidado vê, com um convidado de exemplo. Usa só dados
 // que o organizador já lê (evento e lista); nada é enviado.
@@ -61,7 +61,7 @@ function PublishFromPreview({ record }: { record: EventRecord }) {
   useEffect(() => { if (published) notice.current?.focus() }, [published])
   if (published) return <div ref={notice} tabIndex={-1} role="status" className="state state-success flow-notice">
     <p><strong>Evento publicado.</strong> Agora crie os convites e envie os links.</p>
-    <Link className="button" to={`/eventos/${record.id}`}>Seguir para convidados e presença</Link>
+    <Link className={advanceClass} to={`/eventos/${record.id}`}>Seguir para convidados e presença</Link>
   </div>
   if (record.status !== 'draft') return null
   const missing = validateDraft(toDraft(record), true)
@@ -88,7 +88,7 @@ function PublishFromPreview({ record }: { record: EventRecord }) {
   return <div className="flex flex-col items-start gap-3">
     <p>Tudo certo? Publique para começar a enviar os convites.</p>
     <div className="flow-actions">
-      <Button busy={busy} onClick={() => void publish()}>{busy ? 'Publicando…' : 'Publicar evento'}</Button>
+      <Button variant="advance" busy={busy} onClick={() => void publish()}>{busy ? 'Publicando…' : 'Publicar evento'}</Button>
       {edit}
     </div>
     {error ? <p role="alert" className="error">{(error as Error).message === 'VERSION_CONFLICT' ? 'O evento mudou em outra aba. A prévia foi atualizada: confira e publique de novo.' : errorMessage(error)}</p> : null}

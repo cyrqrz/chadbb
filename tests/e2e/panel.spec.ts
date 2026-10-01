@@ -878,7 +878,7 @@ test.describe('G2.1 · card de convidado', () => {
 
   test('forma: card e botões sem cápsula, selo continua pill', async ({ page }) => {
     const item = card(page, 1)
-    expect(await radius(item)).toBeLessThanOrEqual(16)
+    expect(await radius(item)).toBe(20) // Token surface aprovado no tema bebê; botões continuam sem cápsula.
     for (const name of [/^Editar convite/, 'Reemitir link', 'Revogar acesso']) {
       const button = item.getByRole('button', { name })
       expect(await radius(button)).toBeLessThanOrEqual(12)

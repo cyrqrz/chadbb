@@ -1,17 +1,19 @@
+import { BabyMotif } from '../../components/BabyMotif'
 import { useState } from 'react'
 import { EmptyState, ErrorState, LoadingState, SuccessMessage } from '../../components/States'
 import { BackLink, Button, ConfirmDialog, Field, Progress, Section, Skeleton, StatusBadge, Tabs } from '../../components/ui'
 
 // Página de amostras da foundation (G2). Só existe em desenvolvimento.
 const colors = [
-  ['canvas', 'Fundo'], ['surface', 'Superfície'], ['surface-soft', 'Superfície suave'], ['ink', 'Texto'], ['muted', 'Texto secundário'],
+  ['cream', 'Creme'], ['rose', 'Rosa-antigo (decorativo)'], ['champagne', 'Champagne (decorativo)'], ['canvas', 'Fundo'], ['surface', 'Superfície'], ['surface-soft', 'Superfície suave'], ['ink', 'Texto'], ['muted', 'Texto secundário'],
   ['line', 'Divisória'], ['line-strong', 'Contorno de controle'], ['brand', 'Marca'], ['brand-hover', 'Marca (hover)'], ['brand-soft', 'Marca suave'],
-  ['success', 'Sucesso (barra)'], ['success-text', 'Sucesso (texto)'], ['warning', 'Aviso'], ['danger', 'Erro'],
+  ['success', 'Sucesso (ícones)'], ['success-text', 'Sucesso (texto)'], ['warning', 'Aviso'], ['danger', 'Erro'],
 ] as const
 
 export function SpecimensPage() {
   const [tab, setTab] = useState<'fralda' | 'mimo'>('fralda')
   const [busy, setBusy] = useState(false)
+  const [advanceBusy, setAdvanceBusy] = useState(false)
   const [confirm, setConfirm] = useState<'default' | 'danger' | null>(null)
   return <div className="page flex flex-col gap-12">
     <header className="flex flex-col gap-2">
@@ -20,9 +22,10 @@ export function SpecimensPage() {
       <p className="section-description">Organizar deve ser simples; participar deve ser memorável.</p>
     </header>
 
-    <Section title="Tipografia" description="Fonte editorial só no nome do evento e nos momentos do convite; o resto usa a fonte de interface.">
+    <Section title="Tipografia" description="Fraunces SOFT nos títulos, Manrope no corpo e manuscrita apenas em um acento.">
       <div className="flex flex-col gap-4">
-        <p className="text-display font-display font-medium tracking-tight">Chá de teste</p>
+        <h2 className="text-display font-display font-medium tracking-tight">Chá de teste</h2>
+        <p className="handwritten-accent">Com carinho, para um pequeno começo.</p>
         <p className="text-h1 font-bold tracking-tight">Convites e confirmações</p>
         <p className="text-h2 font-bold">Fraldas por tamanho</p>
         <p className="text-h3 font-bold">Tamanho M</p>
@@ -32,6 +35,10 @@ export function SpecimensPage() {
         <p className="text-caption text-muted">Legenda · 13 px</p>
         <p className="stat">42</p>
       </div>
+    </Section>
+
+    <Section title="Motivos delicados" description="Decorativos, sem interação; champagne e rosa-antigo não carregam informação.">
+      <div className="flex flex-wrap gap-4"><BabyMotif /><BabyMotif variant="stars" /><BabyMotif variant="bear" /><BabyMotif variant="leaf" /></div>
     </Section>
 
     <Section title="Cores" description="Contrastes medidos em docs/design/foundation.md.">
@@ -60,7 +67,16 @@ export function SpecimensPage() {
       </div>
     </Section>
 
-    <Section title="Card de convidado" description="Superfície de 16 px; ações empilham quando o card é estreito.">
+    <Section title="Concluir etapa" description="advance: conclui a etapa e leva ao próximo passo. Uma por tela; ocupa a largura toda no celular; indisponível mostra o que falta.">
+      <div className="flex flex-col items-start gap-4">
+        <div className="flow-actions w-full"><Button variant="secondary">Ver prévia</Button><Button variant="advance">Publicar evento</Button></div>
+        <Button variant="advance" busy={advanceBusy} onClick={() => { setAdvanceBusy(true); setTimeout(() => setAdvanceBusy(false), 1500) }}>{advanceBusy ? 'Publicando…' : 'Publicar (fica ocupado)'}</Button>
+        <div className="w-full"><Button variant="advance" disabled aria-describedby="advance-missing">Publicar evento</Button>
+          <p id="advance-missing" className="hint mt-2">Falta definir a data e o horário.</p></div>
+      </div>
+    </Section>
+
+    <Section title="Card de convidado" description="Superfície de 20 px; ações empilham quando o card é estreito.">
       <ul className="grid gap-4 md:grid-cols-2">
         <li className="card guest-card">
           <div className="flex flex-wrap gap-2"><StatusBadge tone="neutral">Família · até 4 pessoas</StatusBadge></div>
@@ -108,9 +124,9 @@ export function SpecimensPage() {
         <StatusBadge tone="danger">Acesso revogado</StatusBadge>
       </div>
       <ul className="grid max-w-md gap-3">{[['P', 6, 6], ['M', 4, 19], ['G', 12, 19], ['XG', 0, 6]].map(([size, value, max]) =>
-        <li key={size} className="grid grid-cols-[2.5rem_1fr_4.5rem] items-center gap-3">
+        <li key={size} className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
           <span className="font-bold">{size}</span><Progress value={Number(value)} max={Number(max)} />
-          <span className="text-right tabular-nums">{value} / {max}{value === max ? ' ✓' : ''}</span>
+          <span className="text-right tabular-nums">{value} de {max}{value === max ? ' ✓' : ''}</span>
         </li>)}
       </ul>
     </Section>

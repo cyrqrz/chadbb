@@ -1,5 +1,5 @@
 export { BackLink } from './BackLink'
-export { Button } from './Button'
+export { advanceClass, Button } from './Button'
 export type { ButtonVariant } from './Button'
 export { ConfirmDialog } from './ConfirmDialog'
 export { Field } from './Field'

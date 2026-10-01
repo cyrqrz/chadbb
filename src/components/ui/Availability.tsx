@@ -5,6 +5,7 @@ import { Progress } from './Progress'
 export function Availability({ available, limit, committed, unit }: { available: number; limit: number; committed: number; unit: string }) {
   return <div className="availability">
     <p className="availability-text">{available} de {limit} disponíveis</p>
+    <p className="progress-value">{committed} de {limit} {unit} reservados</p>
     <Progress value={committed} max={limit} label={`${committed} de ${limit} ${unit} reservados`} />
   </div>
 }

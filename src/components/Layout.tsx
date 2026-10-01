@@ -1,3 +1,4 @@
+import { BabyMotif } from './BabyMotif'
 import { useState } from 'react'
 import { Link, Outlet } from 'react-router-dom'
 import { useAuth } from '../features/auth/context'
@@ -30,7 +31,7 @@ export function Layout() {
         voltar (src/lib/query.ts) é quem garante o dado atualizado, não este aviso. */}
     {!online && <p role="status" className="state state-warning mt-4">Sem conexão. O que está na tela continua visível, mas alterações não serão enviadas até a internet voltar.</p>}
     <main id="conteudo" className="min-w-0 flex-1"><Outlet /></main>
-    <footer className="flex flex-wrap justify-between gap-2 border-t border-stone-300 py-6 text-sm text-stone-600"><span>chadbb · Pequenos começos, grandes encontros.</span><span>Presença, fraldas e mimos em um só lugar.</span>
+    <footer className="site-footer flex flex-wrap justify-between gap-2 border-t border-stone-300 py-6 text-sm text-stone-600"><BabyMotif variant="leaf" small /><span>chadbb · Pequenos começos, grandes encontros.</span><span>Presença, fraldas e mimos em um só lugar.</span>
       {/* Nova aba: o convite guarda a sessão só na memória, e sair da página a perderia. */}
       <a className="text-link" href="/privacidade" target="_blank" rel="noopener">Privacidade e termos<span className="sr-only"> (abre em nova aba)</span></a></footer>
   </div>

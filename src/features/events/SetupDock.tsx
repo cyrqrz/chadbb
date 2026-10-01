@@ -108,7 +108,7 @@ export function StepCompletion({ event, step }: { event: EventRecord; step: Setu
     <p className="mt-2 text-muted">{step === 'guests'
       ? 'Crie um convite para cada pessoa ou família e envie os links. Quando terminar, marque esta etapa.'
       : 'Monte a lista de fraldas e mimos que os convidados vão ver. Quando terminar, marque esta etapa.'}</p>
-    <Button variant="secondary" className="mt-4" busy={change.isPending} onClick={() => mark(true)}>{change.isPending ? 'Salvando…' : `Concluí ${step === 'guests' ? 'convidados e presença' : 'a lista de presentes'}`}</Button>
+    <Button variant="advance" className="mt-4" busy={change.isPending} onClick={() => mark(true)}>{change.isPending ? 'Salvando…' : `Concluí ${step === 'guests' ? 'convidados e presença' : 'a lista de presentes'}`}</Button>
     {status}{error}
   </section>
 }

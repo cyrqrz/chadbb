@@ -1,3 +1,4 @@
+import { BabyMotif } from '../../components/BabyMotif'
 import { useEffect, useId, useRef, useState } from 'react'
 import type { ReactNode, RefObject } from 'react'
 import type { FormEvent } from 'react'
@@ -135,9 +136,10 @@ export function GuestEvent({ access, preview = false }: { access: { token: strin
     <header className="invite-hero">
       <div className="invite-hero-text">
         <div className="invite-heading">
+          <BabyMotif />
           <p className="eyebrow">Chá de bebê · convite</p>
           <h1 className="invite-title">{event.title}</h1>
-          <p className="invite-lead">{invitation.name}, este convite é para você{invitation.kind === 'family' ? ' e sua família' : ''}.</p>
+          <p className="invite-lead handwritten-accent">{invitation.name}, este convite é para você{invitation.kind === 'family' ? ' e sua família' : ''}.</p>
         </div>
         <dl className="invite-facts">
           <div><dt>Quando</dt><dd>{eventDate(event.starts_at, { dateStyle: 'full', timeStyle: 'short' })}<span className="hint block">Horário de Brasília</span></dd></div>
@@ -197,6 +199,7 @@ function InviteSection({ id, title, description, sectionRef, children }: {
 }) {
   const headingId = useId()
   return <section id={id} ref={sectionRef} tabIndex={sectionRef ? -1 : undefined} aria-labelledby={headingId} className="invite-section">
+    <span className="invite-divider" aria-hidden="true"><BabyMotif variant="stars" small /></span>
     <h2 id={headingId} className="invite-section-title">{title}</h2>
     {description && <p className="section-description">{description}</p>}
     {children}

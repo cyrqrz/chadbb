@@ -1,3 +1,4 @@
+import { BabyMotif } from '../../components/BabyMotif'
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, Navigate, Outlet, useLocation } from 'react-router-dom'
@@ -148,6 +149,7 @@ export function LoginPage() {
       <p className="login-guest"><strong>É convidado?</strong> Não precisa entrar: use o link que a organização enviou pelo WhatsApp.</p>
     </div>
     <aside className="login-aside" aria-labelledby="login-features">
+      <BabyMotif />
       <h2 id="login-features" className="sr-only">O que o chadbb organiza</h2>
       <ul className="login-features">{features.map(([icon, title, text]) => <li key={title} className="login-feature"><span className="login-icon" aria-hidden="true">{icons[icon]}</span><div><h3>{title}</h3><p>{text}</p></div></li>)}</ul>
     </aside>
