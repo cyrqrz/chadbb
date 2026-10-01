@@ -108,7 +108,8 @@ test('criar evento informa os termos de uso', async ({ page }) => {
   await backend(page, true)
   await page.goto('/eventos')
   await expect(page.getByText('Ao criar um evento, você concorda com os termos de uso.')).toBeVisible()
-  await expect(page.getByRole('link', { name: 'termos de uso' })).toHaveAttribute('href', '/privacidade#organizadores')
+  // No conteúdo da tela: o rodapé também tem “Termos de uso”, com o mesmo destino.
+  await expect(page.getByRole('main').getByRole('link', { name: 'termos de uso' })).toHaveAttribute('href', '/privacidade#organizadores')
 })
 
 // Jornada do organizador sem mouse: criar, preencher, salvar, publicar e concluir etapa.
@@ -210,7 +211,7 @@ test('fluxo de criação: prévia, publicação e etapas pendentes até o evento
   // O fluxo não prende: a lista de eventos avisa a pendência.
   await page.getByRole('link', { name: 'Seus eventos' }).first().click()
   await expect(page.getByText('1 etapa pendente')).toBeVisible()
-  await page.getByRole('link', { name: /Chá de bebê da Lia/ }).click()
+  await page.getByRole('link', { name: /Chá de bebê da Lia.*Ver detalhes/ }).click()
   await page.getByRole('navigation', { name: 'Etapas pendentes' }).getByRole('link', { name: 'Presentes' }).click()
   await expect(page).toHaveURL(new RegExp(`/eventos/${eventId}/presentes$`))
   const finish = page.getByRole('button', { name: 'Concluí a lista de presentes' })

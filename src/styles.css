@@ -197,8 +197,9 @@
   /* Superfícies */
   .card { min-width: 0; border: 1px solid var(--card-border); border-radius: var(--card-radius); background: var(--card-surface); padding: var(--card-padding); box-shadow: var(--shadow-sm); transition: border-color var(--duration-fast), box-shadow var(--duration-normal) var(--ease-standard), transform var(--duration-normal) var(--ease-standard); }
   .card-link:hover { border-color: var(--color-line-strong); box-shadow: var(--shadow-md); transform: translateY(-2px); }
-  /* Card com ações (ex.: evento encerrado): o link cobre só o conteúdo, sem o botão dentro. */
-  .card:has(> .card-main:hover) { border-color: var(--color-line-strong); box-shadow: var(--shadow-md); }
+  /* Card com ações (ex.: atalhos do card de evento): o link cobre só o conteúdo, sem o botão
+     dentro; o card inteiro se eleva como o `.card-link`. */
+  .card:has(> .card-main:hover) { border-color: var(--color-line-strong); box-shadow: var(--shadow-md); transform: translateY(-2px); }
   .card-main { border-radius: calc(var(--card-radius) - 8px); }
   .notice { border-radius: var(--radius-surface); background: var(--color-brand-soft); padding: 0.9rem 1.1rem; }
   .badge { display: inline-flex; align-items: center; gap: 0.35rem; border: 1px solid transparent; border-radius: var(--radius-pill); background: var(--color-brand-soft); color: var(--color-brand-hover); padding: 0.25rem 0.7rem; font-size: var(--text-caption); font-weight: 650; }
@@ -256,6 +257,11 @@
   .state-empty { border: 1.5px dashed var(--color-line-strong); background: var(--color-surface-soft); }
   .state-success::before { content: "✓" / ""; font-weight: 800; }
   .state-success { flex-direction: row; align-items: baseline; border: 1px solid var(--color-success-line); border-left-width: 5px; background: var(--color-success-soft); color: var(--color-success-text); }
+  /* Aviso de exclusão com “Desfazer”: texto e ação na mesma linha; em tela estreita a ação desce. */
+  .undo-notice { flex-wrap: wrap; align-items: center; }
+  .undo-notice > p { flex: 1 1 12rem; }
+  .undo-action { display: flex; flex-wrap: wrap; align-items: center; gap: var(--theme-space-sm); max-width: 100%; }
+  .undo-countdown { min-width: 7ch; color: var(--color-muted); font-size: var(--text-body-sm); font-variant-numeric: tabular-nums; }
   .spinner { width: 1.25rem; height: 1.25rem; flex-shrink: 0; border: 3px solid var(--color-brand-soft); border-top-color: var(--color-brand); border-radius: var(--radius-pill); animation: spin 0.8s linear infinite; }
   .skeleton { display: block; border-radius: var(--radius-control); background: linear-gradient(90deg, var(--color-surface-soft) 0%, var(--color-brand-soft) 50%, var(--color-surface-soft) 100%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
   .refresh-status { min-height: 1.5rem; margin-top: 0.5rem; font-size: var(--text-label); color: var(--color-muted); }
@@ -472,6 +478,9 @@
   .card-actions { display: flex; flex-direction: column; align-items: flex-start; gap: var(--action-gap); margin-top: 4px; border-top: 1px solid var(--divider-color); padding-top: 12px; }
   /* O recuo alinha o texto ao conteúdo, mas nunca passa do espaçamento do card (texto a 200%). */
   .card-actions > :is(.btn-ghost, .btn-danger) { justify-content: flex-start; margin-inline-start: calc(-1 * min(0.5rem, var(--card-padding) - 2px)); padding-inline: 0.5rem; }
+  /* Atalhos do card de evento: em linha, editar à esquerda e excluir à direita. */
+  .card-shortcuts { flex-direction: row; flex-wrap: wrap; align-items: center; }
+  .card-shortcuts > .btn-danger:not(:first-child) { margin-inline-start: auto; }
   .card-disclosure { display: flex; width: 100%; flex-direction: column; gap: 12px; padding-block: 4px 12px; }
   .availability { display: flex; flex-direction: column; gap: 6px; }
   .availability-text { font-weight: 650; font-variant-numeric: tabular-nums; }
