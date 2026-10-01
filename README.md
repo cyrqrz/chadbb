@@ -1,16 +1,30 @@
 # chadbb
 
-MVP para o chá de bebê do irmão do solicitante, com cerca de 50 convidados.
-Prioridades: uso simples no celular, design profissional, acessibilidade e dados
-confiáveis e atualizados. Entrega planejada para a segunda semana de outubro de
-2026; evolução comercial fica para depois do evento. Implementação guiada pelo
-[plano de execução](docs/PLANO-EXECUCAO-MVP.md), com a stack do ADR 001.
-Já estão implementados acesso por link de e-mail, criação/edição/publicação/encerramento
-de eventos e envio de capa, com permissões por proprietário, além de catálogo e
-lista de presentes. Convites e reservas ainda não estão implementados.
-Testes SQL e de API do organizador passaram no Supabase local; o ensaio de login
-por link de e-mail no navegador permanece pendente.
-Veja o [contrato do piloto](docs/CONTRATO-PILOTO.md).
+Organizador de chá de bebê: o organizador monta o evento, envia um convite por
+link para cada pessoa ou família, e os convidados confirmam presença e escolhem
+fraldas ou mimos pelo celular, sem criar conta. Primeiro evento real: chá da Liz,
+**01/11/2026, 12h (Brasília)**, cerca de 50 convidados. Produção em
+https://chadbb.pages.dev. Prioridades: uso simples no celular, design
+profissional, acessibilidade e dados confiáveis e atualizados.
+
+Implementado:
+
+- **Organizador:** entrada por código enviado por e-mail; criação, edição,
+  prévia, publicação e encerramento do evento; capa; etapas guiadas após
+  publicar (convidados e lista de presentes).
+- **Convites:** um link por pessoa ou família, com reemissão e revogação; painel
+  de presença com resumo vindo do banco.
+- **Convidado:** confirmação de presença com prazo "Confirme até" definido pelo
+  servidor; Talvez com lembrete por e-mail ([regras](docs/RSVP-LEMBRETES.md));
+  reserva de fraldas por tamanho e de mimos do catálogo.
+- **Operação:** retenção e exclusão de dados 30 dias após o término, backups e
+  verificação de saúde; privacidade e termos em `/privacidade`
+  ([contrato do piloto](docs/CONTRATO-PILOTO.md)).
+
+Decisões de produto vigentes: [30/09/2026](docs/DECISOES-PRODUTO-2026-09-30.md).
+Ponto de retomada: [troca de máquina](docs/TROCA-DE-MAQUINA.md) e
+[quadro dos agentes](docs/TAREFAS-AGENTES.md). Arquitetura no
+[ADR 001](docs/ADR-001-arquitetura-mvp-eventos-presentes.md).
 
 ## Desenvolvimento
 
@@ -65,8 +79,8 @@ os scripts por `--linked`/`--db-url`. A migration inicial estabelece permissões
 o catálogo do chá — 4 tamanhos de fralda e os 23 mimos de [FRALDAS-E-MIMOS](docs/FRALDAS-E-MIMOS.md) — entra por migration, sem marcas, preços ou links; `seed.sql` permanece vazio e os testes criam e removem seus próprios dados fictícios.
 Nenhuma pessoa/evento real deve ser cadastrada nesta fase.
 
-A CI foi configurada para lint, TypeScript, testes, build, PostgreSQL temporário,
-navegador e Supabase local com testes pgTAP e de API. Ainda não foi executada no remoto.
+A CI (GitHub Actions) roda lint, TypeScript, testes, build, PostgreSQL temporário,
+navegador e Supabase local com testes pgTAP e de API.
 
 ## Testar sem Docker
 
@@ -113,11 +127,11 @@ fictícios e mede p50/p95 das chamadas Edge. Resultados e contratos atualizados:
 
 ## Usar o fluxo do organizador
 
-Com Supabase iniciado e `.env.local` preenchido, acesse `/entrar`, solicite o link
-e consulte o servidor de e-mail **local** em http://127.0.0.1:54324. Abra o link no
-mesmo navegador para concluir o PKCE. O callback local está configurado para
-`http://localhost:5173/auth/callback` e `http://127.0.0.1:5173/auth/callback`.
-Em ambientes remotos, cadastre a URL correspondente no Auth antes de usar.
+Com Supabase iniciado e `.env.local` preenchido, acesse `/entrar`, informe o
+e-mail e consulte o servidor de e-mail **local** em http://127.0.0.1:54324. O
+e-mail traz só um **código** (sem link); digite-o na mesma tela. Em produção o
+cadastro público está fechado até 01/11: só entram famílias liberadas pelo
+titular ([decisões](docs/DECISOES-PRODUTO-2026-09-30.md)).
 
 As telas seguem o contrato de atualização do plano: nenhuma resposta em cache é
 apresentada como nova. Eventos, detalhe e lista reconsultam o servidor ao abrir,
@@ -126,8 +140,9 @@ recuo progressivo enquanto a consulta falhar e indicação “Atualizando…”.
 está digitado nunca é substituído por uma atualização recebida: o formulário
 avisa que existe versão mais recente e oferece recarregar.
 
-Em `/eventos`, crie um rascunho, salve título e data futura e publique. O encerramento
-é definitivo nesta etapa. Campos privados não têm leitura anônima. Edições usam
+Em `/eventos`, crie um rascunho, salve título, data e término, confira a prévia e
+publique. Depois de publicar, as etapas guiam a criação dos convites e da lista de
+presentes. O encerramento é definitivo nesta etapa. Campos privados não têm leitura anônima. Edições usam
 versão para detectar conflitos entre abas; o botão de recarregar permite recuperar.
 
 A capa aceita JPEG, PNG e WebP até 5 MB. O envio exige autorização explícita e o
@@ -147,34 +162,53 @@ compatível com esta sequência: o CLI consideraria essas versões já aplicadas
 Esses bancos devem ser recriados (`npm run db:reset` localmente). O projeto do chá
 (`chadbb-cha`) nasceu com a sequência atual e não é afetado.
 
+## Design system
+
+Tema "chá de bebê": vinho (`#8E3658`) sobre creme, com rosa-antigo e champagne
+só em detalhes decorativos; títulos em Fraunces (eixo SOFT), corpo em Manrope e
+um único acento manuscrito (Patrick Hand) por tela. Todos os valores visuais são
+tokens em `src/styles.css`; contrastes medidos (WCAG AA), componentes e regras de
+uso em [foundation](docs/design/foundation.md).
+
+- **Botões:** `primary` (uma por contexto), `advance` (conclui a etapa e leva ao
+  próximo passo, como "Publicar evento": seta no fim, largura total no celular,
+  uma por tela), `secondary`, `ghost`, `danger`, `icon` e `link`.
+- **Motivos** (`BabyMotif`): SVG decorativos, ocultos do leitor de tela e em
+  cores forçadas.
+- **Amostras:** `/amostras`, só no servidor de desenvolvimento, mostra paleta,
+  tipografia, botões e estados; o e2e roda axe nela.
+
 ## Estrutura
 
-- `src/features/`: fluxos; `src/components/`: interface compartilhada.
+- `src/features/`: fluxos (auth, eventos, convidados, presentes, privacidade).
+- `src/components/`: interface compartilhada; `src/components/ui/`: componentes do design system.
 - `src/lib/`: configuração, Supabase e TanStack Query.
-- `supabase/migrations/`, `supabase/functions/`, `supabase/tests/`: backend.
-- `functions/`: futura prévia pública no Cloudflare Pages.
-- `tests/`: testes unitários, banco PostgreSQL, API Supabase e navegador.
+- `supabase/migrations/`, `supabase/functions/` (`guest`, `rsvp-reminders`,
+  `retention`, `delete-event`), `supabase/tests/`: backend.
+- `functions/`: reservado para a futura prévia pública no Cloudflare Pages (ainda vazio).
+- `scripts/`: backup, saúde e modelos de e-mail.
+- `tests/`: unitários, banco PostgreSQL, API Supabase, navegador e e2e (Playwright).
+- `docs/`: decisões, contratos, planos, revisões (`docs/reviews/`) e design (`docs/design/`).
 
-## Preview no Cloudflare Pages
+## Cloudflare Pages
 
-Conecte o repositório a um projeto Pages de **desenvolvimento**, com build
-`npm run build`, saída `dist`, Node 22 e diretório raiz deste repositório.
-Habilite previews das branches. Para essa base, as variáveis Supabase podem ficar
-ausentes. Quando necessário, use um projeto Supabase separado da produção e
-configure URLs de retorno do Auth por ambiente. Não reutilize dados reais nos previews.
+Produção em https://chadbb.pages.dev, com build `npm run build`, saída `dist` e
+Node 22. Para previews de branch, as variáveis Supabase podem ficar ausentes;
+quando necessário, use um projeto Supabase separado da produção. Não reutilize
+dados reais nos previews.
 
 `public/_redirects` prepara fallback das rotas SPA. `public/_headers` configura
 cabeçalhos para arquivos estáticos. A futura Pages Function deverá aplicar seus
 próprios cabeçalhos. Domínio próprio de Supabase exige revisar `connect-src`.
-Verifique `/` e uma rota inexistente após cada deploy. Preview remoto ainda não
-foi criado: depende de acesso às contas e repositório remoto.
+Verifique `/` e uma rota inexistente após cada deploy.
 
 ## Evidências e pendências
 
-Consulte [execução da base](docs/EXECUCAO-BASE.md), [execução do organizador](docs/EXECUCAO-ORGANIZADOR.md)
-e [validação local de 11/09](docs/VALIDACAO-LOCAL-2026-09-11.md). Não há aprovação de piloto.
-Docker, contas de hospedagem, orçamento, restauração, regras comerciais e
-validação em celular/WhatsApp precisam das etapas previstas no plano.
+Revisões e evidências por entrega ficam em `docs/reviews/`. O que falta antes do
+envio dos convites (conteúdo real, restauração com dados reais, ensaio com a
+família, passada com leitor de tela) está na retomada mais recente de
+[TROCA-DE-MAQUINA](docs/TROCA-DE-MAQUINA.md) e no [quadro](docs/TAREFAS-AGENTES.md).
+Roteiros de ensaio e suporte: [entrega e suporte](docs/ENTREGA-E-SUPORTE.md).
 
 Referências técnicas: [Vite](https://vite.dev/guide/),
 [Tailwind com Vite](https://tailwindcss.com/docs/installation/using-vite),
