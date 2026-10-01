@@ -2,7 +2,7 @@
 
 Pedido do titular: refatorar o visual do convite que chega no WhatsApp, com as
 características do evento. Também: a URL do site (home) não pode sair com prévia
-de convite — só o convite deve sair assim. **Nada implementado ainda.**
+de convite — só o convite deve sair assim. **Fase 1 implementada em 01/10 (sem publicar); fase 2 aguarda as decisões abaixo.**
 
 ## Restrição que manda em tudo
 
@@ -46,6 +46,16 @@ primeira tela, respeitando movimento reduzido), testar em vários aparelhos.
 - **G2 — imagem genérica do convite redesenhada:** vinho/creme, motivos do tema,
   "Você recebeu um convite para um chá de bebê", < 300 KB. Evidência: tamanho e
   captura no WhatsApp real.
+
+**Fase 1 — feito em 01/10 (na `clone-main`, aguardando revisão e merge):**
+`index.html` com prévia de produto (`og-site.png`) e `convite.html` com prévia de
+convite (`og-convite.png`, "Você recebeu um convite"), as duas a 1200×630 e abaixo de
+300 KB, geradas por `node scripts/og/render.mjs` a partir dos modelos em `scripts/og/`.
+O Vite gera as duas páginas; no dev e no preview, `/convite` é entregue por
+`convite.html`. No simulador local do Pages (`wrangler pages dev dist`), `/convite`
+sai com `convite.html` sem mudar o `_redirects` (a regra `/*` não atropela o arquivo),
+`/convite/` redireciona para `/convite` e os cabeçalhos de `_headers` valem nas duas.
+Falta: conferir no preview do PR e num WhatsApp real (G2).
 
 **Fase 2 — prévia por evento (back + front)**
 - **G3 — contrato** em `CONTRATOS-TRANSACIONAIS.md`: leitura pública
