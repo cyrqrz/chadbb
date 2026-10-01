@@ -175,6 +175,11 @@ uso em [foundation](docs/design/foundation.md).
   uma por tela), `secondary`, `ghost`, `danger`, `icon` e `link`.
 - **Motivos** (`BabyMotif`): SVG decorativos, ocultos do leitor de tela e em
   cores forçadas.
+- **Home e rodapé:** etapas em nuvens, benefícios, perguntas frequentes e rodapé
+  com links úteis ([revisão](docs/reviews/2026-10-01-home-referencias.md)). No
+  convite, o rodapé é só a barra com a política, em nova aba.
+- **Cards de evento:** atalhos "Editar dados" e "Excluir", com "Desfazer" por 10 s
+  ([revisão](docs/reviews/2026-10-01-atalhos-desfazer.md)).
 - **Amostras:** `/amostras`, só no servidor de desenvolvimento, mostra paleta,
   tipografia, botões e estados; o e2e roda axe nela.
 

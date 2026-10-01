@@ -1,6 +1,6 @@
-import { BabyMotif } from './BabyMotif'
+import { SiteFooter } from './SiteFooter'
 import { useState } from 'react'
-import { Link, Outlet } from 'react-router-dom'
+import { Link, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../features/auth/context'
 import { supabase } from '../lib/supabase'
 import { useOnline } from '../lib/useOnline'
@@ -9,6 +9,7 @@ import { ErrorState } from './States'
 export function Layout() {
   const { session } = useAuth()
   const online = useOnline()
+  const { pathname } = useLocation()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(false)
   async function signOut() {
@@ -16,7 +17,8 @@ export function Layout() {
     try { const result = await supabase?.auth.signOut({ scope: 'local' }); if (result?.error) throw result.error }
     catch { setError(true) } finally { setBusy(false) }
   }
-  return <div className="mx-auto flex min-h-screen max-w-6xl flex-col px-6 md:px-12">
+  // O rodapé fica fora da coluna central para a barra vinho ocupar a largura toda.
+  return <div className="flex min-h-screen flex-col"><div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-6 md:px-12">
     <a href="#conteudo" className="skip-link">Pular para o conteúdo</a>
     <header className="site-header border-b border-stone-300">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-4">
@@ -31,8 +33,7 @@ export function Layout() {
         voltar (src/lib/query.ts) é quem garante o dado atualizado, não este aviso. */}
     {!online && <p role="status" className="state state-warning mt-4">Sem conexão. O que está na tela continua visível, mas alterações não serão enviadas até a internet voltar.</p>}
     <main id="conteudo" className="min-w-0 flex-1"><Outlet /></main>
-    <footer className="site-footer flex flex-wrap justify-between gap-2 border-t border-stone-300 py-6 text-sm text-stone-600"><BabyMotif variant="leaf" small /><span>chadbb · Pequenos começos, grandes encontros.</span><span>Presença, fraldas e mimos em um só lugar.</span>
-      {/* Nova aba: o convite guarda a sessão só na memória, e sair da página a perderia. */}
-      <a className="text-link" href="/privacidade" target="_blank" rel="noopener">Privacidade e termos<span className="sr-only"> (abre em nova aba)</span></a></footer>
+    </div>
+    <SiteFooter compact={pathname === '/convite'} />
   </div>
 }

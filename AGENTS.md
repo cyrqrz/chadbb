@@ -32,12 +32,17 @@ passo. Nada destrutivo ou remoto roda sem aprovação (ver Regras obrigatórias)
 **Desde 2026-09-21 existem só duas branches: `main` e `clone-main`.** As antigas
 `claude/front` e `codex/back` foram unificadas na `clone-main` e apagadas.
 
-**Desde 2026-09-22, também não há mais clone por agente.** Os dois trabalham
-na mesma pasta de trabalho — a que este `AGENTS.md` está, qualquer que seja o
-caminho na máquina do dia — sempre na `clone-main`. As entradas antigas neste
-documento e no quadro citando `~/projetos/chadbb-claude` e
-`~/projetos/chadbb-codex` são históricas; não valem mais. Nenhum dos dois
-altera a pasta `~/projetos/chadbb`, que fica na `main` e é só do usuário.
+**Desde 2026-10-01 existe um único clone na máquina:** a pasta em que este
+`AGENTS.md` está (hoje `C:\Users\leonardo.martins\chadbb`; no WSL,
+`/mnt/c/Users/leonardo.martins/chadbb`), com `main` e `clone-main` locais
+acompanhando o GitHub. Os dois agentes trabalham nele, sempre na `clone-main`;
+a `main` local só recebe `git pull` depois de cada merge. Os clones antigos
+(`Documents/chadbb`, `~/projetos/chadbb`, `~/projetos/chadbb-claude`,
+`~/projetos/chadbb-codex`) foram apagados por não terem nada fora do GitHub;
+os dois stashes antigos do `chadbb-claude` estão em
+`../chadbb-revisao/stashes-antigos/`. Menções a esses caminhos em outros docs
+são históricas. Não crie outro clone nem outra branch permanente: trabalho
+longo usa branch temporária a partir da `clone-main`, apagada após o merge.
 
 **Desde 2026-09-22 também não há mais divisão por área de arquivo**, por decisão
 do usuário: os dois trabalham juntos no projeto inteiro. Quem pegar a tarefa
@@ -85,11 +90,13 @@ Formato do perfil: [documentação oficial de subagentes](https://learn.chatgpt.
 
 ## Ambiente compartilhado
 
-- Os dois clones usam o mesmo Docker. **O Supabase local (`npm run db:start`)
-  roda só no clone do Codex.** O front usa essa stack pelo `.env.local`
+- **O Supabase local (`npm run db:start`) roda a partir deste clone**, que monta
+  `supabase/templates/` nos containers. O front usa essa stack pelo `.env.local`
   (`127.0.0.1:54321`).
 - Vite na porta 5173. Os testes de navegador e de e-mail exigem essa porta
-  livre; pare o `npm run dev` do outro clone antes de rodá-los.
+  livre; pare qualquer `npm run dev` antes de rodá-los. Os e2e usam a 4173 com o
+  Vite em modo dev: não crie nem apague arquivos na pasta do projeto enquanto
+  rodam, porque a recarga derruba testes.
 - Node 22 (`.nvmrc`). Use `npm ci`, sem misturar com o npm do Windows.
 
 ## Comandos
