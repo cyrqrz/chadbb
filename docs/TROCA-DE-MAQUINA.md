@@ -1,5 +1,12 @@
 # Retomar o chadbb em outra máquina
 
+## Retomada em 01/10/2026 — Claude (sessão de design) — comece por aqui
+
+Leia o topo de [TAREFAS-AGENTES.md](TAREFAS-AGENTES.md) (seção de 01/10). Um
+único clone: `C:\Users\leonardo.martins\chadbb` (WSL
+`/mnt/c/Users/leonardo.martins/chadbb`), com `main` e `clone-main` locais. Os
+clones antigos foram apagados (ver `AGENTS.md`). As seções abaixo são históricas.
+
 ## Retomada em 30/09/2026 — Claude após Codex
 
 Leia primeiro [HANDOFF-CLAUDE-2026-09-30.md](HANDOFF-CLAUDE-2026-09-30.md).
