@@ -13,6 +13,7 @@ const colors = [
 export function SpecimensPage() {
   const [tab, setTab] = useState<'fralda' | 'mimo'>('fralda')
   const [busy, setBusy] = useState(false)
+  const [advanceBusy, setAdvanceBusy] = useState(false)
   const [confirm, setConfirm] = useState<'default' | 'danger' | null>(null)
   return <div className="page flex flex-col gap-12">
     <header className="flex flex-col gap-2">
@@ -63,6 +64,15 @@ export function SpecimensPage() {
         <Button variant="secondary" size="sm">Pequeno (44 px)</Button>
         <p>Ação dentro de frase: <Button variant="link">usar resposta atual</Button>.</p>
         <BackLink to="/amostras">Detalhes do evento</BackLink>
+      </div>
+    </Section>
+
+    <Section title="Concluir etapa" description="advance: conclui a etapa e leva ao próximo passo. Uma por tela; ocupa a largura toda no celular; indisponível mostra o que falta.">
+      <div className="flex flex-col items-start gap-4">
+        <div className="flow-actions w-full"><Button variant="secondary">Ver prévia</Button><Button variant="advance">Publicar evento</Button></div>
+        <Button variant="advance" busy={advanceBusy} onClick={() => { setAdvanceBusy(true); setTimeout(() => setAdvanceBusy(false), 1500) }}>{advanceBusy ? 'Publicando…' : 'Publicar (fica ocupado)'}</Button>
+        <div className="w-full"><Button variant="advance" disabled aria-describedby="advance-missing">Publicar evento</Button>
+          <p id="advance-missing" className="hint mt-2">Falta definir a data e o horário.</p></div>
       </div>
     </Section>
 

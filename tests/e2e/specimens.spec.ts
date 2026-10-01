@@ -55,3 +55,18 @@ test('diálogo de confirmação: acessível, Esc e clique fora fecham, foco volt
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(trigger).toBeFocused()
 })
+
+test('concluir etapa: seta só visual e largura toda no celular', async ({ page }) => {
+  await page.goto('/amostras')
+  const button = page.getByRole('button', { name: 'Publicar (fica ocupado)', exact: true })
+  await expect(button).toHaveClass(/btn-advance/)
+  const { arrow, width, parent, viewport } = await button.evaluate(el => ({
+    arrow: getComputedStyle(el, '::after').width,
+    width: el.getBoundingClientRect().width,
+    parent: el.parentElement!.getBoundingClientRect().width,
+    viewport: window.innerWidth,
+  }))
+  expect(arrow).toBe('18px')
+  if (viewport < 640) expect(Math.abs(width - parent)).toBeLessThan(1)
+  else expect(width).toBeLessThan(parent)
+})

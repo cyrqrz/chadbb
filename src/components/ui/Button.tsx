@@ -2,10 +2,13 @@ import type { ButtonHTMLAttributes } from 'react'
 
 // Hierarquia (G2.1): uma `primary` por contexto; `secondary` para ações
 // importantes; `ghost` para auxiliares; `danger` para destrutivas; `icon` só
-// com nome acessível; `link` só para ação dentro de uma frase.
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'icon' | 'link'
+// com nome acessível; `link` só para ação dentro de uma frase. `advance` conclui
+// a etapa e leva ao próximo passo: uma por tela, a última do fluxo. Em link,
+// use a classe `advanceClass`.
+export type ButtonVariant = 'primary' | 'advance' | 'secondary' | 'ghost' | 'danger' | 'icon' | 'link'
+export const advanceClass = 'button btn-advance'
 const variants: Record<ButtonVariant, string> = {
-  primary: 'button', secondary: 'secondary', ghost: 'btn-ghost', danger: 'btn-danger', icon: 'btn-icon', link: 'text-link',
+  primary: 'button', advance: advanceClass, secondary: 'secondary', ghost: 'btn-ghost', danger: 'btn-danger', icon: 'btn-icon', link: 'text-link',
 }
 type Props = ButtonHTMLAttributes<HTMLButtonElement> & { busy?: boolean; size?: 'md' | 'sm' }
   & ({ variant?: Exclude<ButtonVariant, 'icon'> } | { variant: 'icon'; 'aria-label': string })

@@ -100,6 +100,9 @@
   --handwritten-leading: 1.4;
   --invite-message-size: var(--text-h3);
   --invite-message-leading: 1.7;
+  /* Ação que conclui a etapa (`advance`): seta e deslocamento no hover. */
+  --advance-icon-size: 1.125rem;
+  --advance-nudge: 2px;
   /* Aliases por intenção, usados pelos componentes. */
   --color-text: var(--color-ink);
   --color-text-muted: var(--color-muted);
@@ -161,6 +164,12 @@
   .button, .secondary, .btn-ghost, .btn-danger, .btn-icon { position: relative; display: inline-flex; max-width: 100%; min-height: var(--control-height-md); align-items: center; justify-content: center; gap: 0.5rem; border: 1.5px solid transparent; border-radius: var(--radius-control); padding: 0.625rem var(--space-control-x); font-weight: 650; line-height: 1.2; text-align: center; text-decoration: none; transition: background-color var(--duration-fast), border-color var(--duration-fast), color var(--duration-fast), box-shadow var(--duration-normal), transform var(--duration-fast) var(--ease-standard); }
   .button { background: var(--color-brand); color: white; box-shadow: 0 1px 0 rgb(255 255 255 / 0.15) inset, 0 6px 16px -10px var(--color-brand); }
   .button:hover:not(:disabled, [aria-disabled="true"]) { background: var(--color-brand-hover); }
+  /* `advance` (sempre com `.button`): conclui a etapa e leva ao próximo passo. Uma por tela, a última do fluxo.
+     A seta é máscara em pseudo-elemento: não tem texto, então o leitor de tela lê só o rótulo. */
+  .btn-advance { box-shadow: 0 1px 0 rgb(255 255 255 / 0.15) inset, var(--shadow-md); }
+  .btn-advance::after { content: ""; width: var(--advance-icon-size); height: var(--advance-icon-size); flex-shrink: 0; background: currentColor; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14M13 6l6 6-6 6'/%3E%3C/svg%3E") center / contain no-repeat; transition: transform var(--duration-fast) var(--ease-standard); }
+  .btn-advance:hover:not(:disabled, [aria-disabled="true"])::after { transform: translateX(var(--advance-nudge)); }
+  @media (max-width: 639px) { .btn-advance { width: 100%; } }
   .secondary { border-color: var(--color-border); background: var(--color-surface); color: var(--color-text); }
   .secondary:hover:not(:disabled, [aria-disabled="true"]) { border-color: var(--color-brand); color: var(--color-brand-hover); background: var(--color-surface-subtle); }
   .btn-ghost { background: transparent; color: var(--color-text); }
@@ -552,11 +561,15 @@
   .setup-dock-inner, .step-card, .venue-map, .guest-notice, .confirm-dialog { border-color: CanvasText; }
   .legal-contact { border: 1px solid CanvasText; }
   :focus-visible { outline-color: Highlight; }
+  /* A seta é pintada pelo fundo, que as cores forçadas apagariam. */
+  .btn-advance::after { forced-color-adjust: none; background: ButtonText; }
+  .btn-advance:is(:disabled, [aria-disabled="true"])::after { background: GrayText; }
 }
 
 /* Movimento reduzido: sem animações nem transições; spinner e skeleton ficam parados. */
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
+  .btn-advance:hover::after { transform: none; }
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-delay: 0ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
   .spinner { border-right-color: var(--color-brand); }
 }

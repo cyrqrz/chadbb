@@ -142,7 +142,7 @@ function EventEditor({ server, created, refreshing, refreshFailed, retry }: { se
     {message && <div className="mt-6"><SuccessMessage>{message}</SuccessMessage></div>}
     {!closed && <div className="mt-10 border-t border-stone-300 pt-6">
       {dirty && <p className="mb-4 text-sm text-stone-600">{record.status === 'draft' ? 'Salve as alterações antes de ver a prévia ou publicar.' : 'Salve as alterações antes de encerrar.'}</p>}
-      {record.status === 'draft' ? <div className="flow-actions"><PreviewLink id={record.id} dirty={dirty || busy} /><button className="secondary" disabled={busy || dirty} onClick={() => void transition('published')}>Publicar evento</button></div> :
+      {record.status === 'draft' ? <div className="flow-actions"><PreviewLink id={record.id} dirty={dirty || busy} /><Button variant="advance" disabled={busy || dirty} onClick={() => void transition('published')}>Publicar evento</Button></div> :
         confirmClose ? <div className="notice"><p>Encerrar este evento? Ele não poderá receber novas reservas nem ser reaberto.</p><div className="mt-4 flex flex-wrap gap-4"><button className="btn-danger btn-danger-strong" disabled={busy || dirty} onClick={() => void transition('closed')}>Confirmar encerramento</button><Button variant="ghost" disabled={busy} onClick={() => setConfirmClose(false)}>Continuar com evento aberto</Button></div></div> :
           <button className="btn-danger" disabled={busy || dirty} onClick={() => setConfirmClose(true)}>Encerrar evento</button>}
     </div>}
