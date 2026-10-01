@@ -1479,15 +1479,15 @@ test.describe('eventos: excluir evento', () => {
   }
   test.beforeEach(async ({ page }) => { await page.clock.install() })
 
-  test('atalhos ficam fora do link: editar em rascunho e publicado, excluir em rascunho e encerrado', async ({ page }) => {
+  test('atalhos ficam fora do link: editar em rascunho e publicado, excluir em todos (publicado encerra e exclui)', async ({ page }) => {
     const mock = list([event, closed, draft])
     await backend(page, none, mock.events)
     await page.goto('/eventos')
     const card = (title: string) => page.getByRole('article').filter({ has: page.getByRole('heading', { name: title }) })
-    for (const [title, edit, remove] of [['Chá de teste', true, false], ['Chá encerrado', false, true], ['Chá rascunho', true, true]] as const) {
+    for (const [title, edit, remove] of [['Chá de teste', true, 'Encerrar e excluir'], ['Chá encerrado', false, 'Excluir'], ['Chá rascunho', true, 'Excluir']] as const) {
       await expect(card(title).getByRole('link', { name: new RegExp(`${title}.*Ver detalhes`) })).toHaveCount(1)
       await expect(card(title).getByRole('link', { name: `Editar dados de ${title}` })).toHaveCount(edit ? 1 : 0)
-      await expect(card(title).getByRole('button', { name: `Excluir evento ${title}` })).toHaveCount(remove ? 1 : 0)
+      await expect(card(title).getByRole('button', { name: `${remove} evento ${title}`, exact: true })).toHaveCount(1)
       await expect(card(title).locator('a button, a a')).toHaveCount(0)
     }
     await expect(card('Chá de teste').getByRole('link', { name: 'Editar dados de Chá de teste' })).toHaveAttribute('href', `/eventos/${event.id}/dados`)
@@ -1684,6 +1684,106 @@ test.describe('eventos: excluir evento', () => {
     await expire(page)
     await expect(page.getByRole('status').filter({ hasText: '“Chá encerrado” já tinha sido excluído em outra aba.' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Chá encerrado' })).toHaveCount(0)
+  })
+
+  // 01/10: publicado também sai daqui. Encerrar é imediato e sem volta (os convites
+  // param na hora); a exclusão segue o prazo de desfazer, com a versão já encerrada.
+  test('publicado: encerrar e excluir avisa, encerra na hora e desfazer devolve encerrado', async ({ page }) => {
+    const published: EventRecord = { ...event, title: 'Chá publicado', version: 4 }
+    const mock = list([published])
+    const transitions: Record<string, unknown>[] = []
+    await backend(page, none, mock.events, {
+      '/functions/v1/delete-event': mock.remove(),
+      '/rest/v1/rpc/transition_event': ({ body }) => { transitions.push(body); return { status: 200, json: { ...published, status: 'closed', version: 5 } } },
+    })
+    await page.goto('/eventos')
+    const trigger = page.getByRole('button', { name: 'Encerrar e excluir evento Chá publicado' })
+    await trigger.click()
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    const question = page.getByText('Encerrar e excluir “Chá publicado”?')
+    await expect(question).toBeFocused()
+    await expect(question).toContainText('Os convites deixam de funcionar na hora e encerrar não tem volta.')
+    await expect(question).toContainText('se desfizer, o evento continua, mas encerrado')
+    await expectAccessible(page)
+    expect(transitions).toEqual([])
+    await page.getByRole('button', { name: 'Sim, encerrar e excluir' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'excluído.' })).toHaveText('Evento “Chá publicado” excluído.')
+    expect(transitions).toEqual([{ p_event_id: published.id, p_version: 4, p_status: 'closed' }])
+    // O “Desfazer” ignora clique de ponteiro enquanto a lista se rearruma (SETTLE_MS).
+    await page.clock.runFor(700)
+    await page.getByRole('button', { name: 'Desfazer exclusão de “Chá publicado”' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'desfeita' })).toHaveText('Exclusão de “Chá publicado” desfeita. O evento continua, mas encerrado: os convites não funcionam mais.')
+    await expire(page)
+    expect(mock.calls).toEqual([])
+  })
+
+  test('publicado: sem desfazer, a exclusão vai com a versão encerrada; falha ao encerrar não exclui', async ({ page }) => {
+    const published: EventRecord = { ...event, title: 'Chá publicado', version: 4 }
+    const other: EventRecord = { ...event, id: '10000000-0000-4000-8000-000000000009', title: 'Chá que falha', version: 2 }
+    const mock = list([published, other])
+    await backend(page, none, mock.events, {
+      '/functions/v1/delete-event': mock.remove(),
+      '/rest/v1/rpc/transition_event': ({ body }) => body.p_event_id === other.id
+        ? { status: 409, json: { message: 'EVENT_VERSION_CONFLICT', code: 'P0001' } }
+        : { status: 200, json: { ...published, status: 'closed', version: 5 } },
+    })
+    await page.goto('/eventos')
+    await page.getByRole('button', { name: 'Encerrar e excluir evento Chá que falha' }).click()
+    await page.getByRole('button', { name: 'Sim, encerrar e excluir' }).click()
+    await expect(page.getByRole('alert')).toContainText('Não foi possível encerrar “Chá que falha”.')
+    await expect(page.getByRole('heading', { name: 'Chá que falha' })).toBeVisible()
+    await page.getByRole('button', { name: 'Encerrar e excluir evento Chá publicado' }).click()
+    await page.getByRole('button', { name: 'Sim, encerrar e excluir' }).click()
+    await expire(page)
+    await expect.poll(() => mock.calls).toEqual([{ event_id: published.id, version: 5 }])
+  })
+
+  test('seleção: vários eventos com um aviso e um só desfazer; publicados entram no aviso de encerrar', async ({ page }) => {
+    const published: EventRecord = { ...event, title: 'Chá publicado', version: 4 }
+    const mock = list([published, closed, draft])
+    const transitions: Record<string, unknown>[] = []
+    await backend(page, none, mock.events, {
+      '/functions/v1/delete-event': mock.remove(),
+      '/rest/v1/rpc/transition_event': ({ body }) => { transitions.push(body); return { status: 200, json: { ...published, status: 'closed', version: 5 } } },
+    })
+    await page.goto('/eventos')
+    const select = page.getByRole('button', { name: 'Selecionar' })
+    await select.click()
+    await expect(page.getByRole('button', { name: 'Cancelar seleção' })).toHaveAttribute('aria-pressed', 'true')
+    const bar = page.getByRole('region', { name: 'Seleção de eventos' })
+    await expect(bar).toContainText('Marque os eventos que quer excluir.')
+    await expect(bar.getByRole('button', { name: 'Excluir selecionados' })).toBeDisabled()
+    // Na seleção, os atalhos dão lugar à caixa de marcar (fora do link do card).
+    await expect(page.getByRole('button', { name: /^Excluir evento/ })).toHaveCount(0)
+    await page.getByRole('checkbox', { name: 'Selecionar Chá publicado' }).check()
+    await page.getByRole('checkbox', { name: 'Selecionar Chá rascunho' }).check()
+    await expect(bar).toContainText('2 eventos selecionados')
+    await expectAccessible(page)
+    await bar.getByRole('button', { name: 'Excluir selecionados' }).click()
+    const question = bar.getByText('Excluir 2 eventos?')
+    await expect(question).toBeFocused()
+    await expect(question).toContainText('1 deles está publicado e será encerrado')
+    await bar.getByRole('button', { name: 'Sim, encerrar e excluir 2 eventos' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'excluídos.' })).toHaveText('2 eventos excluídos.')
+    await expect(page.getByRole('heading', { name: 'Chá publicado' })).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: 'Chá rascunho' })).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: 'Chá encerrado' })).toBeVisible()
+    expect(transitions).toHaveLength(1)
+    await page.clock.runFor(700)
+    await page.getByRole('button', { name: 'Desfazer exclusão de 2 eventos' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'desfeita' })).toHaveText('Exclusão de 2 eventos desfeita. Os que estavam publicados continuam, mas encerrados.')
+    await expect(page.getByRole('heading', { name: 'Chá rascunho' })).toBeVisible()
+    await expire(page)
+    expect(mock.calls).toEqual([])
+    // De novo, sem desfazer: um pedido por evento, com a versão de cada um.
+    await page.getByRole('button', { name: 'Selecionar' }).click()
+    await bar.getByRole('button', { name: 'Marcar todos' }).click()
+    await expect(bar).toContainText('3 eventos selecionados')
+    await page.getByRole('checkbox', { name: 'Selecionar Chá publicado' }).uncheck()
+    await bar.getByRole('button', { name: 'Excluir selecionados' }).click()
+    await bar.getByRole('button', { name: 'Sim, excluir 2 eventos' }).click()
+    await expire(page)
+    await expect.poll(() => mock.calls).toEqual([{ event_id: closed.id, version: 7 }, { event_id: draft.id, version: 3 }])
   })
 })
 

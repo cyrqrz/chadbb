@@ -41,3 +41,7 @@ export function SendIcon({ size = 20 }: { size?: number }) {
 export function UndoIcon({ size = 20 }: { size?: number }) {
   return <Icon size={size}><path d="M9 14 4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /></Icon>
 }
+
+export function CheckIcon({ size = 20 }: { size?: number }) {
+  return <Icon size={size}><rect x="4" y="4" width="16" height="16" rx="4" /><path d="m8.5 12 2.5 2.5 4.5-5" /></Icon>
+}

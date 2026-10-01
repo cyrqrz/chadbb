@@ -489,6 +489,10 @@
   .list-card > .item-rows { border-top: 1px solid var(--divider-color); }
   .list-card > .card-header > .refresh-status { margin-top: -4px; }
   .card .catalog-rows > li:last-child { border-bottom: 0; }
+  /* Seleção de eventos: o card marcado ganha a borda da marca; a caixa tem área de toque de 44 px. */
+  .card-selected { border-color: var(--color-brand); box-shadow: 0 0 0 1px var(--color-brand), var(--shadow-sm); }
+  .card-select { min-height: var(--touch-min); cursor: pointer; font-weight: 650; }
+  .selection-bar .card-shortcuts { gap: 0.5rem 1rem; }
   .card-disclosure { display: flex; width: 100%; flex-direction: column; gap: 12px; padding-block: 4px 12px; }
   .availability { display: flex; flex-direction: column; gap: 6px; }
   .availability-text { font-weight: 650; font-variant-numeric: tabular-nums; }
