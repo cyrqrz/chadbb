@@ -481,15 +481,16 @@ test.describe('G3 · página inicial e prévia', () => {
 
   // Pedido do titular em 2026-09-17: os três passos estavam apagados, só com
   // um fio em cima. Viram cartões com peso próprio e reagem ao mouse.
+  const steps = (page: import('@playwright/test').Page) => page.getByRole('region', { name: /etapas do convite ao abraço/ })
   const stepCards = (page: import('@playwright/test').Page) =>
-    page.getByRole('listitem').filter({ has: page.getByRole('heading', { level: 3 }) })
+    steps(page).getByRole('listitem').filter({ has: page.getByRole('heading', { level: 3 }) })
 
   test('os três passos são cartões com superfície e contorno próprios', async ({ page }) => {
     await page.goto('/')
     const cards = stepCards(page)
     await expect(cards).toHaveCount(3)
     for (const title of ['Prepare o encontro', 'Convide com carinho', 'Acompanhe os presentes']) {
-      await expect(page.getByRole('heading', { level: 3, name: title })).toBeVisible()
+      await expect(page.getByRole('heading', { level: 3, name: new RegExp(title) })).toBeVisible()
     }
     // Cartão de verdade: fundo, borda em volta e sombra — não um fio só no topo.
     const first = cards.first()
@@ -526,10 +527,11 @@ test.describe('G3 · página inicial e prévia', () => {
 
   test('o número do passo continua decorativo para o leitor de tela', async ({ page }) => {
     await page.goto('/')
-    // A ordem já vem da lista numerada; o "01" não deve ser lido de novo.
-    await expect(page.getByRole('list').filter({ has: page.getByRole('heading', { level: 3 }) })).toHaveCount(1)
-    for (const number of ['01', '02', '03']) {
-      await expect(page.getByText(number, { exact: true })).toHaveAttribute('aria-hidden', 'true')
+    // A ordem já vem da lista numerada; o número na nuvem não deve ser lido de novo
+    // (o título da etapa leva "Etapa N:" só para o leitor de tela).
+    await expect(steps(page).getByRole('list').filter({ has: page.getByRole('heading', { level: 3 }) })).toHaveCount(1)
+    for (const number of ['1', '2', '3']) {
+      await expect(steps(page).getByText(number, { exact: true })).toHaveAttribute('aria-hidden', 'true')
     }
   })
 
@@ -892,12 +894,12 @@ test.describe('cascata da página inicial', () => {
       Object.defineProperty(window, '__entrada', { get: () => seen })
       document.addEventListener('animationstart', event => {
         const target = event.target as HTMLElement
-        if (target.matches?.('.stagger > *')) seen.push((target.textContent ?? '').slice(0, 2))
+        if (target.matches?.('.stagger > *')) seen.push(target.querySelector('.step-badge-number')?.textContent ?? '')
       }, true)
     })
     await page.goto('/')
     await expect(page.getByRole('heading', { level: 3, name: 'Prepare o encontro' })).toBeVisible()
-    await expect.poll(() => page.evaluate(() => (window as unknown as { __entrada: string[] }).__entrada)).toEqual(['01', '02', '03'])
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __entrada: string[] }).__entrada)).toEqual(['1', '2', '3'])
     const states = await page.evaluate(async () => {
       const items = [...document.querySelectorAll('.stagger > *')] as HTMLElement[]
       await Promise.all(items.flatMap(el => el.getAnimations().map(a => a.finished.then(() => {}, () => {}))))
@@ -1086,4 +1088,50 @@ test('fraldas aparecem do menor ao maior tamanho: P, M, G, XG', async ({ page })
   await backend(page, { items: [size(1, 'G'), size(2, 'M'), size(3, 'P'), size(4, 'XG')] })
   await page.goto(`/convite#${token}`)
   await expect(page.locator('.invite-gift').getByRole('heading')).toHaveText(['Fraldas tamanho P', 'Fraldas tamanho M', 'Fraldas tamanho G', 'Fraldas tamanho XG'])
+})
+
+// Referências de 01/10: etapas em nuvens, benefícios, perguntas frequentes e rodapé.
+test.describe('home: benefícios, perguntas frequentes e rodapé', () => {
+  test('perguntas abrem e fecham pelo teclado, sem perder o lugar', async ({ page }) => {
+    await page.goto('/')
+    const question = page.getByText('Quanto custa?', { exact: true })
+    const answer = page.getByText('Nesta fase, o chadbb é gratuito para as famílias convidadas.')
+    await expect(answer).toBeHidden()
+    await question.focus()
+    await page.keyboard.press('Enter')
+    await expect(answer).toBeVisible()
+    await expect(question).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(answer).toBeHidden()
+    await expect(page.getByRole('link', { name: 'Ainda com dúvidas? Fale com a gente' })).toHaveAttribute('href', '/privacidade#contato')
+  })
+
+  test('seis benefícios com título e o segundo convite à ação com outro nome', async ({ page }) => {
+    await page.goto('/')
+    const benefits = page.getByRole('region', { name: /Por que organizar/ }).getByRole('heading', { level: 3 })
+    await expect(benefits).toHaveCount(6)
+    await expect(page.getByRole('link', { name: 'Organizar meu chá' })).toHaveAttribute('href', '/entrar')
+    await expect(page.getByRole('heading', { level: 3, name: 'Etapa 1: Prepare o encontro' })).toBeVisible()
+  })
+
+  test('home inteira cabe em 320 px com texto a 200% e passa no axe, com perguntas abertas', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 740 })
+    await page.goto('/')
+    await page.addStyleTag({ content: 'html { font-size: 200% !important; }' })
+    await page.locator('details').evaluateAll(all => all.forEach(el => { (el as HTMLDetailsElement).open = true }))
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    await expectAccessible(page)
+  })
+
+  test('no convite o rodapé é só a barra, com a política em nova aba', async ({ page }) => {
+    await backend(page)
+    await page.goto(`/convite#${token}`)
+    await expect(page.getByRole('heading', { level: 1, name: 'Chá de teste' })).toBeVisible()
+    const footer = page.getByRole('contentinfo')
+    await expect(footer.getByRole('link')).toHaveCount(1)
+    const privacy = footer.getByRole('link', { name: 'Política de Privacidade (abre em nova aba)' })
+    await expect(privacy).toHaveAttribute('href', '/privacidade')
+    await expect(privacy).toHaveAttribute('target', '_blank')
+    await expect(footer.getByRole('navigation', { name: 'Links úteis' })).toHaveCount(0)
+  })
 })
