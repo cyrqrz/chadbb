@@ -1366,3 +1366,14 @@ test('lista pronta de mimos: só mimos sugeridos, sem fraldas, idempotente e só
   await transition((await as(alice, 'select * from public.events where id=$1', [event.id])).rows[0], 'closed')
   await assert.rejects(prepare(alice), /EVENT_CLOSED/)
 })
+
+test('cota do formulário de contato: 3 por minuto por rede e 30 no total, sem afetar as cotas do convidado', async () => {
+  const hit = key => admin.query('select public.check_guest_rate($1) ok', [key]).then(r => r.rows[0].ok)
+  for (let i = 0; i < 3; i++) assert.equal(await hit('contact:198.51.100.7'), true)
+  assert.equal(await hit('contact:198.51.100.7'), false)
+  assert.equal(await hit('contact:198.51.100.8'), true)
+  for (let i = 0; i < 30; i++) assert.equal(await hit('contact-global'), true)
+  assert.equal(await hit('contact-global'), false)
+  // As chaves do convidado seguem com os limites de antes.
+  for (let i = 0; i < 5; i++) assert.equal(await hit('ip:198.51.100.7'), true)
+})

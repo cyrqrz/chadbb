@@ -437,3 +437,7 @@ verify_jwt = false
 # Autenticação própria por x-rsvp-secret; nenhuma chamada do navegador.
 [functions.rsvp-reminders]
 verify_jwt = false
+
+# Formulário de contato público: sem login; origem, cota e campo-armadilha na própria função.
+[functions.contact]
+verify_jwt = false

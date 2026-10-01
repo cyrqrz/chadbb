@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { CONTACT } from '../../lib/contact'
+import { ContactForm } from './ContactForm'
 
 // Texto aprovado pelo titular em 30/09 (T4 de docs/DECISOES-PRODUTO-2026-09-30.md).
 // Descreve o que o sistema faz: mudar retenção, dados ou fornecedores exige mudar aqui.
@@ -60,9 +61,10 @@ export function PrivacyPage() {
         </section>
 
         <section id="contato" className="legal-contact" aria-labelledby="contato-titulo">
-          <h2 id="contato-titulo" className="text-h3 font-bold">Dúvidas ou pedidos sobre seus dados</h2>
-          <p>O chadbb é mantido por Leonardo Martins. Respondemos pelo e-mail.</p>
-          <a className="button" href={`mailto:${CONTACT}`}>Escrever para {CONTACT}</a>
+          <h2 id="contato-titulo" className="text-h3 font-bold">Fale com a gente</h2>
+          <p>Dúvidas, problemas com um convite ou pedidos sobre seus dados. O chadbb é mantido por Leonardo Martins, e a resposta chega no e-mail que você informar.</p>
+          <ContactForm />
+          <p>Prefere o seu e-mail? <a className="text-link" href={`mailto:${CONTACT}`}>Escrever para {CONTACT}</a></p>
         </section>
       </div>
     </div>

@@ -537,6 +537,12 @@
   .legal-body { display: flex; min-width: 0; flex-direction: column; gap: 3rem; }
   /* 9rem: no celular estreito o cabeçalho fixo ocupa duas linhas (~130 px). */
   .legal-section, .legal-contact { scroll-margin-top: 9rem; }
+  /* Formulário de contato: campos em coluna; nome e e-mail lado a lado a partir de 640 px. */
+  .contact-form { display: flex; width: 100%; flex-direction: column; gap: 1rem; }
+  .contact-form-row { display: grid; gap: 1rem; }
+  @media (min-width: 640px) { .contact-form-row { grid-template-columns: 1fr 1fr; } }
+  /* Campo-armadilha fora da tela (e não display: none, que alguns robôs pulam). */
+  .contact-trap { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
   .legal-qa, .legal-terms { max-width: 65ch; margin-top: 1rem; }
   .legal-qa > div { display: grid; gap: 0.25rem; border-top: 1px solid var(--color-line); padding-block: 1rem; }
   .legal-qa dt { font-weight: 700; }
