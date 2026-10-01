@@ -8,11 +8,10 @@ import { errorMessage } from '../../lib/errors'
 import { failedLast, live } from '../../lib/query'
 import { useLastError } from '../../lib/useLastError'
 import { EmptyState, ErrorState, LoadingState, RefreshStatus, SuccessMessage } from '../../components/States'
-import { Button, ConfirmDialog, Pagination, QuantityField, Skeleton, StatusBadge } from '../../components/ui'
+import { Button, ConfirmDialog, Pagination, PlusIcon, QuantityField, Skeleton, StatusBadge, TrashIcon } from '../../components/ui'
 import { EventNotFound } from '../events/EventLayout'
 import { StepCompletion } from '../events/SetupDock'
-import { addCustomTreat, addItem, CATALOG_LIMIT, DIAPER_SIZES, giftKeys, listDefaults, listedProducts, listItems, listProducts, PAGE_SIZE, prepareList, removeItem, setQuantity } from './api'
-import type { DiaperAmounts } from './api'
+import { addCustomTreat, addItem, CATALOG_LIMIT, giftKeys, listedProducts, listItems, listProducts, PAGE_SIZE, prepareTreatList, removeItem, setQuantity } from './api'
 import { parseQuantity, platformLabels, categoryLabels } from './model'
 import type { Category, DiaperSize, EventItem, Product } from './model'
 import type { ListedItem } from './api'
@@ -41,10 +40,11 @@ function GiftList({ eventId, closed, eventStatus, step }: { eventId: string; clo
   const [focusSummary, setFocusSummary] = useState(false)
   const cache = useQueryClient()
   const query = useQuery({ queryKey: [...giftKeys.items(eventId), session?.user.id, category, page], queryFn: () => listItems(eventId, page, category), ...live })
-  async function prepare(diapers?: DiaperAmounts) {
+  async function prepare() {
     setPreparing(true); setNotice(null); setFocusSummary(false)
     const fromEmpty = empty
-    try { const count = await prepareList(eventId, diapers); await cache.invalidateQueries({ queryKey: giftKeys.items(eventId) }); setFocusSummary(fromEmpty); setNotice({ ok: true, text: !count ? 'Os itens do chá já estão na lista.' : fromEmpty ? 'Lista do chá preparada.' : `${count} ${count === 1 ? 'item da lista pronta voltou' : 'itens da lista pronta voltaram'} para a lista.` }) }
+    // A contagem é a que o servidor devolve: o front não calcula quantos faltavam.
+    try { const count = await prepareTreatList(eventId); await cache.invalidateQueries({ queryKey: giftKeys.items(eventId) }); setFocusSummary(fromEmpty); setNotice({ ok: true, text: !count ? 'Os mimos sugeridos já estão na lista.' : fromEmpty ? `${count} ${count === 1 ? 'mimo sugerido entrou' : 'mimos sugeridos entraram'} na lista.` : `${count} ${count === 1 ? 'mimo sugerido voltou' : 'mimos sugeridos voltaram'} para a lista.` }) }
     catch (cause) { setNotice({ ok: false, text: errorMessage(cause) }) } finally { setPreparing(false) }
   }
   // A11: o erro guardado é o desta categoria e página. A12: a última contagem
@@ -54,12 +54,6 @@ function GiftList({ eventId, closed, eventStatus, step }: { eventId: string; clo
   if (query.data && query.data.count !== total) setTotal(query.data.count)
   const listed = useQuery({ queryKey: [...giftKeys.items(eventId), 'listed', session?.user.id], queryFn: () => listedProducts(eventId), ...live })
   const empty = listed.data?.length === 0
-  // Padrões sugeridos pelo servidor viram o ponto de partida; cada evento ajusta os seus.
-  const defaults = useQuery({ queryKey: [...giftKeys.items(eventId), 'defaults'], queryFn: listDefaults, enabled: empty && !closed, staleTime: Infinity })
-  const [typed, setTyped] = useState<Partial<Record<DiaperSize, string>>>({})
-  const amountOf = (size: DiaperSize) => typed[size] ?? (defaults.data?.[size] !== undefined ? String(defaults.data[size]) : '')
-  const chosen = defaults.data ? DIAPER_SIZES.map(size => parseQuantity(amountOf(size))) : null
-  const amountsValid = chosen === null || chosen.every(amount => amount !== null)
   // O cartão removido some: o foco vai para o aviso, e não para o início da página.
   const [removed, setRemoved] = useState({ title: '', count: 0 })
   // Todos os tamanhos já na lista: o atalho de adicionar levaria a uma seção sem o que oferecer.
@@ -79,34 +73,37 @@ function GiftList({ eventId, closed, eventStatus, step }: { eventId: string; clo
     {eventStatus}
     {step}
     <p className="mt-4 max-w-2xl text-stone-600">Fraldas por tamanho e mimos de livre escolha. Os convidados veem esta lista pelo link do convite.</p>
+    {/* Lista vazia: só os mimos têm lista pronta. As fraldas cada organizador monta
+        para o seu chá, escolhendo os tamanhos e os pacotes em “Adicionar à lista”. */}
     {!closed && empty && <section aria-labelledby="quick-start" className="quick-start mt-8">
       <p className="eyebrow">Recomendado</p>
       <div className="flex flex-wrap items-center justify-between gap-5">
         <div className="min-w-0 max-w-2xl">
-          <h2 id="quick-start" className="text-2xl font-bold">Comece com a lista pronta do chá</h2>
-          <p className="mt-2 text-stone-600">Um toque inclui os quatro tamanhos de fralda e os mimos sugeridos. Ajuste os pacotes de cada tamanho para o seu chá; depois ainda dá para mudar item por item.</p>
-          {defaults.data && <div className="quick-start-sizes mt-4" role="group" aria-label="Pacotes por tamanho na lista pronta">{DIAPER_SIZES.map(size =>
-            <QuantityField key={size} label={`Tamanho ${size}`} unit={`pacotes do tamanho ${size}`} value={amountOf(size)} onChange={value => setTyped(current => ({ ...current, [size]: value }))} max={10000} disabled={preparing} />)}</div>}
+          <h2 id="quick-start" className="text-2xl font-bold">Comece pelos mimos sugeridos</h2>
+          <p className="mt-2">Um toque inclui os mimos mais pedidos em chá de bebê. Depois é só tirar o que não quiser e acrescentar outros.</p>
+          <p className="mt-2">As fraldas você monta do seu jeito: escolha os tamanhos e quantos pacotes de cada em “Adicionar à lista”.</p>
         </div>
-        <button className="button" disabled={preparing || !amountsValid} onClick={() => void prepare(chosen ? Object.fromEntries(DIAPER_SIZES.map((size, index) => [size, chosen[index]])) as DiaperAmounts : undefined)}>{preparing ? 'Preparando…' : 'Preparar lista do chá'}</button>
+        <button className="button" disabled={preparing} onClick={() => void prepare()}><PlusIcon />{preparing ? 'Incluindo…' : 'Incluir mimos sugeridos'}</button>
       </div>
       {notice && <div className="mt-4">{notice.ok ? <SuccessMessage>{notice.text}</SuccessMessage> : <ErrorState message={notice.text} />}</div>}
     </section>}
     {!empty && <ListSummary listed={listed.data} failed={listed.errorUpdatedAt > listed.dataUpdatedAt} focus={focusSummary}>
-      {/* Enquanto a conferência não responde, ainda não se sabe se é "Preparar" ou "Completar". */}
-      {!closed && (listed.data || listed.errorUpdatedAt > listed.dataUpdatedAt) && <div className="card-actions">
-        <p className="text-muted">Faltou algum item da lista pronta? Este botão inclui de novo tudo o que falta, inclusive o que você removeu.</p>
-        <button className="secondary self-start" disabled={preparing} onClick={() => void prepare()}>{preparing ? 'Preparando…' : 'Completar a lista do chá'}</button>
-        {notice && (notice.ok ? <SuccessMessage>{notice.text}</SuccessMessage> : <ErrorState message={notice.text} />)}
+      {/* Atalho abaixo do divisor, como nos cards de evento. Enquanto a conferência não
+          responde, ainda não se sabe se a lista está vazia (destaque) ou não (atalho). */}
+      {!closed && (listed.data || listed.errorUpdatedAt > listed.dataUpdatedAt) && <div className="card-actions card-shortcuts">
+        <p className="card-hint" id="suggested-hint">Faltou algum mimo sugerido? O atalho inclui de novo os que faltam, inclusive os que você removeu.</p>
+        <button className="secondary btn-sm" aria-describedby="suggested-hint" disabled={preparing} onClick={() => void prepare()}><PlusIcon size={18} />{preparing ? 'Incluindo…' : 'Incluir mimos sugeridos'}</button>
+        {notice && <div className="card-hint">{notice.ok ? <SuccessMessage>{notice.text}</SuccessMessage> : <ErrorState message={notice.text} />}</div>}
       </div>}
     </ListSummary>}
     {closed && <p className="notice mt-6">Evento encerrado. A lista está disponível apenas para consulta.</p>}
     <nav aria-label="Categorias de presentes" className="mt-10"><div className="segmented">{(['fralda', 'mimo'] as Category[]).map(value => <button key={value} aria-pressed={category === value} onClick={() => { setCategory(value); setPage(0); setTotal(null); setRemoved({ title: '', count: 0 }) }}>{categoryLabels[value]}</button>)}</div></nav>
-    <section key={`list-${category}`} aria-labelledby="list-title" className="fade-swap mt-6">
-      {/* Cabeçalho da área: o título vem primeiro, o contador diz o tamanho da lista e
-          o atalho de incluir tem mais peso que qualquer remoção. */}
+    {/* Card no padrão dos cards de evento: cabeçalho (título, contador, descrição), divisor
+        e as linhas. O atalho de incluir fica no cabeçalho: numa lista longa, embaixo ele sumiria. */}
+    <section key={`list-${category}`} aria-labelledby="list-title" className="card card-stack list-card fade-swap mt-6">
+      <header className="card-header">
       <div className="list-toolbar">
-        <h2 id="list-title" className="text-2xl font-bold">{categoryLabels[category]} na lista</h2>
+        <h2 id="list-title" className="card-title text-h2">{categoryLabels[category]} na lista</h2>
         {/* Some enquanto carrega e na lista vazia: lá o próprio estado vazio já diz o que há. */}
         {count > 0 && <span className="badge badge-neutral list-count">{count} {count === 1 ? 'item' : 'itens'}</span>}
         {!closed && !catalogComplete && <a className="secondary btn-sm list-toolbar-cta" href="#adicionar" onClick={event => {
@@ -114,15 +111,19 @@ function GiftList({ eventId, closed, eventStatus, step }: { eventId: string; clo
           if (!target) return
           // Sem entrada no histórico: no celular o primeiro "voltar" só tiraria o `#adicionar`.
           event.preventDefault(); target.scrollIntoView({ block: 'start' }); target.focus()
-        }}><span aria-hidden="true">+</span>Adicionar à lista</a>}
+        }}><PlusIcon size={18} />Adicionar à lista</a>}
       </div>
+      {/* A regra está no presente: some com a lista vazia (lá importa o próximo passo) e no
+          evento encerrado (contradiria o aviso logo acima). */}
+      {!closed && count > 0 && <p className="card-description">{category === 'fralda' ? 'Os convidados reservam pacotes até a quantidade pedida em cada tamanho.' : 'Sem limite de quantidade. Cada convidado informa quantos vai levar.'}</p>}
+      {/* No cabeçalho, e não entre ele e as linhas: a linha reservada do aviso não abre um vão no card. */}
+      {query.data && <RefreshStatus fetching={query.isFetching} failed={query.isError} onRetry={() => void query.refetch()} retryLabel="Recarregar lista" label="Atualizando…" />}
+      </header>
       {query.isPending && !(failedLast(query) && listError) ? <><LoadingState>Carregando a lista…</LoadingState><ListSkeleton /></> : !query.data ? <div className="mt-5"><ErrorState message={errorMessage(listError)} busy={query.isFetching} onRetry={() => void query.refetch()} retryLabel="Recarregar lista" /></div> : <>
-        <RefreshStatus fetching={query.isFetching} failed={query.isError} onRetry={() => void query.refetch()} retryLabel="Recarregar lista" label="Atualizando…" />
         {removed.title && <p ref={removedNotice} tabIndex={-1} role="status" className="state state-success mt-3">“{removed.title}” saiu da lista.</p>}
-        {!query.data.count ? <div className="mt-3"><EmptyState title={category === 'fralda' ? 'Nenhum tamanho de fralda na lista.' : 'Nenhum mimo na lista.'}>{closed ? 'Nenhum presente foi incluído nesta categoria.' : 'Use a lista pronta do chá acima ou o atalho “Adicionar à lista”.'}</EmptyState></div> : <>
-          {/* G4b.3: "sem limite" é regra da categoria, e aparece uma vez no topo — não em cada linha. */}
-          {category === 'mimo' && !closed && <p className="mt-3 text-muted">Sem limite de quantidade. Cada convidado informa quantos vai levar.</p>}
-          <ul className="card item-rows stagger mt-3">{(category === 'fralda' ? bySize(query.data.items) : query.data.items).map(item => <li key={item.id}><ItemRow item={item} closed={closed} onRemoved={onRemoved} /></li>)}</ul>
+        {!query.data.count ? <div className="mt-3"><EmptyState title={category === 'fralda' ? 'Nenhum tamanho de fralda na lista.' : 'Nenhum mimo na lista.'}>{closed ? 'Nenhum presente foi incluído nesta categoria.' : category === 'fralda' ? 'Escolha os tamanhos e quantos pacotes de cada em “Adicionar à lista”.' : 'Inclua os mimos sugeridos ou adicione os seus em “Adicionar à lista”.'}</EmptyState></div> : <>
+          {/* G4b.3: "sem limite" é regra da categoria e aparece uma vez, na descrição do card — não em cada linha. */}
+          <ul className="item-rows stagger">{(category === 'fralda' ? bySize(query.data.items) : query.data.items).map(item => <li key={item.id}><ItemRow item={item} closed={closed} onRemoved={onRemoved} /></li>)}</ul>
         </>}
       </>}
       {/* Fora dos ramos de estado: a paginação continua montada ao carregar e na falha, e o foco não cai. */}
@@ -134,7 +135,7 @@ function GiftList({ eventId, closed, eventStatus, step }: { eventId: string; clo
 // §10: enquanto a lista carrega, o espaço reservado tem a forma das linhas. O anúncio
 // fica com o LoadingState ao lado; aqui é só desenho.
 function ListSkeleton() {
-  return <ul className="card item-rows mt-3" aria-hidden="true">{[70, 52, 84].map((width, index) =>
+  return <ul className="item-rows" aria-hidden="true">{[70, 52, 84].map((width, index) =>
     <li key={index}><div className="item-row">
       <div className="item-row-text"><Skeleton width={`${width}%`} height="1.25rem" /></div>
       <span className="item-row-remove"><Skeleton width="1.25rem" height="1.25rem" /></span>
@@ -149,7 +150,10 @@ function ListSummary({ listed, failed, focus, children }: { listed?: ListedItem[
   const diapers = listed?.filter(row => row.category === 'fralda') ?? []
   const treats = listed?.filter(row => row.category === 'mimo').length ?? 0
   return <section aria-labelledby="list-summary" className="card card-stack mt-8">
-    <h2 id="list-summary" ref={title} tabIndex={-1} className="card-title">Lista do chá</h2>
+    <header className="card-header">
+      <h2 id="list-summary" ref={title} tabIndex={-1} className="card-title text-h2">Lista do chá</h2>
+      <p className="card-description">O que os convidados veem pelo link do convite.</p>
+    </header>
     {/* Sem total de pacotes: o front não soma agregados (regra 6); ele vem com summary.diapers do servidor. */}
     {listed ? <>
       <ul className="size-chips" aria-label="Pacotes pedidos por tamanho">{sizes.map(size => {
@@ -279,7 +283,7 @@ function RemoveItem({ item, disabled, onRemoved }: { item: EventItem; disabled: 
   const removeLabel = `Remover da lista: ${item.product.title}`
   return <>
     <button ref={trigger} type="button" className="btn-icon item-row-remove" disabled={disabled} aria-expanded={confirming} aria-controls={panelId}
-      aria-label={removeLabel} title={removeLabel} onClick={() => confirming ? cancel() : setConfirming(true)}>{trashIcon}</button>
+      aria-label={removeLabel} title={removeLabel} onClick={() => confirming ? cancel() : setConfirming(true)}><TrashIcon /></button>
     {confirming && <div id={panelId} className="card-disclosure item-row-confirm">
       <p ref={question} tabIndex={-1}>Remover “{item.product.title}” da lista? Os convidados deixam de ver este presente.{item.product.event_id ? ' Este mimo foi criado por você e será apagado.' : ''}</p>
       <div className="flex flex-wrap gap-3">
@@ -290,11 +294,6 @@ function RemoveItem({ item, disabled, onRemoved }: { item: EventItem; disabled: 
     </div>}
   </>
 }
-// Lixeira decorativa: quem lê a tela pelo teclado ou por leitor recebe o aria-label do botão.
-const trashIcon = <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-  <path d="M4 7h16" /><path d="M10 11.5v5.5" /><path d="M14 11.5v5.5" />
-  <path d="M6.5 7l.8 11.2A2 2 0 0 0 9.3 20h5.4a2 2 0 0 0 2-1.8L17.5 7" /><path d="M9.5 7V5.5A1.5 1.5 0 0 1 11 4h2a1.5 1.5 0 0 1 1.5 1.5V7" />
-</svg>
 // Mimo que não está no catálogo: só nome e descrição, sem limite, só para este evento.
 function CustomTreatForm({ eventId }: { eventId: string }) {
   const [title, setTitle] = useState('')
@@ -323,17 +322,21 @@ function CustomTreatForm({ eventId }: { eventId: string }) {
       setError(code === 'ITEM_ALREADY_EXISTS' ? 'Já existe um mimo com esse nome na lista.' : errorMessage(cause))
     } finally { sending.current = false; setBusy(false) }
   }
-  return <section aria-labelledby="custom-treat" className="card mt-6">
-    <h3 id="custom-treat" className="card-title">Adicionar mimo próprio</h3>
-    <p className="mt-1 text-muted">Escreva o nome de qualquer mimo. Vale só para este evento, sem limite de quantidade.</p>
-    <form onSubmit={submit} className="mt-4 grid gap-4">
+  return <section aria-labelledby="custom-treat" className="card card-stack mt-6">
+    <header className="card-header">
+      <h3 id="custom-treat" className="card-title">Adicionar mimo próprio</h3>
+      <p className="card-description">Escreva o nome de qualquer mimo. Vale só para este evento, sem limite de quantidade.</p>
+    </header>
+    <form onSubmit={submit} className="grid gap-4">
       {/* readOnly, e não disabled: com Enter no campo, o foco continua nele durante o envio. */}
       <label className="field">Nome do mimo<input ref={nameField} maxLength={160} value={title} readOnly={busy} aria-invalid={nameInvalid || undefined} aria-describedby={nameInvalid ? errorId : undefined} onChange={e => { setTitle(e.target.value); setMessage(''); setError(null); setNameInvalid(false) }} placeholder="Ex.: Livro de pano" /></label>
       <label className="field">Descrição (opcional)<textarea rows={2} maxLength={2000} value={description} readOnly={busy} onChange={e => { setDescription(e.target.value); setMessage('') }} /></label>
-      <Button type="submit" variant="secondary" className="justify-self-start" busy={busy}>{busy ? 'Adicionando…' : 'Adicionar mimo'}</Button>
+      <div className="card-actions card-shortcuts">
+        <Button type="submit" variant="secondary" size="sm" busy={busy}><PlusIcon size={18} />{busy ? 'Adicionando…' : 'Adicionar mimo'}</Button>
+      </div>
     </form>
-    {message && <div className="mt-4"><SuccessMessage>{message}</SuccessMessage></div>}
-    {error && <p id={errorId} role="alert" className="error mt-4">{error}</p>}
+    {message && <SuccessMessage>{message}</SuccessMessage>}
+    {error && <p id={errorId} role="alert" className="error">{error}</p>}
   </section>
 }
 // Uma seção só para incluir: mimo próprio (na aba Mimos) e as sugestões do catálogo
@@ -364,8 +367,11 @@ function Catalog({ eventId, category, listed, listedFailed, listedFetching, retr
   return <section id="adicionar" tabIndex={-1} aria-labelledby="catalog-title" className="mt-14 border-t border-stone-300 pt-10">
     <h2 id="catalog-title" className="text-2xl font-bold">Adicionar à lista</h2>
     {category === 'mimo' && <CustomTreatForm eventId={eventId} />}
-    <section aria-labelledby="catalog-suggestions" className="mt-8">
-      <h3 id="catalog-suggestions" className="text-xl font-semibold">Sugestões do catálogo</h3>
+    <section aria-labelledby="catalog-suggestions" className="card card-stack mt-6">
+      <header className="card-header">
+        <h3 id="catalog-suggestions" className="card-title">Sugestões do catálogo</h3>
+        <p className="card-description">{category === 'fralda' ? 'Um tamanho por vez: informe os pacotes e adicione.' : 'Mimos comuns em chá de bebê que ainda não estão na sua lista.'}</p>
+      </header>
       {listedFailed && <div className="mt-4"><ErrorState message="Não foi possível conferir o que já está na lista. Se um item já estiver incluído, o sistema recusa a repetição." busy={listedFetching} onRetry={retryListed} retryLabel="Conferir a lista de novo" /></div>}
       {added.title && <p ref={addedNotice} tabIndex={-1} role="status" className="state state-success mt-4">“{added.title}” entrou na lista.</p>}
       {(query.isPending && !(failedLast(query) && catalogError)) || (!listed && !listedFailed) ? <LoadingState>Carregando sugestões…</LoadingState>
@@ -409,7 +415,7 @@ function ProductCard({ product, eventId, onAdded }: { product: Product; eventId:
     </div>
     <form onSubmit={add} className="catalog-row-form">
       {diaper && <QuantityField label="Pacotes" context={product.title} unit="pacotes" value={quantity} max={10000} disabled={busy} onChange={text => { setValue(text); setError(null) }} />}
-      <Button type="submit" variant="secondary" size="sm" busy={busy} aria-label={`Adicionar ${product.title} à lista`}>{busy ? 'Adicionando…' : 'Adicionar'}</Button>
+      <Button type="submit" variant="secondary" size="sm" busy={busy} aria-label={`Adicionar ${product.title} à lista`}><PlusIcon size={18} />{busy ? 'Adicionando…' : 'Adicionar'}</Button>
     </form>
     {error && <ErrorState message={error} />}
   </article>

@@ -187,7 +187,7 @@ test('sugestões do catálogo mostram só o que falta na lista', async ({ page }
     '/rest/v1/products': () => ({ status: 200, json: [g, product(2, 'M')], headers: { 'content-range': '0-1/2' } }),
   })
   await page.goto(`/eventos/${eventId}/presentes`)
-  await expect(page.getByRole('button', { name: 'Completar a lista do chá' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Incluir mimos sugeridos' })).toBeVisible()
   const catalog = page.getByRole('region', { name: 'Adicionar à lista' })
   await expect(catalog.getByRole('button', { name: 'Adicionar Fraldas tamanho M à lista' })).toBeVisible()
   // O tamanho G já está na lista: não aparece como sugestão.
@@ -265,17 +265,17 @@ test('remover item já removido em outra aba conta como removido; conflito de ve
   await expect(page.getByRole('status').filter({ hasText: '“Pomada fictícia” saiu da lista.' })).toBeFocused()
 })
 
-test('completar depois de remover diz que o item da lista pronta voltou', async ({ page }) => {
+test('incluir os sugeridos depois de remover diz que o mimo voltou', async ({ page }) => {
   const rows = [{ product_id: '81000000-0000-4000-8000-000000000001', diaper_size: 'P', category: 'fralda', quantity_requested: 6 }]
   await backend(page, () => ({ status: 200, json: full }), undefined, {
     '/rest/v1/event_items': ({ url }) => isListQuery(url) ? { status: 200, json: [], headers: { 'content-range': '*/0' } } : { status: 200, json: rows, headers: { 'content-range': '0-0/1' } },
     '/rest/v1/products': none,
-    '/rest/v1/rpc/prepare_family_list': () => ({ status: 200, json: 1 }),
+    '/rest/v1/rpc/prepare_treat_list': () => ({ status: 200, json: 1 }),
   })
   await page.goto(`/eventos/${eventId}/presentes`)
-  await expect(page.getByText('inclui de novo tudo o que falta, inclusive o que você removeu')).toBeVisible()
-  await page.getByRole('button', { name: 'Completar a lista do chá' }).click()
-  await expect(page.getByRole('status').filter({ hasText: '1 item da lista pronta voltou para a lista.' })).toBeVisible()
+  await expect(page.getByText('inclui de novo os que faltam, inclusive os que você removeu')).toBeVisible()
+  await page.getByRole('button', { name: 'Incluir mimos sugeridos' }).click()
+  await expect(page.getByRole('status').filter({ hasText: '1 mimo sugerido voltou para a lista.' })).toBeVisible()
 })
 
 test('mimo próprio: entra na lista com o selo “Criado por você” e recusa nome repetido', async ({ page }) => {
@@ -319,11 +319,11 @@ test('mimo próprio: entra na lista com o selo “Criado por você” e recusa n
   await expectAccessible(page)
 })
 
-test('lista vazia recomenda a lista pronta do chá', async ({ page }) => {
+test('lista vazia recomenda os mimos sugeridos', async ({ page }) => {
   await backend(page, () => ({ status: 200, json: full }), undefined, { '/rest/v1/event_items': none, '/rest/v1/products': none })
   await page.goto(`/eventos/${eventId}/presentes`)
-  await expect(page.getByRole('region', { name: 'Comece com a lista pronta do chá' })).toContainText('Recomendado')
-  await expect(page.getByRole('button', { name: 'Preparar lista do chá' })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Comece pelos mimos sugeridos' })).toContainText('Recomendado')
+  await expect(page.getByRole('button', { name: 'Incluir mimos sugeridos' })).toBeVisible()
   await expectAccessible(page)
 })
 
@@ -739,7 +739,7 @@ test.describe('G4b.2 · resumo da lista', () => {
   test('com itens, a lista pronta vira uma ação dentro do resumo, sem cartão próprio', async ({ page }) => {
     await summaryBackend(page)
     await page.goto(`/eventos/${eventId}/presentes`)
-    await expect(summary(page).getByRole('button', { name: 'Completar a lista do chá' })).toBeVisible()
+    await expect(summary(page).getByRole('button', { name: 'Incluir mimos sugeridos' })).toBeVisible()
     await expect(page.getByRole('region', { name: 'Lista pronta do chá' })).toHaveCount(0)
     await expect(page.getByText('Recomendado')).toHaveCount(0)
   })
@@ -747,7 +747,7 @@ test.describe('G4b.2 · resumo da lista', () => {
   test('lista vazia continua com o destaque da lista pronta e sem resumo', async ({ page }) => {
     await backend(page, () => ({ status: 200, json: full }), undefined, { '/rest/v1/event_items': none, '/rest/v1/products': none })
     await page.goto(`/eventos/${eventId}/presentes`)
-    await expect(page.getByRole('button', { name: 'Preparar lista do chá' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Incluir mimos sugeridos' })).toBeVisible()
     await expect(summary(page)).toHaveCount(0)
   })
 
@@ -769,7 +769,7 @@ test.describe('G4b.2 · resumo da lista', () => {
     await expect(summary(page).getByRole('list', { name: 'Pacotes pedidos por tamanho' })).toContainText('M 20 pacotes')
   })
 
-  // QA G4b.2: o botão "Preparar" some quando a lista passa a ter itens.
+  // QA G4b.2: o destaque dos sugeridos some quando a lista passa a ter itens.
   test('QA · preparar a lista vazia não perde o foco e anuncia o resultado', async ({ page }) => {
     let prepared = false
     const rows = [{ product_id: '81000000-0000-4000-8000-000000000001', diaper_size: 'P', category: 'fralda', quantity_requested: 6 }]
@@ -779,47 +779,37 @@ test.describe('G4b.2 · resumo da lista', () => {
         return { status: 200, json, headers: { 'content-range': json.length ? '0-0/1' : '*/0' } }
       },
       '/rest/v1/products': none,
-      '/rest/v1/rpc/prepare_family_list': () => { prepared = true; return { status: 200, json: 1 } },
+      '/rest/v1/rpc/prepare_treat_list': () => { prepared = true; return { status: 200, json: 1 } },
     })
     await page.goto(`/eventos/${eventId}/presentes`)
-    await page.getByRole('button', { name: 'Preparar lista do chá' }).click()
-    await expect(summary(page)).toContainText('Lista do chá preparada.')
+    await page.getByRole('button', { name: 'Incluir mimos sugeridos' }).click()
+    await expect(summary(page)).toContainText('1 mimo sugerido entrou na lista.')
     expect(await page.evaluate(() => document.activeElement?.tagName)).not.toBe('BODY')
   })
 
-  test('lista pronta: pacotes por tamanho vêm sugeridos, são editáveis e seguem no pedido', async ({ page }) => {
+  // 01/10: só os mimos têm lista pronta. As fraldas o organizador monta do zero,
+  // sem números sugeridos e sem consultar os padrões do servidor.
+  test('lista pronta só de mimos: sem pacotes sugeridos e o pedido leva só o evento', async ({ page }) => {
     let sent: unknown = null
+    let defaults = false
     await backend(page, () => ({ status: 200, json: full }), undefined, {
       '/rest/v1/event_items': () => ({ status: 200, json: [], headers: { 'content-range': '*/0' } }),
       '/rest/v1/products': none,
-      '/rest/v1/rpc/family_list_defaults': () => ({ status: 200, json: { P: 6, M: 19, G: 19, XG: 6 } }),
-      '/rest/v1/rpc/prepare_family_list': ({ body }) => { sent = body; return { status: 200, json: 27 } },
+      '/rest/v1/rpc/family_list_defaults': () => { defaults = true; return { status: 200, json: { P: 6, M: 19, G: 19, XG: 6 } } },
+      '/rest/v1/rpc/prepare_treat_list': ({ body }) => { sent = body; return { status: 200, json: 23 } },
     })
     await page.goto(`/eventos/${eventId}/presentes`)
-    const group = page.getByRole('group', { name: 'Pacotes por tamanho na lista pronta' })
-    await expect(group.getByRole('spinbutton', { name: 'Tamanho M' })).toHaveValue('19')
-    await group.getByRole('spinbutton', { name: 'Tamanho M' }).fill('12')
-    await group.getByRole('spinbutton', { name: 'Tamanho XG' }).fill('')
-    await expect(page.getByRole('button', { name: 'Preparar lista do chá' })).toBeDisabled()
-    await group.getByRole('spinbutton', { name: 'Tamanho XG' }).fill('4')
-    await page.getByRole('button', { name: 'Preparar lista do chá' }).click()
-    await expect.poll(() => sent).toEqual({ p_event_id: eventId, p_diapers: { P: 6, M: 12, G: 19, XG: 4 } })
-  })
-
-  test('lista pronta: se os padrões não carregam, ainda prepara com os do servidor', async ({ page }) => {
-    let sent: unknown = null
-    await backend(page, () => ({ status: 200, json: full }), undefined, {
-      '/rest/v1/event_items': () => ({ status: 200, json: [], headers: { 'content-range': '*/0' } }),
-      '/rest/v1/products': none,
-      '/rest/v1/rpc/prepare_family_list': ({ body }) => { sent = body; return { status: 200, json: 27 } },
-    })
-    await page.goto(`/eventos/${eventId}/presentes`)
+    const start = page.getByRole('region', { name: 'Comece pelos mimos sugeridos' })
+    await expect(start).toContainText('As fraldas você monta do seu jeito')
     await expect(page.getByRole('group', { name: 'Pacotes por tamanho na lista pronta' })).toHaveCount(0)
-    await page.getByRole('button', { name: 'Preparar lista do chá' }).click()
+    await expect(start.getByRole('spinbutton')).toHaveCount(0)
+    await start.getByRole('button', { name: 'Incluir mimos sugeridos' }).click()
     await expect.poll(() => sent).toEqual({ p_event_id: eventId })
+    await expect(page.getByRole('status').filter({ hasText: '23 mimos sugeridos entraram na lista.' })).toBeVisible()
+    expect(defaults).toBe(false)
   })
 
-  test('QA · enquanto confere a lista, não oferece "Completar" a quem ainda não tem itens', async ({ page }) => {
+  test('QA · enquanto confere a lista, não oferece o atalho dos sugeridos a quem ainda não tem itens', async ({ page }) => {
     await backend(page, () => ({ status: 200, json: full }), undefined, { '/rest/v1/event_items': none, '/rest/v1/products': none })
     let release = () => {}
     const held = new Promise<void>(resolve => { release = resolve })
@@ -831,9 +821,9 @@ test.describe('G4b.2 · resumo da lista', () => {
     await page.goto(`/eventos/${eventId}/presentes`)
     await expect(page.getByText('Carregando evento…')).toHaveCount(0)
     await expect(page.getByRole('heading', { name: 'Lista de presentes' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Completar a lista do chá' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Incluir mimos sugeridos' })).toHaveCount(0)
     release()
-    await expect(page.getByRole('button', { name: 'Preparar lista do chá' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Incluir mimos sugeridos' })).toBeVisible()
   })
 
   test('QA · resumo cabe em 320 px com texto a 200% e o botão tem 44 px', async ({ page }) => {
@@ -843,7 +833,7 @@ test.describe('G4b.2 · resumo da lista', () => {
     await expect(summary(page)).toContainText('M 19 pacotes')
     await page.addStyleTag({ content: 'html { font-size: 200% !important; }' })
     expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBe(0)
-    const box = await summary(page).getByRole('button', { name: 'Completar a lista do chá' }).boundingBox()
+    const box = await summary(page).getByRole('button', { name: 'Incluir mimos sugeridos' }).boundingBox()
     expect(box!.height).toBeGreaterThanOrEqual(44)
     expect(box!.x + box!.width).toBeLessThanOrEqual(320)
   })
@@ -1034,7 +1024,9 @@ test.describe('G3.1 · cards do organizador', () => {
     for (const [tab, region] of [['Fraldas', 'Fraldas na lista'], ['Mimos', 'Mimos na lista']] as const) {
       await page.getByRole('button', { name: tab, exact: true }).click()
       const section = page.getByRole('region', { name: region })
-      await expect(section.locator('.card')).toHaveCount(1)
+      // 01/10: a seção é o próprio card (cabeçalho, divisor e linhas), sem card dentro.
+      await expect(section).toHaveClass(/\bcard\b/)
+      await expect(section.locator('.card')).toHaveCount(0)
       await expect(section.locator('ul.item-rows > li')).toHaveCount(1)
       // A linha é o próprio item: nenhum card dentro da lista.
       await expect(section.locator('.item-rows .card')).toHaveCount(0)
@@ -1353,7 +1345,7 @@ test.describe('G3.1 · cards do organizador', () => {
     await expect(card.getByRole('button', { name: 'Aumentar pacotes' })).toBeDisabled()
     await expect(card.getByRole('button', { name: 'Atualizar quantidade' })).toHaveCount(0)
     await expect(page.getByRole('region', { name: 'Adicionar à lista' })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: /Lista pronta|Preparar|Completar/ })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /Lista pronta|Preparar|Completar|mimos sugeridos/ })).toHaveCount(0)
     // A regra dos mimos está no presente ("cada convidado informa quantos vai levar"):
     // num chá que já aconteceu ela contradiz o aviso de encerrado logo acima.
     await page.getByRole('button', { name: 'Mimos', exact: true }).click()

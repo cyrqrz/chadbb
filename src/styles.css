@@ -481,8 +481,14 @@
   /* Atalhos do card de evento: em linha, editar à esquerda e excluir à direita. */
   .card-shortcuts { flex-direction: row; flex-wrap: wrap; align-items: center; }
   .card-shortcuts > .btn-danger:not(:first-child) { margin-inline-start: auto; }
+  /* Texto de apoio entre os atalhos: linha inteira e na cor do texto (o cinza secundário lia como desabilitado). */
+  .card-hint { flex-basis: 100%; color: var(--color-ink); }
   /* Ícone dos botões com rótulo: nunca encolhe, e segue a cor do texto do botão. */
   :is(.button, .secondary, .btn-ghost, .btn-danger) > svg { flex-shrink: 0; }
+  /* Lista dentro do card: o divisor separa o cabeçalho das linhas, como nos cards de evento. */
+  .list-card > .item-rows { border-top: 1px solid var(--divider-color); }
+  .list-card > .card-header > .refresh-status { margin-top: -4px; }
+  .card .catalog-rows > li:last-child { border-bottom: 0; }
   .card-disclosure { display: flex; width: 100%; flex-direction: column; gap: 12px; padding-block: 4px 12px; }
   .availability { display: flex; flex-direction: column; gap: 6px; }
   .availability-text { font-weight: 650; font-variant-numeric: tabular-nums; }

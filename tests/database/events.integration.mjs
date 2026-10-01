@@ -1348,3 +1348,21 @@ test('lista pronta ajustável: pacotes por tamanho, omitido usa o padrão, valor
   assert.deepEqual(defaults, { P: 6, M: 19, G: 19, XG: 6 })
   await assert.rejects(as(null, 'select public.family_list_defaults()', [], 'anon'), /permission denied/)
 })
+
+test('lista pronta de mimos: só mimos sugeridos, sem fraldas, idempotente e só para o dono', async () => {
+  const event = await transition(await save(await create(), alice, { date: new Date(Date.now()+30*86400000).toISOString() }), 'published')
+  const prepare = user => as(user, 'select public.prepare_treat_list($1) n', [event.id])
+  await assert.rejects(prepare(bob), /EVENT_NOT_FOUND/)
+  await assert.rejects(as(null, 'select public.prepare_treat_list($1)', [event.id], 'anon'), /permission denied/)
+  const count = sql => as(alice, `select count(*)::int n from public.event_items where event_id=$1 and ${sql}`, [event.id]).then(r => r.rows[0].n)
+  assert.equal((await prepare(alice)).rows[0].n, 23)
+  assert.equal(await count("category='mimo'"), 23)
+  assert.equal(await count("category='fralda'"), 0)
+  assert.equal((await prepare(alice)).rows[0].n, 0)
+  // Mimo removido volta; o que já está fica como está.
+  const one = (await as(alice, "select id, version from public.event_items where event_id=$1 and category='mimo' order by id limit 1", [event.id])).rows[0]
+  await as(alice, 'select public.remove_event_item($1,$2,$3)', [event.id, one.id, one.version])
+  assert.equal((await prepare(alice)).rows[0].n, 1)
+  await transition((await as(alice, 'select * from public.events where id=$1', [event.id])).rows[0], 'closed')
+  await assert.rejects(prepare(alice), /EVENT_CLOSED/)
+})
