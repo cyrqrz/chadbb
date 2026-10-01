@@ -31,18 +31,20 @@ Contraste medido pela fórmula da WCAG 2.x.
 
 | Token | Valor | Uso | Contraste |
 |---|---|---|---|
-| `canvas` | `#FCF9F7` | fundo da página | — |
+| `cream` / `canvas` | `#FFF8EF` | fundo quente da página | — |
+| `rose` | `#B8798D` | decoração e preenchimento de progresso, nunca texto | 3,24:1 no creme |
+| `champagne` | `#D8BC86` | detalhes exclusivamente decorativos | 1,74:1 no creme |
 | `surface` | `#FFFFFF` | superfícies | — |
 | `surface-soft` | `#F8EEF1` | superfície suave, somente leitura | — |
-| `ink` | `#292326` | texto | 14,7:1 no canvas |
-| `muted` | `#6A6166` | texto secundário, placeholder | 4,9:1 no pior fundo (`brand-soft`); 5,7:1 no canvas |
-| `line` | `#E8DEE2` | divisórias decorativas | — (não usar como contorno de controle) |
+| `ink` | `#292326` | texto | 14,62:1 no creme |
+| `muted` | `#6A6166` | texto secundário, placeholder | 4,9:1 no pior fundo (`brand-soft`); 5,67:1 no creme |
+| `line` | `#D9B9C5` | bordas de cards e divisórias decorativas | — (não usar como contorno de controle) |
 | `line-strong` | `#948790` | contorno de campos e botões secundários | 3,0:1 no `surface-soft`, 3,3:1 no canvas, 3,4:1 no branco |
-| `brand` | `#8E3658` | ação principal, marca, foco | 7,5:1 com branco |
+| `brand` | `#8E3658` | ação principal, marca, foco | 7,45:1 com branco; 7,07:1 no creme; 4,83:1 no blush; 6,11:1 no brand-soft |
 | `brand-hover` | `#742845` | hover, texto de selo | 9,9:1 com branco; 8,1:1 no `brand-soft` |
 | `brand-soft` | `#F6E4EB` | fundo de aviso, selo, trilho de barra | — |
 | `blush` | `#F2C4D4` | painel do login, seleção | 10:1 com `ink` |
-| `success` | `#66806A` | barras e ícones de concluído | 4,3:1 com branco (não usar em texto) |
+| `success` | `#66806A` | ícones de concluído | 4,3:1 com branco (não usar em texto) |
 | `success-text` | `#4E6852` | texto de sucesso | 5,5:1 no `success-soft` |
 | `warning` | `#8A5A12` | texto de aviso | 5,4:1 no `warning-soft` |
 | `danger` | `#A23B43` | texto e contorno de erro | 5,7:1 no `danger-soft` |
@@ -56,20 +58,29 @@ Diferenças em relação ao plano original, todas por contraste:
 
 ## Tipografia
 
-| Papel | Fonte | Peso do arquivo (latino) |
+| Papel | Fonte / arquivo latino | Bytes carregados |
 |---|---|---|
-| Interface | Manrope Variable (`--font-sans`) | 25 KB |
-| Editorial | Fraunces Variable, só eixo de peso (`--font-display`) | 37 KB |
+| Corpo e interface | Manrope Variable, eixo `wght` | 24.836 |
+| Títulos | Fraunces Variable, eixos `wght` + `SOFT` | 62.432 |
+| Saudação do convite | Patrick Hand, peso 400 | 23.944 |
 
-As duas vêm de `@fontsource-variable`, servidas pelo próprio site (a CSP não
-aceita fontes externas), com licença OFL. Somam 62 KB, dentro da meta de
-120 KB. O navegador só baixa outros alfabetos quando a página usa esses
-caracteres.
+Todas são locais, OFL e usam **font-display: swap**. No convite, foram medidos
+**111.212 bytes (111,2 KB / 108,6 KiB)** de fontes WOFF2 efetivamente recebidas
+pelo Chromium, com cache vazio. Sem fontes externas, itálicos ou Nunito carregados.
+Os CSS de Manrope/Fraunces usam unicode-range: apenas latino foi requisitado
+no cenário em português. Outros alfabetos podem elevar esse total.
 
-A Fraunces fica restrita ao nome do evento, ao hero do convite e a títulos
-especiais; nunca no painel. **Aprovado pelo usuário em 2026-09-16** para o MVP
-(no lugar da Figtree, que saiu das dependências); a identidade de produto será
-revista depois do chá.
+A variante `soft.css` instalada expõe SOFT; o token `--title-softness: 50`
+só é aplicado a títulos. Corpo, campos, mensagens e números não recebem esse
+eixo. Patrick Hand fica na saudação e em amostras, no máximo dois acentos por
+tela; nunca em instruções extensas, prazos ou controles. A descrição do convite
+usa Manrope. A personalização por evento permanece fora desta etapa visual.
+
+A etapa de 01/10 substitui a restrição antiga de Fraunces fora do painel:
+títulos do organizador também podem herdar o tratamento; controles e conteúdo
+continuam Manrope. Patrick Hand foi adicionada no rascunho anterior e é mantida
+para o acento aprovado; não se adicionou outra biblioteca nesta etapa. Nunito
+ficou guardada no patch da personalização, sem dependência no tema entregue.
 
 Escala (`text-*`):
 
@@ -96,9 +107,9 @@ Escala (`text-*`):
   |---|---|---|
   | `--radius-control` | 10 px | botões, abas, alvos de navegação |
   | `--radius-field` | 12 px | campos, opções de rádio |
-  | `--radius-surface` | 16 px | cards, avisos, estados |
-  | `--radius-panel` | 20 px | login, capa, lista pronta |
-  | `--radius-pill` | 9999 px | só selo, barra de progresso, spinner, avatar |
+  | `--radius-surface` | 20 px | cards, avisos, estados |
+  | `--radius-panel` | 24 px | login, capa, lista pronta |
+  | `--radius-pill` | 9999 px | só selo, spinner, avatar e ícone circular |
 - **Sombras:** só `shadow-sm` (repouso) e `shadow-md` (destaque ou hover). Um
   cartão existe pela borda, não pela sombra.
 - **Toque:** `--touch-min` 44 px para qualquer alvo; `--control-height` 48 px para
@@ -136,7 +147,7 @@ opacidade), ocupado (`aria-disabled`, mantém o foco), erro e selecionado
 | `StatusBadge` | selo pill com ícone + texto | `brand`, `neutral`, `success`, `warning`, `danger` | `--radius-pill` | quebra linha | ícone decorativo; a cor nunca é a única pista |
 | `Field` (input, select, textarea) | rótulo, controle, dica, erro | — | `--radius-field`, `--control-height-md`, `--color-border` | largura total | `htmlFor`, `aria-describedby` (dica e erro) e `aria-invalid`; somente leitura com contorno tracejado |
 | `Tabs` | `nav` rotulada com botões | — | `--radius-control` | quebra linha | `aria-pressed`; troca de conteúdo sem mover o foco |
-| `Progress` | trilho + barra | completa fica verde | `--radius-pill` | largura do contêiner | sem `label`, decorativa (o número está escrito ao lado); com `label`, `progressbar` com `aria-label`, `aria-valuenow/max` e `aria-valuetext` |
+| `Progress` | trilho + barra | rosa-antigo → vinho; completa fica vinho | `--radius-control` | largura do contêiner | sem `label`, decorativa (o número está escrito ao lado); com `label`, `progressbar` com `aria-label`, `aria-valuenow/max` e `aria-valuetext` |
 | `Availability` | texto “N de M disponíveis” + `Progress` | — | `.availability` | largura do contêiner | texto antes da barra; a barra recebe o nome “N de M {unidade} reservados” |
 | `QuantityField` | rótulo + stepper `− \| valor \| +` | `label` (padrão “Quantidade”), `context` só para leitor de tela, `min`/`max` | `--control-radius`, `--control-height-md`, `--color-border` | não passa da largura do card | grupo rotulado; `−`/`+` com nome (“Diminuir pacotes”); nos limites, `aria-disabled` mantém o foco; campo vazio volta ao mínimo |
 | `Section` | `section` + título + descrição | `level` 2 ou 3 | `--text-h2` | — | `aria-labelledby` |
@@ -166,3 +177,64 @@ cards (G4).
 - `eslint-plugin-jsx-a11y`: **bloqueado** (sem versão para ESLint 10);
 - teste manual por teclado e leitor de tela nas jornadas críticas continua
   obrigatório antes do ensaio (G5).
+
+## Tema bebê aprovado em 01/10/2026
+
+G1: paleta aprovada pelo titular, com ajustes de progresso, bordas e fontes.
+G2: implementação só de front/estilos/documentação. G3: check, e2e e revisão
+visual em celular. G4: titular revisa diff antes de qualquer commit/push.
+
+### Tokens e contraste
+
+Medição: luminância relativa sRGB da WCAG 2.x, `(Lmaior + 0,05) / (Lmenor + 0,05)`.
+Valores opacos, antes de qualquer transparência decorativa.
+
+| Primeiro plano / fundo | Razão | Uso |
+|---|---:|---|
+| brand / cream | 7,07:1 | títulos, foco e links |
+| brand / blush | 4,83:1 | texto normal permitido |
+| brand / brand-soft | 6,11:1 | texto normal permitido |
+| branco / brand | 7,45:1 | botão principal |
+| ink / cream | 14,62:1 | corpo |
+| muted / cream | 5,67:1 | texto secundário |
+| muted / brand-soft | 4,90:1 | texto secundário no painel suave |
+| rose / cream | 3,24:1 | barra; nunca texto normal |
+| champagne / cream | 1,74:1 | só decoração, nunca informação |
+| line / cream | 1,70:1 | borda decorativa de card; não contorno de controle |
+| line-strong / cream | 3,25:1 | trilho de progresso e controles |
+| line-strong / branco | 3,43:1 | campos |
+| line-strong / surface-soft | 3,02:1 | controles no fundo suave |
+
+Cards têm fundo branco, borda `line` rosada (#D9B9C5) e sombra; não dependem
+só da sombra para delimitar a superfície. Em `prefers-contrast: more`, contornos
+semânticos usam `line-strong`. A leitura sob sol real continua sendo verificação
+manual; captura de tela não simula reflexo/brilho do aparelho.
+
+Sombras `shadow-sm: 0 2px 8px rgb(142 54 88 / 6%)`,
+`shadow-md: 0 8px 24px rgb(142 54 88 / 10%)` e `shadow-dock` vinho.
+Cards 20px, painéis 24px; botões/campos preservam seus raios e alvos ≥44px.
+Todos os valores novos de cor, raio, dimensão e opacidade vivem em tokens.
+
+Progresso: trilho creme delimitado por `line-strong`, preenchimento rose → brand.
+A disponibilidade continua escrita e o valor da barra também aparece por extenso
+(ex.: “12 de 20 pacotes reservados”). Leitor de tela recebe valor/nome da barra.
+Nem o número nem o estado dependem de reconhecer cor; cores forçadas mantêm
+contorno e preenchimento do sistema. O estado completo continua identificado
+pelos valores e pelos selos/textos existentes.
+
+### Motivos e aplicação
+
+`BabyMotif` usa SVG inline, tokens/currentColor, `aria-hidden`, `focusable=false`
+e `pointer-events:none`, com opacidade 0,55. Não contém texto nem informação.
+
+- Nuvem, lua e coração: cabeçalho do convite, painel da home e lateral do login.
+- Estrelas: divisores de seção do convite e mensagens de sucesso.
+- Ursinho de traço: estados vazios; sem alterar rótulos ou anúncios existentes.
+- Folhinha: rodapé, sem competir com o link de privacidade.
+
+Não há animação nos motivos; escondidos em cores forçadas. Patrick Hand fica
+restrita à saudação. O nome real do bebê não é fixado em componente algum.
+`InvitePreview` reutiliza `GuestEvent`, portanto herda a mesma apresentação.
+`/amostras` demonstra paleta, motivos, títulos SOFT, acento e progresso.
+`theme-color` acompanha o creme. Favicon e imagem OG existentes foram
+inspecionados: já usam vinho/rosé e continuam coerentes, sem nova imagem pesada.

@@ -1,3 +1,4 @@
+import { BabyMotif } from '../../components/BabyMotif'
 import { Link } from 'react-router-dom'
 import { readPublicConfig } from '../../lib/config'
 import { useAuth } from '../auth/context'
@@ -23,7 +24,8 @@ export function HomePage() {
           ? <Link to="/eventos" className="button">Ir para seus eventos</Link>
           : <Link to="/entrar" className="button">Começar a organizar</Link>}
       </div>
-      <aside className="flex flex-col justify-center gap-4 rounded-panel border border-line bg-brand-soft p-8 md:p-10">
+      <aside className="flex flex-col justify-center gap-4 rounded-panel border border-line baby-welcome p-8 md:p-10">
+        <BabyMotif />
         <h2 className="font-display text-h2 font-medium">Cada chegada merece um encontro especial.</h2>
         <p className="text-stone-700">Convidados confirmam presença e escolhem fraldas ou mimos pelo celular, sem criar conta.</p>
         <p className="border-t border-line pt-4 text-body-sm text-stone-700">{backend.status === 'ready'

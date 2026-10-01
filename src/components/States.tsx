@@ -1,3 +1,4 @@
+import { BabyMotif } from './BabyMotif'
 import { useDelayedFlag } from '../lib/useDelayedFlag'
 import type { ReactNode } from 'react'
 import { Button } from './ui/Button'
@@ -28,11 +29,11 @@ export function ErrorState({ title, message, onRetry, retryLabel = 'Tentar novam
 }
 
 export function EmptyState({ title, children }: { title: string; children?: ReactNode }) {
-  return <div className="state state-empty"><p className="font-semibold">{title}</p>{children && <div className="text-stone-600">{children}</div>}</div>
+  return <div className="state state-empty"><BabyMotif variant="bear" small /><p className="font-semibold">{title}</p>{children && <div className="text-stone-600">{children}</div>}</div>
 }
 
 export function SuccessMessage({ children }: { children: ReactNode }) {
-  return <p role="status" className="state state-success">{children}</p>
+  return <p role="status" className="state state-success"><BabyMotif variant="stars" small />{children}</p>
 }
 
 // Texto visível sem região viva: indica que a tela está sendo reconsultada e,
