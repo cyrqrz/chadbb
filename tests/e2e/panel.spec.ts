@@ -1738,6 +1738,24 @@ test.describe('eventos: excluir evento', () => {
     await expect.poll(() => mock.calls).toEqual([{ event_id: published.id, version: 5 }])
   })
 
+  test('seleção em 320 px com texto a 200%: barra e confirmação cabem e os alvos têm 44 px', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 640 })
+    const published: EventRecord = { ...event, title: 'Chá publicado', version: 4 }
+    await backend(page, none, list([published, draft]).events)
+    await page.goto('/eventos')
+    await page.addStyleTag({ content: 'html { font-size: 200% !important; }' })
+    await page.getByRole('button', { name: 'Selecionar' }).click()
+    const bar = page.getByRole('region', { name: 'Seleção de eventos' })
+    await bar.getByRole('checkbox', { name: 'Selecionar todos' }).check()
+    await bar.getByRole('button', { name: 'Excluir selecionados' }).click()
+    for (const target of [bar.getByText('Selecionar todos'), bar.getByRole('button', { name: 'Excluir selecionados' }),
+      bar.getByRole('button', { name: /^Sim, encerrar e excluir/ }), bar.getByRole('button', { name: 'Cancelar', exact: true }), page.getByRole('button', { name: 'Cancelar seleção' })]) {
+      expect((await target.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    await expectAccessible(page)
+  })
+
   test('seleção: vários eventos com um aviso e um só desfazer; publicados entram no aviso de encerrar', async ({ page }) => {
     const published: EventRecord = { ...event, title: 'Chá publicado', version: 4 }
     const mock = list([published, closed, draft])
@@ -1751,13 +1769,13 @@ test.describe('eventos: excluir evento', () => {
     await select.click()
     await expect(page.getByRole('button', { name: 'Cancelar seleção' })).toHaveAttribute('aria-pressed', 'true')
     const bar = page.getByRole('region', { name: 'Seleção de eventos' })
-    await expect(bar).toContainText('Marque os eventos que quer excluir.')
+    await expect(bar).toContainText('Nenhum selecionado')
     await expect(bar.getByRole('button', { name: 'Excluir selecionados' })).toBeDisabled()
     // Na seleção, os atalhos dão lugar à caixa de marcar (fora do link do card).
     await expect(page.getByRole('button', { name: /^Excluir evento/ })).toHaveCount(0)
     await page.getByRole('checkbox', { name: 'Selecionar Chá publicado' }).check()
     await page.getByRole('checkbox', { name: 'Selecionar Chá rascunho' }).check()
-    await expect(bar).toContainText('2 eventos selecionados')
+    await expect(bar).toContainText('2 selecionados')
     await expectAccessible(page)
     await bar.getByRole('button', { name: 'Excluir selecionados' }).click()
     const question = bar.getByText('Excluir 2 eventos?')
@@ -1777,9 +1795,12 @@ test.describe('eventos: excluir evento', () => {
     expect(mock.calls).toEqual([])
     // De novo, sem desfazer: um pedido por evento, com a versão de cada um.
     await page.getByRole('button', { name: 'Selecionar' }).click()
-    await bar.getByRole('button', { name: 'Marcar todos' }).click()
-    await expect(bar).toContainText('3 eventos selecionados')
+    const all = bar.getByRole('checkbox', { name: 'Selecionar todos' })
+    await all.check()
+    await expect(bar).toContainText('3 selecionados')
     await page.getByRole('checkbox', { name: 'Selecionar Chá publicado' }).uncheck()
+    // Parte marcada: a caixa de todos fica no estado parcial (padrão de ações em lote).
+    expect(await all.evaluate(el => (el as HTMLInputElement).indeterminate)).toBe(true)
     await bar.getByRole('button', { name: 'Excluir selecionados' }).click()
     await bar.getByRole('button', { name: 'Sim, excluir 2 eventos' }).click()
     await expire(page)

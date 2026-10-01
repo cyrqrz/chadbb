@@ -149,8 +149,8 @@ export function EventsPage() {
   const firstUse = query.data?.count === 0 && page === 0
   const form = (autoFocus: boolean) => <form onSubmit={submit} className="mt-6 space-y-4"><label className="field">Nome do evento<input autoFocus={autoFocus} maxLength={120} placeholder="Chá de bebê da família" value={title} onChange={e => setTitle(e.target.value)} /></label><p className="text-sm text-stone-600">Depois você completa os detalhes, vê a prévia e publica.</p><button className="button" disabled={create.isPending}>{create.isPending ? 'Criando…' : 'Criar evento'}</button><p className="text-sm text-stone-600">Ao criar um evento, você concorda com os <Link className="text-link" to="/privacidade#organizadores">termos de uso</Link>.</p>{create.error && <p role="alert" className="error">{errorMessage(create.error)}</p>}</form>
   return <section className="page">
-    <div className="flex flex-wrap items-center justify-between gap-6"><div><p className="eyebrow">Organize com carinho</p><h1 className="page-title">Seus eventos</h1><SlowRefresh fetching={query.isFetching} /></div>{!firstUse && <div className="flex flex-wrap gap-3">
-      {!!query.data?.events.length && <button type="button" className="secondary" aria-pressed={selecting} onClick={toggleSelecting}><CheckIcon />{selecting ? 'Cancelar seleção' : 'Selecionar'}</button>}
+    <div className="flex flex-wrap items-center justify-between gap-6"><div><p className="eyebrow">Organize com carinho</p><h1 className="page-title">Seus eventos</h1><SlowRefresh fetching={query.isFetching} /></div>{!firstUse && <div className="flow-actions page-head-actions">
+      {!!query.data?.events.length && <button type="button" className="secondary" aria-pressed={selecting} onClick={toggleSelecting}><CheckIcon />{selecting ? <>Cancelar<span className="sr-only"> seleção</span></> : 'Selecionar'}</button>}
       <button className="button" onClick={() => setCreating(!creating)}>{!creating && <PlusIcon />}{creating ? 'Fechar formulário' : 'Novo evento'}</button>
     </div>}</div>
     {creating && !firstUse && <div className="card mt-8">{form(true)}</div>}
@@ -160,8 +160,8 @@ export function EventsPage() {
         {pending && pending.key === notice.id && <UndoAction key={pending.key} subject={subject(pending.items)} settleUntil={settling} onUndo={undo} onExpire={() => void commit(pending)} />}
       </div>}
       {failure && <p role="alert" className="error mt-8">Não foi possível {failure.closing ? 'encerrar' : 'excluir'} {failure.titles.map(title => `“${title}”`).join(', ')}. {errorMessage(failure.cause)}</p>}
-      {selecting && !!query.data.events.length && <SelectionBar events={query.data.events.filter(event => selected.has(event.id) && !hidden.has(event.id))} confirming={confirmBatch} busy={closing}
-        onAll={() => setSelected(new Set(query.data.events.filter(event => !hidden.has(event.id)).map(event => event.id)))} onClear={() => { setSelected(new Set()); setConfirmBatch(false) }}
+      {selecting && !!query.data.events.length && <SelectionBar events={query.data.events.filter(event => selected.has(event.id) && !hidden.has(event.id))} total={query.data.events.filter(event => !hidden.has(event.id)).length} confirming={confirmBatch} busy={closing}
+        onAll={on => { setSelected(on ? new Set(query.data.events.filter(event => !hidden.has(event.id)).map(event => event.id)) : new Set()); setConfirmBatch(false) }}
         onDelete={() => setConfirmBatch(true)} onCancel={() => setConfirmBatch(false)}
         onConfirm={events => void remove(events.map(event => ({ event, title: event.title || 'Evento sem título' })))} />}
       {query.isError && <RefreshStatus fetching={query.isFetching} failed onRetry={() => void query.refetch()} />}
@@ -211,30 +211,32 @@ function UndoAction({ subject, settleUntil, onUndo, onExpire }: { subject: strin
   </div>
 }
 
-// Barra da seleção: quantos estão marcados, marcar todos e excluir. Excluir vários
-// sempre confirma; se houver publicados, o aviso diz que encerrar não tem volta.
-function SelectionBar({ events, confirming, busy, onAll, onClear, onDelete, onCancel, onConfirm }: {
-  events: EventRecord[]; confirming: boolean; busy: boolean; onAll: () => void; onClear: () => void; onDelete: () => void; onCancel: () => void; onConfirm: (events: EventRecord[]) => void
+// Barra de ações em lote (padrão do Shopify Polaris e afins): caixa “Selecionar todos”
+// (marcada, parcial ou vazia), a contagem ao lado e a ação na mesma linha; no celular, a
+// ação desce para a largura toda. Excluir vários sempre confirma; se houver publicados, o
+// aviso diz que encerrar não tem volta.
+function SelectionBar({ events, total, confirming, busy, onAll, onDelete, onCancel, onConfirm }: {
+  events: EventRecord[]; total: number; confirming: boolean; busy: boolean; onAll: (on: boolean) => void; onDelete: () => void; onCancel: () => void; onConfirm: (events: EventRecord[]) => void
 }) {
   const question = useRef<HTMLParagraphElement>(null)
+  const all = useRef<HTMLInputElement>(null)
   useEffect(() => { if (confirming) question.current?.focus() }, [confirming])
-  const published = events.filter(event => event.status === 'published').length
   const count = events.length
+  const partial = count > 0 && count < total
+  useEffect(() => { if (all.current) all.current.indeterminate = partial }, [partial])
+  const published = events.filter(event => event.status === 'published').length
   const noun = count === 1 ? '1 evento' : `${count} eventos`
-  return <section aria-label="Seleção de eventos" className="card card-stack selection-bar mt-8">
-    <div className="card-shortcuts flex">
-      <p className="font-semibold" aria-live="polite">{count ? `${noun} selecionado${count === 1 ? '' : 's'}` : 'Marque os eventos que quer excluir.'}</p>
-      <div className="flex flex-wrap gap-2 sm:ms-auto">
-        <Button variant="ghost" size="sm" onClick={onAll}>Marcar todos</Button>
-        {count > 0 && <Button variant="ghost" size="sm" onClick={onClear}>Desmarcar</Button>}
-        <Button variant="danger" size="sm" disabled={!count || busy} aria-expanded={confirming} onClick={onDelete}><TrashIcon size={18} />Excluir selecionados</Button>
-      </div>
+  return <section aria-label="Seleção de eventos" className="card selection-bar mt-8">
+    <div className="selection-head">
+      <label className="choice selection-all"><input ref={all} type="checkbox" checked={count > 0 && count === total} onChange={e => onAll(e.target.checked)} />Selecionar todos</label>
+      <p className="selection-count" aria-live="polite">{count ? `${count} selecionado${count === 1 ? '' : 's'}` : 'Nenhum selecionado'}</p>
+      <Button variant="danger" size="sm" className="selection-delete" disabled={!count || busy} aria-expanded={confirming} onClick={onDelete}><TrashIcon size={18} />Excluir selecionados</Button>
     </div>
-    {confirming && count > 0 && <div className="card-disclosure">
+    {confirming && count > 0 && <div className="card-disclosure selection-confirm">
       <p ref={question} tabIndex={-1}>Excluir {noun}? Convites, respostas e reservas serão apagados.{published ? ` ${published === 1 ? '1 deles está publicado e será encerrado' : `${published} deles estão publicados e serão encerrados`}: os convites deixam de funcionar e encerrar não tem volta.` : ''} Você terá {UNDO_MS / 1000} segundos para desfazer a exclusão.</p>
-      <div className="flex flex-wrap gap-3">
-        <Button variant="danger" className="btn-danger-strong" busy={busy} onClick={() => onConfirm(events)}>{busy ? 'Encerrando…' : published ? `Sim, encerrar e excluir ${noun}` : `Sim, excluir ${noun}`}</Button>
-        <Button variant="ghost" disabled={busy} onClick={onCancel}>Cancelar</Button>
+      <div className="flow-actions">
+        <Button variant="danger" size="sm" className="btn-danger-strong" busy={busy} onClick={() => onConfirm(events)}><TrashIcon size={18} />{busy ? 'Encerrando…' : published ? `Sim, encerrar e excluir ${noun}` : `Sim, excluir ${noun}`}</Button>
+        <Button variant="ghost" size="sm" disabled={busy} onClick={onCancel}>Cancelar</Button>
       </div>
     </div>}
   </section>
@@ -281,7 +283,7 @@ function EventCard({ event, busy, onDelete, focus, onFocused, selecting, selecte
     if (!await onDelete(event, title)) { sending.current = false; cancel() }
   }
   function cancel() { setConfirming(false); trigger.current?.focus() }
-  return <article className={`card card-stack${selected ? ' card-selected' : ''}`} aria-labelledby={`${confirmId}-titulo`}>
+  return <article className={`card card-stack event-card${selected ? ' card-selected' : ''}`} aria-labelledby={`${confirmId}-titulo`}>
     <Link ref={main} className="card-stack card-main" to={`/eventos/${event.id}`}>{content}</Link>
     <div className="card-actions card-shortcuts">
       {selecting ? <label className="choice card-select"><input type="checkbox" checked={selected} onChange={e => onSelect(e.target.checked)} />Selecionar<span className="sr-only"> {title}</span></label> : <>
@@ -293,9 +295,9 @@ function EventCard({ event, busy, onDelete, focus, onFocused, selecting, selecte
         {published
           ? <p ref={question} tabIndex={-1}>Encerrar e excluir “{title}”? Os convites deixam de funcionar na hora e encerrar não tem volta. Convites, respostas e reservas serão apagados. Você terá {UNDO_MS / 1000} segundos para desfazer a exclusão; se desfizer, o evento continua, mas encerrado.</p>
           : <p ref={question} tabIndex={-1}>Excluir “{title}”? Convites, respostas e reservas deste evento serão apagados. Você terá {UNDO_MS / 1000} segundos para desfazer.</p>}
-        <div className="flex flex-wrap gap-3">
-          <Button variant="danger" className="btn-danger-strong" busy={busy} onClick={() => void remove()}>{busy ? 'Encerrando…' : published ? 'Sim, encerrar e excluir' : 'Sim, excluir'}</Button>
-          <Button variant="ghost" disabled={busy} onClick={cancel}>Cancelar</Button>
+        <div className="flow-actions">
+          <Button variant="danger" size="sm" className="btn-danger-strong" busy={busy} onClick={() => void remove()}><TrashIcon size={18} />{busy ? 'Encerrando…' : published ? 'Sim, encerrar e excluir' : 'Sim, excluir'}</Button>
+          <Button variant="ghost" size="sm" disabled={busy} onClick={cancel}>Cancelar</Button>
         </div>
       </div>}
       </>}

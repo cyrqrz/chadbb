@@ -10,7 +10,7 @@ import { failedLast, live } from '../../lib/query'
 import { useLastError } from '../../lib/useLastError'
 import { useAuth } from '../auth/context'
 import { ErrorState, LoadingState, RefreshStatus, SlowRefresh, SuccessMessage } from '../../components/States'
-import { Button, ConfirmDialog, StatusBadge } from '../../components/ui'
+import { BanIcon, Button, ConfirmDialog, StatusBadge } from '../../components/ui'
 import { EventNotFound } from './EventLayout'
 import type { EventLayoutContext } from './EventLayout'
 
@@ -143,8 +143,8 @@ function EventEditor({ server, created, refreshing, refreshFailed, retry }: { se
     {!closed && <div className="mt-10 border-t border-stone-300 pt-6">
       {dirty && <p className="mb-4 text-sm text-stone-600">{record.status === 'draft' ? 'Salve as alterações antes de ver a prévia ou publicar.' : 'Salve as alterações antes de encerrar.'}</p>}
       {record.status === 'draft' ? <div className="flow-actions"><PreviewLink id={record.id} dirty={dirty || busy} /><Button variant="advance" disabled={busy || dirty} onClick={() => void transition('published')}>Publicar evento</Button></div> :
-        confirmClose ? <div className="notice"><p>Encerrar este evento? Ele não poderá receber novas reservas nem ser reaberto.</p><div className="mt-4 flex flex-wrap gap-4"><button className="btn-danger btn-danger-strong" disabled={busy || dirty} onClick={() => void transition('closed')}>Confirmar encerramento</button><Button variant="ghost" disabled={busy} onClick={() => setConfirmClose(false)}>Continuar com evento aberto</Button></div></div> :
-          <button className="btn-danger" disabled={busy || dirty} onClick={() => setConfirmClose(true)}>Encerrar evento</button>}
+        confirmClose ? <div className="notice"><p>Encerrar este evento? Ele não poderá receber novas reservas nem ser reaberto.</p><div className="mt-4 flex flex-wrap gap-4"><button className="btn-danger btn-danger-strong" disabled={busy || dirty} onClick={() => void transition('closed')}><BanIcon size={18} />Confirmar encerramento</button><Button variant="ghost" disabled={busy} onClick={() => setConfirmClose(false)}>Continuar com evento aberto</Button></div></div> :
+          <button className="btn-danger" disabled={busy || dirty} onClick={() => setConfirmClose(true)}><BanIcon size={18} />Encerrar evento</button>}
     </div>}
     <ConfirmDialog open={confirmReload} title="Descartar as alterações locais?"
       description="A versão salva será carregada no lugar do que você digitou." confirmLabel="Descartar e recarregar" tone="danger"

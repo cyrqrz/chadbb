@@ -69,10 +69,8 @@ export function ContactForm() {
     } finally { sending.current = false; setBusy(false) }
   }
   return <form className="contact-form" onSubmit={submit} noValidate>
-    <div className="contact-form-row">
-      <Field label="Seu nome" error={errors.name}>{props => <input {...props} ref={el => { refs.current.name = el }} autoComplete="name" maxLength={120} readOnly={busy} value={form.name} onChange={e => set('name')(e.target.value)} />}</Field>
-      <Field label="E-mail para a resposta" error={errors.email}>{props => <input {...props} ref={el => { refs.current.email = el }} type="email" inputMode="email" autoComplete="email" maxLength={254} readOnly={busy} value={form.email} onChange={e => set('email')(e.target.value)} />}</Field>
-    </div>
+    <Field label="Seu nome" error={errors.name}>{props => <input {...props} ref={el => { refs.current.name = el }} autoComplete="name" maxLength={120} readOnly={busy} value={form.name} onChange={e => set('name')(e.target.value)} />}</Field>
+    <Field label="E-mail para a resposta" error={errors.email}>{props => <input {...props} ref={el => { refs.current.email = el }} type="email" inputMode="email" autoComplete="email" maxLength={254} readOnly={busy} value={form.email} onChange={e => set('email')(e.target.value)} />}</Field>
     <Field label="Assunto" error={errors.topic}>{props => <select {...props} ref={el => { refs.current.topic = el }} disabled={busy} value={form.topic} onChange={e => set('topic')(e.target.value)}>
       <option value="">Escolha um assunto</option>
       {topics.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -85,7 +83,7 @@ export function ContactForm() {
       <label>Site<input tabIndex={-1} autoComplete="off" value={website} onChange={e => setWebsite(e.target.value)} name="website" /></label>
     </div>
     <p id="contato-privacidade" className="hint">Sua mensagem vai direto para o nosso e-mail e não fica guardada no site.</p>
-    <Button type="submit" className="self-start" busy={busy} aria-describedby="contato-privacidade"><SendIcon />{busy ? 'Enviando…' : 'Enviar mensagem'}</Button>
+    <Button type="submit" className="contact-submit" busy={busy} aria-describedby="contato-privacidade"><SendIcon />{busy ? 'Enviando…' : 'Enviar mensagem'}</Button>
     {sent && <SuccessMessage>Mensagem enviada. Respondemos no e-mail que você informou.</SuccessMessage>}
     {failure && <p role="alert" className="error">{failure}</p>}
   </form>

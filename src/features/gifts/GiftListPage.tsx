@@ -286,9 +286,9 @@ function RemoveItem({ item, disabled, onRemoved }: { item: EventItem; disabled: 
       aria-label={removeLabel} title={removeLabel} onClick={() => confirming ? cancel() : setConfirming(true)}><TrashIcon /></button>
     {confirming && <div id={panelId} className="card-disclosure item-row-confirm">
       <p ref={question} tabIndex={-1}>Remover “{item.product.title}” da lista? Os convidados deixam de ver este presente.{item.product.event_id ? ' Este mimo foi criado por você e será apagado.' : ''}</p>
-      <div className="flex flex-wrap gap-3">
-        {!blocked && <Button variant="danger" busy={busy} onClick={() => void remove()}>{busy ? 'Removendo…' : 'Remover'}</Button>}
-        <Button variant="ghost" disabled={busy} onClick={cancel}>{blocked ? 'Fechar' : 'Cancelar'}</Button>
+      <div className="flow-actions">
+        {!blocked && <Button variant="danger" size="sm" className="btn-danger-strong" busy={busy} onClick={() => void remove()}><TrashIcon size={18} />{busy ? 'Removendo…' : 'Remover'}</Button>}
+        <Button variant="ghost" size="sm" disabled={busy} onClick={cancel}>{blocked ? 'Fechar' : 'Cancelar'}</Button>
       </div>
       {error && <p ref={errorText} tabIndex={-1} role="alert" className="error">{error}</p>}
     </div>}
