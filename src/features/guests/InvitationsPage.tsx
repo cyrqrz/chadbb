@@ -164,15 +164,17 @@ function GuestCard({ invitation: inv, sending, canEdit, canRevoke, onEdit, onRot
   // G5.1: cada card cuida do próprio diálogo, para o foco voltar ao botão certo.
   const [confirmAction, setConfirmAction] = useState<'rotate' | 'revoke' | null>(null)
   return <li className="card card-stack guest-card">
+    {/* Mesma anatomia do card de evento: selos de situação no topo, o nome como título
+        e o tipo do convite como descrição; abaixo do divisor, as ações. */}
     <header className="card-header">
       <div className="card-badges">
-        <StatusBadge tone="neutral">{inv.kind === 'family' ? `Família · até ${inv.capacity} pessoas` : 'Individual'}</StatusBadge>
+        <StatusBadge tone={responseTones[inv.response]} icon={responseIcons[inv.response]}>{inv.auto_declined ? 'Não poderá ir (automático)' : responseLabels[inv.response]}{inv.response === 'yes' ? ` · ${inv.attending} pessoa(s)` : ''}</StatusBadge>
+        {sending && <StatusBadge tone="brand">Vai enviar presente</StatusBadge>}
         {inv.revoked && <StatusBadge tone="danger">Acesso revogado</StatusBadge>}
       </div>
-      <h3 className="card-title">{inv.name}</h3>
+      <h3 className="card-title text-h2">{inv.name}</h3>
+      <p className="card-description">{inv.kind === 'family' ? `Família · até ${inv.capacity} pessoas` : 'Individual · 1 pessoa'}</p>
     </header>
-    <p className="card-badges"><StatusBadge tone={responseTones[inv.response]} icon={responseIcons[inv.response]}>{inv.auto_declined ? 'Não poderá ir (automático)' : responseLabels[inv.response]}{inv.response === 'yes' ? ` · ${inv.attending} pessoa(s)` : ''}</StatusBadge>
-      {sending && <StatusBadge tone="brand">Vai enviar presente</StatusBadge>}</p>
     {inv.auto_declined && <p className="hint">Não houve nova resposta após o prazo do lembrete.</p>}
     {inv.revoked && <p className="hint">O link antigo não funciona mais; as respostas e escolhas foram preservadas.</p>}
     <div className="card-actions">

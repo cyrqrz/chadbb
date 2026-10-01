@@ -1991,8 +1991,9 @@ test.describe('painel: quem não vai e mesmo assim reservou', () => {
     await backend(page, () => ({ status: 200, json: withGift }))
     await page.goto(`/eventos/${eventId}/convites`)
     await page.addStyleTag({ content: 'html { font-size: 200% !important; }' })
+    // Desde 01/10 o tipo do convite é descrição, não selo: ficam a resposta e o presente.
     const badges = card(page, 'Convidado fictício 2').locator('.card-badges .badge')
-    await expect(badges).toHaveCount(3)
+    await expect(badges).toHaveCount(2)
     for (const badge of await badges.all()) await expect(badge).toBeVisible()
     await expectAccessible(page)
   })
