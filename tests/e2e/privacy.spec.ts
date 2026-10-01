@@ -35,3 +35,20 @@ test('rodapé do site: links úteis e barra com a política de privacidade', asy
   await page.getByRole('contentinfo').getByRole('link', { name: 'Termos de uso' }).click()
   await expect(page.getByRole('heading', { name: 'Termos para organizadores' })).toBeInViewport()
 })
+
+// Celular, 01/10: clicar na política no fim da home abria a página nova ainda
+// rolada até o rodapé, e parecia que nada tinha acontecido.
+test('trocar de página pelo rodapé começa no topo da página nova', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 740 })
+  await page.goto('/')
+  const footer = page.getByRole('contentinfo')
+  await footer.scrollIntoViewIfNeeded()
+  await footer.getByRole('link', { name: 'Política de Privacidade', exact: true }).click()
+  await expect(page).toHaveURL(/\/privacidade$/)
+  await expect(page.getByRole('heading', { level: 1, name: 'Privacidade e termos' })).toBeInViewport()
+  expect(await page.evaluate(() => window.scrollY)).toBe(0)
+  // Com âncora, vai para a seção e não para o topo.
+  await page.goto('/')
+  await page.getByRole('contentinfo').getByRole('link', { name: 'Termos de uso' }).click()
+  await expect(page.getByRole('heading', { name: 'Termos para organizadores' })).toBeInViewport()
+})

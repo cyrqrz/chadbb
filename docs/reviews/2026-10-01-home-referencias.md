@@ -43,3 +43,15 @@ repaginadas e benefícios. Só front; sem mudança de dados.
 - `privacy.spec.ts`: links úteis, barra, sem redes sociais, âncoras da home e
   dos termos.
 - Suíte e2e completa: ver o commit.
+
+## Correções após publicar (01/10)
+
+- **Link de privacidade "não fazia nada" no celular:** o roteador não rolava ao
+  trocar de página, e a política abria já rolada até o rodapé (parecido com o da
+  home). Antes não aparecia porque o link abria em nova aba. Agora o `Layout` leva
+  ao topo a cada navegação nova; com âncora, a página rola até a seção; "voltar"
+  do navegador mantém a posição. Teste em `privacy.spec.ts` (falhou antes da
+  correção).
+- **Perguntas frequentes com resposta apagada:** a resposta usava o cinza
+  secundário. Agora: resposta na cor do texto (15,41:1), pergunta aberta com
+  cabeçalho rosado e divisor (8,07:1), seta num círculo que vira vinho ao abrir.
