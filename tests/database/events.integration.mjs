@@ -1392,6 +1392,167 @@ test('lista pronta de mimos: só mimos sugeridos, sem fraldas, idempotente e só
   await assert.rejects(prepare(alice), /EVENT_CLOSED/)
 })
 
+// Lote na lista (seleção e "Adicionar todos os tamanhos"): tudo ou nada, por produto ou item.
+const addItems = (event, items, user = alice) => as(user, 'select public.add_event_items($1,$2::jsonb) ids',
+  [event.id, items === undefined ? null : JSON.stringify(items)]).then(r => r.rows[0].ids)
+const removeItems = (event, items, user = alice) => as(user, 'select public.remove_event_items($1,$2::jsonb) ids',
+  [event.id, items === undefined ? null : JSON.stringify(items)]).then(r => r.rows[0].ids)
+const listedSizes = async event => Object.fromEntries((await admin.query(
+  "select diaper_size s, quantity_requested q from public.event_items where event_id=$1 and category='fralda' order by diaper_size", [event.id])).rows.map(r => [r.s, r.q]))
+const itemCount = event => count('select count(*) n from public.event_items where event_id=$1', [event.id])
+const chaProduct = async ref => (await admin.query('select * from public.products where external_reference=$1', [ref])).rows[0]
+const chaDiaper = size => chaProduct(`cha:fralda-${size.toLowerCase()}`)
+// Em sequência: o cliente admin é um só e não aceita consultas sobrepostas.
+const chaDiapers = async sizes => { const out = []; for (const size of sizes) out.push(await chaDiaper(size)); return out }
+const sorted = ids => [...ids].sort()
+const failure = promise => promise.then(() => null, error => error)
+
+test('lote: inclui fraldas e mimos escolhidos com os pacotes de cada linha, pula o que já está e só para o dono', async () => {
+  const event = await transition(await save(await create()), 'published')
+  const [p, m, g, xg] = await chaDiapers(['P', 'M', 'G', 'XG'])
+  const toalha = await chaProduct('cha:mimo-toalha-capuz'); const aspirador = await chaProduct('cha:mimo-aspirador-nasal')
+  // Formato e quantidade: recusados antes de qualquer escrita, inclusive um item ruim entre vários.
+  for (const bad of [undefined, {}, [], [5], [{ product_id: 'x', quantity: 1 }], [{ product_id: p.id, quantity: 1, extra: 1 }],
+    [{ product_id: p.id, quantity: 1 }, { product_id: p.id.toUpperCase(), quantity: 2 }], Array.from({ length: 201 }, () => ({ product_id: crypto.randomUUID(), quantity: 1 }))])
+    await assert.rejects(addItems(event, bad), /INVALID_PAYLOAD/, JSON.stringify(bad)?.slice(0, 80))
+  for (const quantity of [0, 10001, 1.5, '5', -3])
+    await assert.rejects(addItems(event, [{ product_id: m.id, quantity: 2 }, { product_id: p.id, quantity }]), /INVALID_QUANTITY/, String(quantity))
+  await assert.rejects(addItems(event, [{ product_id: p.id, quantity: 2 }], bob), /EVENT_NOT_FOUND/)
+  await assert.rejects(as(null, 'select public.add_event_items($1,$2::jsonb)', [event.id, JSON.stringify([{ product_id: p.id, quantity: 1 }])], 'anon'), /permission denied/)
+  assert.equal(await itemCount(event), 0)
+  // P já está com 9 pacotes: fica como está, sem somar nem trocar, e sai do retorno.
+  const listed = await addGift(event, p, 9)
+  const added = await addItems(event, [{ product_id: p.id, quantity: 2 }, { product_id: m.id, quantity: 3 }, { product_id: g.id, quantity: 4 },
+    { product_id: xg.id, quantity: 5 }, { product_id: toalha.id, quantity: null }, { product_id: aspirador.id }])
+  assert.deepEqual(sorted(added), sorted([m.id, g.id, xg.id, toalha.id, aspirador.id]))
+  assert.deepEqual(await listedSizes(event), { G: 4, M: 3, P: 9, XG: 5 })
+  assert.deepEqual((await admin.query('select * from public.event_items where id=$1', [listed.id])).rows[0], listed)
+  assert.equal(await count("select count(*) n from public.event_items where event_id=$1 and category='mimo' and quantity_requested is null", [event.id]), 2)
+  assert.deepEqual(await addItems(event, [{ product_id: m.id, quantity: 1 }, { product_id: toalha.id, quantity: null }]), [])
+  // Categoria continua valendo: fralda sem pacotes, mimo com limite.
+  const other = await transition(await save(await create()), 'published')
+  await assert.rejects(addItems(other, [{ product_id: toalha.id, quantity: null }, { product_id: p.id, quantity: null }]), /DIAPER_LIMIT_REQUIRED/)
+  await assert.rejects(addItems(other, [{ product_id: toalha.id, quantity: 2 }]), /TREAT_HAS_NO_LIMIT/)
+  // Dois produtos do mesmo tamanho: o segundo seria pulado sem aviso.
+  await assert.rejects(addItems(other, [{ product_id: p.id, quantity: 1 }, { product_id: (await diaper('P')).id, quantity: 1 }]), /INVALID_PAYLOAD/)
+  assert.equal(await itemCount(other), 0)
+})
+
+test('lote: item já listado ainda valida a quantidade da categoria e recusa o lote inteiro', async () => {
+  const event = await transition(await save(await create()), 'published')
+  const [p, m] = await chaDiapers(['P', 'M'])
+  const toalha = await chaProduct('cha:mimo-toalha-capuz')
+  await addGift(event, p, 9)
+  await addGift(event, toalha, null)
+  const snapshot = async () => (await admin.query('select * from public.event_items where event_id=$1 order by id', [event.id])).rows
+  const before = await snapshot()
+  for (const [invalid, expected] of [
+    [{ product_id: p.id, quantity: null }, /DIAPER_LIMIT_REQUIRED/],
+    [{ product_id: toalha.id, quantity: 2 }, /TREAT_HAS_NO_LIMIT/],
+  ]) {
+    await assert.rejects(addItems(event, [{ product_id: m.id, quantity: 3 }, invalid]), expected)
+    assert.deepEqual(await snapshot(), before, 'o item novo não entra e os existentes ficam intactos')
+  }
+})
+
+test('lote: inclusão é tudo ou nada; encerrado e expurgado recusam', async () => {
+  const event = await transition(await save(await create()), 'published')
+  const [p, m, g] = await chaDiapers(['P', 'M', 'G'])
+  // Homônimo com mimo no G derruba a chamada inteira: P e M, incluídos antes, são desfeitos.
+  await customTreat(event, 'fraldas TAMANHO g')
+  await assert.rejects(addItems(event, [{ product_id: p.id, quantity: 2 }, { product_id: m.id, quantity: 3 }, { product_id: g.id, quantity: 4 }]), /ITEM_ALREADY_EXISTS/)
+  assert.deepEqual(await listedSizes(event), {})
+  const inactive = await diaper('XG', false)
+  await assert.rejects(addItems(event, [{ product_id: p.id, quantity: 2 }, { product_id: inactive.id, quantity: 1 }]), /PRODUCT_UNAVAILABLE/)
+  assert.deepEqual(await listedSizes(event), {})
+  const closed = await transition((await as(alice, 'select * from public.events where id=$1', [event.id])).rows[0], 'closed')
+  await assert.rejects(addItems(closed, [{ product_id: p.id, quantity: 2 }]), /EVENT_CLOSED/)
+  const ended = await transition(await save(await create()), 'published')
+  await endAt(ended.id, "now()-interval '31 days'")
+  assert.equal(await purge(ended.id), 'purged')
+  await assert.rejects(addItems(ended, [{ product_id: p.id, quantity: 2 }]), /EVENT_PURGED/)
+  assert.equal(await itemCount(ended), 0)
+})
+
+test('lote: inclusão espera o bloqueio do evento e dois lotes simultâneos não duplicam', async () => {
+  const event = await transition(await save(await create()), 'published')
+  const [p, m, g] = await chaDiapers(['P', 'M', 'G'])
+  const holder = server.getPgClient(); await holder.connect()
+  const adder = await connectAs(alice)
+  try {
+    // Evento bloqueado por outra transação: o lote espera, e o tempo-limite curto comprova isso.
+    await holder.query('begin'); await holder.query('select * from public.events where id=$1 for share', [event.id])
+    await adder.query("set statement_timeout='150ms'")
+    await assert.rejects(adder.query('select public.add_event_items($1,$2::jsonb)', [event.id, JSON.stringify([{ product_id: p.id, quantity: 2 }])]), { code: '57014' })
+    await holder.query('commit')
+    assert.equal(await itemCount(event), 0)
+  } finally { await holder.query('rollback'); await Promise.all([holder.end(), adder.end()]) }
+  const results = await Promise.all([
+    addItems(event, [{ product_id: p.id, quantity: 2 }, { product_id: m.id, quantity: 3 }]),
+    addItems(event, [{ product_id: g.id, quantity: 1 }, { product_id: m.id, quantity: 3 }, { product_id: p.id, quantity: 2 }]),
+  ])
+  // Quem chega depois recebe só o que ainda faltava; cada produto entra uma única vez.
+  assert.deepEqual(sorted(results.flat()), sorted([p.id, m.id, g.id]))
+  assert.deepEqual(await listedSizes(event), { G: 1, M: 3, P: 2 })
+})
+
+test('lote: remove vários com versão por item; reserva ativa recusa tudo e diz quais', async () => {
+  const f = await familyFixture()
+  const rows = (await admin.query('select * from public.event_items where event_id=$1 order by id', [f.event.id])).rows
+  const [p, m] = ['P', 'M'].map(size => rows.find(row => row.diaper_size === size))
+  const treats = rows.filter(row => row.category === 'mimo')
+  const ref = row => ({ id: row.id, version: row.version })
+  for (const bad of [undefined, {}, [], [5], [{ id: p.id }], [{ id: p.id, version: '1' }], [{ id: p.id, version: 1, extra: 1 }], [ref(p), ref(p)]])
+    await assert.rejects(removeItems(f.event, bad), /INVALID_PAYLOAD/, JSON.stringify(bad))
+  await assert.rejects(removeItems(f.event, [ref(p)], bob), /EVENT_NOT_FOUND/)
+  await assert.rejects(as(null, 'select public.remove_event_items($1,$2::jsonb)', [f.event.id, JSON.stringify([ref(p)])], 'anon'), /permission denied/)
+  // Reserva ativa em P e no primeiro mimo: nada sai, e o detalhe traz exatamente esses itens.
+  await guestAction(f.token, 'reserve', request({ item_id: p.id, quantity: 1, version: null }))
+  await guestAction(f.token, 'reserve', request({ item_id: treats[0].id, quantity: 1, version: null }))
+  const before = await itemCount(f.event)
+  const blocked = await failure(removeItems(f.event, [ref(m), ref(p), ref(treats[0]), ref(treats[1])]))
+  assert.match(blocked?.message ?? '', /ITEM_HAS_RESERVATIONS/)
+  assert.deepEqual(blocked.detail.split(',').sort(), sorted([p.id, treats[0].id]))
+  assert.equal(await itemCount(f.event), before)
+  // Versão antiga de um item recusa o lote e diz qual.
+  const edited = await updateGift(m, 7)
+  const conflict = await failure(removeItems(f.event, [ref(m), ref(treats[1])]))
+  assert.match(conflict?.message ?? '', /ITEM_VERSION_CONFLICT/)
+  assert.equal(conflict.detail, m.id)
+  assert.equal(await itemCount(f.event), before)
+  // Reserva cancelada não impede; item já removido em outra aba é pulado.
+  await guestAction(f.token, 'cancel', request({ item_id: treats[0].id, version: 1 }))
+  await as(alice, 'select public.remove_event_item($1,$2,$3)', [f.event.id, treats[2].id, treats[2].version])
+  const removed = await removeItems(f.event, [ref(edited), ref(treats[0]), ref(treats[1]), ref(treats[2])])
+  assert.deepEqual(sorted(removed), sorted([m.id, treats[0].id, treats[1].id]))
+  assert.equal(await itemCount(f.event), before - 4)
+  assert.equal(await count('select count(*) n from public.reservations where item_id=$1', [treats[0].id]), 0)
+  // Mimo próprio sai com o produto, como na remoção individual.
+  const own = await customTreat(f.event, 'Mimo próprio do lote')
+  assert.deepEqual(await removeItems(f.event, [ref(own)]), [own.id])
+  assert.equal(await count('select count(*) n from public.products where id=$1', [own.product_id]), 0)
+  const closed = await transition((await as(alice, 'select * from public.events where id=$1', [f.event.id])).rows[0], 'closed')
+  await assert.rejects(removeItems(closed, [ref(treats[3])]), /EVENT_CLOSED/)
+})
+
+test('lote: remoção e reserva simultâneas respeitam quem bloqueou primeiro, sem deadlock', async () => {
+  const f = await familyFixture()
+  const rows = (await admin.query("select * from public.event_items where event_id=$1 and category='fralda' order by id", [f.event.id])).rows
+  const diapers = () => count("select count(*) n from public.event_items where event_id=$1 and category='fralda'", [f.event.id])
+  const [removal, reservation] = await Promise.all([
+    outcome(removeItems(f.event, rows.map(row => ({ id: row.id, version: row.version })))),
+    outcome(guestAction(f.token, 'reserve', request({ item_id: rows[0].id, quantity: 1, version: null }))),
+  ])
+  // Ou a reserva entrou e nada saiu, ou o lote levou tudo e a reserva falhou.
+  if (removal.error) {
+    assert.match(removal.error.message, /ITEM_HAS_RESERVATIONS/)
+    assert.equal(await diapers(), rows.length)
+  } else {
+    assert.ok(reservation.error)
+    assert.equal(await diapers(), 0)
+  }
+})
+
 test('cota do formulário de contato: 3 por minuto por rede e 30 no total, sem afetar as cotas do convidado', async () => {
   const hit = key => admin.query('select public.check_guest_rate($1) ok', [key]).then(r => r.rows[0].ok)
   for (let i = 0; i < 3; i++) assert.equal(await hit('contact:198.51.100.7'), true)

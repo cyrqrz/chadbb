@@ -48,6 +48,34 @@ catálogo) que faltam, com as mesmas regras de dono, evento encerrado, dados exp
 e homônimos de `prepare_family_list`, e retorna o número de inclusões efetivas.
 `prepare_family_list` e `family_list_defaults` continuam no banco para scripts e testes.
 
+Inclusão e remoção em lote (pedidos do titular em 02/10): "Adicionar todos os tamanhos" na aba
+Fraldas e a seleção de várias sugestões ou de vários itens da lista. `prepare_family_list` não
+serve porque inclui também os mimos. A primeira versão do atalho, `add_diaper_sizes(p_event_id,
+p_diapers)` (migration `20261002040000`, por tamanho), existiu só no Supabase local e sai na
+`20261002050000`, trocada pela inclusão por produto abaixo: o que a tela mostra é o que entra.
+
+- `add_event_items(p_event_id uuid, p_items jsonb)`: `p_items` é uma lista de 1 a 200
+  `{"product_id": uuid, "quantity": inteiro de 1 a 10000 nas fraldas | null nos mimos}`, sem
+  repetir produto. Devolve `uuid[]` com os produtos efetivamente incluídos. **Tudo ou nada:** uma
+  transação; qualquer recusa desfaz as inclusões anteriores da mesma chamada. Validações de
+  `add_event_item` em cada produto: só o dono (`EVENT_NOT_FOUND` para alheio ou inexistente), evento
+  não encerrado (`EVENT_CLOSED`) nem expurgado (`EVENT_PURGED`), `INVALID_QUANTITY`,
+  `DIAPER_LIMIT_REQUIRED`, `TREAT_HAS_NO_LIMIT`, `PRODUCT_UNAVAILABLE` e homônimo com mimo na lista
+  (`ITEM_ALREADY_EXISTS`, recusa a chamada inteira). Lista malformada, produto repetido ou dois
+  produtos do mesmo tamanho de fralda: `INVALID_PAYLOAD`. Formato e quantidades são conferidos antes
+  de qualquer bloqueio. Produto (ou tamanho de fralda) que já está na lista é pulado sem somar nem
+  trocar a quantidade e fica fora do retorno.
+- `remove_event_items(p_event_id uuid, p_items jsonb)`: lista de 1 a 200 `{"id": uuid, "version":
+  inteiro}`, sem repetir item. Devolve `uuid[]` com os itens removidos. **Tudo ou nada**, com as
+  regras de `remove_event_item`: dono, evento não encerrado (`EVENT_CLOSED`), versão de cada item
+  (`ITEM_VERSION_CONFLICT`, com o id do item em `details`) e reserva ativa (`ITEM_HAS_RESERVATIONS`
+  recusa o lote inteiro; `details` traz os ids dos itens com reserva, separados por vírgula, para a
+  tela dizer quais). Item que não existe mais no evento (removido em outra aba) é pulado: o
+  resultado já é o pedido. Reservas canceladas e mimo próprio saem junto, como na remoção individual.
+- Ordem de bloqueio, a mesma das mudanças estruturais: evento `FOR UPDATE` → produtos `FOR SHARE`
+  ou itens `FOR UPDATE` em ordem de id → reservas. Dois lotes simultâneos não duplicam item (o
+  segundo recebe só o que ainda faltava) nem formam ciclo. `anon` não executa nenhuma das duas.
+
 Prévia do link do convite por evento (migration `20261001020000`, decisão do titular em
 01/10; correção de concorrência em `20261002000000`):
 `set_event_preview(p_event_id, p_path, p_version)` registra a arte que o navegador do dono

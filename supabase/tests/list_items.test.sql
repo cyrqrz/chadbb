@@ -43,6 +43,23 @@ select throws_ok($$ select public.add_custom_treat('10000000-0000-4000-8000-0000
 select throws_ok($$ select public.add_custom_treat('10000000-0000-4000-8000-000000000002','Invasão') $$,'42501','EVENT_NOT_FOUND','não cria mimo em evento alheio');
 select throws_ok($$ insert into public.products(title,platform,external_reference,category) values ('x','manual','x','mimo') $$,'42501','permission denied for table products','não cadastra produto direto');
 
+-- Lote: inclusão e remoção, tudo ou nada, só para o dono e com evento aberto
+select is(cardinality(public.add_event_items('10000000-0000-4000-8000-000000000001',
+  jsonb_build_array(jsonb_build_object('product_id',(select id from public.products where external_reference='cha:fralda-p'),'quantity',2),jsonb_build_object('product_id',(select id from public.products where external_reference='cha:fralda-m'),'quantity',3)))),2,'dono inclui vários de uma vez');
+select is((select array_agg(quantity_requested order by diaper_size desc) from public.event_items where event_id='10000000-0000-4000-8000-000000000001' and category='fralda'),array[2,3],'cada um com os seus pacotes');
+select is(public.add_event_items('10000000-0000-4000-8000-000000000001',
+  jsonb_build_array(jsonb_build_object('product_id',(select id from public.products where external_reference='cha:fralda-p'),'quantity',9),jsonb_build_object('product_id',(select id from public.products where external_reference='cha:fralda-g'),'quantity',1))),array[(select id from public.products where external_reference='cha:fralda-g')],'o que já está na lista é pulado');
+select is((select quantity_requested from public.event_items where event_id='10000000-0000-4000-8000-000000000001' and diaper_size='P'),2,'sem somar pacotes');
+select throws_ok($$ select public.add_event_items('10000000-0000-4000-8000-000000000001',jsonb_build_array(jsonb_build_object('product_id',(select id from public.products where external_reference='cha:fralda-p'),'quantity',0))) $$,'22023','INVALID_QUANTITY','pacotes inválidos são recusados');
+select throws_ok($$ select public.add_event_items('10000000-0000-4000-8000-000000000003',jsonb_build_array(jsonb_build_object('product_id',(select id from public.products where external_reference='cha:fralda-p'),'quantity',2))) $$,'22023','EVENT_CLOSED','evento encerrado não recebe itens');
+select throws_ok($$ select public.add_event_items('10000000-0000-4000-8000-000000000002',jsonb_build_array(jsonb_build_object('product_id',(select id from public.products where external_reference='cha:fralda-p'),'quantity',2))) $$,'42501','EVENT_NOT_FOUND','não inclui em evento alheio');
+select throws_ok($$ select public.remove_event_items('10000000-0000-4000-8000-000000000001',jsonb_build_array(
+  jsonb_build_object('id',(select id from public.event_items where event_id='10000000-0000-4000-8000-000000000001' and diaper_size='G'),'version',1),
+  jsonb_build_object('id','30000000-0000-4000-8000-000000000002','version',1))) $$,'P0001','ITEM_HAS_RESERVATIONS','reserva ativa recusa o lote inteiro');
+select is((select count(*)::integer from public.event_items where event_id='10000000-0000-4000-8000-000000000001' and diaper_size='G'),1,'nada sai quando o lote é recusado');
+select is(cardinality(public.remove_event_items('10000000-0000-4000-8000-000000000001',(select jsonb_agg(jsonb_build_object('id',id,'version',version)) from public.event_items where event_id='10000000-0000-4000-8000-000000000001' and category='fralda'))),3,'dono remove vários de uma vez');
+select throws_ok($$ select public.remove_event_items('10000000-0000-4000-8000-000000000003','[{"id":"30000000-0000-4000-8000-000000000003","version":1}]') $$,'P0001','EVENT_CLOSED','evento encerrado não perde itens em lote');
+
 -- Outro organizador não vê nem usa o mimo próprio
 select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000002',true);
 select is((select count(*)::integer from public.products where event_id is not null),0,'mimo próprio não aparece para outro organizador');
@@ -63,6 +80,8 @@ set local role anon;
 select set_config('request.jwt.claim.sub','',true);
 select throws_ok($$ select public.remove_event_item('10000000-0000-4000-8000-000000000001','30000000-0000-4000-8000-000000000002',1) $$,'42501','permission denied for function remove_event_item','visitante não remove item');
 select throws_ok($$ select public.add_custom_treat('10000000-0000-4000-8000-000000000001','x') $$,'42501','permission denied for function add_custom_treat','visitante não cria mimo');
+select throws_ok($$ select public.add_event_items('10000000-0000-4000-8000-000000000001','[]') $$,'42501','permission denied for function add_event_items','visitante não inclui em lote');
+select throws_ok($$ select public.remove_event_items('10000000-0000-4000-8000-000000000001','[]') $$,'42501','permission denied for function remove_event_items','visitante não remove em lote');
 reset role;
 select * from finish();
 rollback;
