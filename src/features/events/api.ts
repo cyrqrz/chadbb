@@ -88,17 +88,6 @@ export async function ensureEventPreview(event: EventRecord) {
   const { PREVIEW_ART_VERSION } = await import('./previewArt')
   if (!current?.includes(`/preview-${PREVIEW_ART_VERSION}-`)) await refreshEventPreview(event)
 }
-// Arte atual da prévia como arquivo, para enviar como foto no WhatsApp (aparece grande no
-// celular e no computador). Null se o evento ainda não tem arte.
-export async function previewArtFile(eventId: string) {
-  const { data, error } = await getClient().rpc('public_event_preview', { p_event_id: eventId })
-  if (error) throw error
-  const path = (data as { image_path: string | null }[])[0]?.image_path
-  if (!path) return null
-  const response = await fetch(coverUrl(path))
-  if (!response.ok) throw new Error('PREVIEW_UNAVAILABLE')
-  return new File([await response.blob()], 'convite.jpg', { type: 'image/jpeg' })
-}
 export function coverUrl(path: string) { return getClient().storage.from('event-public').getPublicUrl(path).data.publicUrl }
 export async function uploadCover(event: EventRecord, file: File) {
   const extension = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[file.type]
