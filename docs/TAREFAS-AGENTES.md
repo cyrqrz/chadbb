@@ -1,5 +1,18 @@
 # Tarefas e combinados entre agentes
 
+## Retomada em 02/10/2026 — Codex — comece por aqui
+
+O titular pediu para salvar tudo no Git e retomar em outro PC. Branch temporária:
+`retomada/2026-10-02-lista`, sobre `clone-main` (`1001935`). Leia primeiro
+[RETOMADA.md](../RETOMADA.md) e a
+[revisão da entrega](reviews/2026-10-02-retomada-lista-acessibilidade.md).
+Inclui todos os tamanhos de fralda, seleção em lote e ajustes de acessibilidade.
+Check e 114 testes de banco passaram; 68 cenários e2e validados, com dois
+repetidos após timeout inicial. Suíte completa não concluída nesta retomada.
+As duas migrations novas ainda não foram aplicadas em produção.
+As entradas abaixo são históricas e não substituem este ponto de retomada.
+
+
 ## Em andamento — 2026-10-01
 
 **Atualização (Claude, tarde de 01/10).** PR #45 aberto (topo sem rolagem animada,

@@ -1,0 +1,6 @@
+Check: aprovado (101 testes unitários, lint, TypeScript, build).
+Banco portátil: 114/114.
+E2E focados: 66/68 na rodada inicial; os 2 timeouts de carregamento passaram na repetição (1 worker, 90 s).
+Suíte completa interrompida para evitar duplicação: não concluída.
+Dry-run: apenas migrations 20261002040000 e 20261002050000; sem seeds/roles.
+Nenhuma migration aplicada em produção.
