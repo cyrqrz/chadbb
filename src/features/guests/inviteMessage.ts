@@ -15,10 +15,19 @@ export function withLink(text: string, link: string) {
 }
 
 // Compartilhar pelo menu do aparelho, sem passar o texto (com o token) por um servidor como
-// o wa.me. Sem esse menu (ou se ele falhar), copia a mensagem para colar no WhatsApp.
-export async function shareInvite(text: string): Promise<'shared' | 'copied' | 'cancelled'> {
+// o wa.me. Com a arte, vai como foto com a mensagem na legenda: foto aparece grande também no
+// WhatsApp do computador, onde a prévia do link é só miniatura. A mensagem é copiada no mesmo
+// toque, porque nem todo app mantém a legenda junto da foto. Sem menu (ou se ele falhar),
+// só copia. `share` sai sem nenhum await antes: o Safari exige o gesto do toque ainda ativo.
+export async function shareInvite(text: string, art: File | null = null): Promise<'shared-art' | 'shared' | 'copied' | 'cancelled'> {
   if (typeof navigator.share === 'function') {
-    try { await navigator.share({ text }); return 'shared' } catch (error) {
+    const withArt = art !== null && typeof navigator.canShare === 'function' && navigator.canShare({ files: [art] })
+    const copied = withArt ? navigator.clipboard?.writeText(text).catch(() => undefined) : undefined
+    try {
+      await navigator.share(withArt ? { files: [art], text } : { text })
+      await copied
+      return withArt ? 'shared-art' : 'shared'
+    } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return 'cancelled'
     }
   }

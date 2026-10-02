@@ -2245,8 +2245,15 @@ test('painel lista as fraldas do menor ao maior tamanho, mesmo vindo em ordem al
 // O nome do convidado vai no texto da mensagem; o envio usa o menu de compartilhar do
 // aparelho (nada passa por wa.me) e, sem ele, copia a mensagem para colar no WhatsApp.
 test.describe('enviar o convite pelo WhatsApp', () => {
-  async function created(page: Page) {
+  // Arte atual do evento na prévia pública; registrada depois do backend, tem prioridade.
+  const art = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0, 1, 0xff, 0xd9])
+  async function created(page: Page, withArt = false) {
     await backend(page, actions({ create: { status: 200, json: { id: 'novo', token: 'token-ficticio' } } }))
+    if (withArt) {
+      await page.route('https://e2e.supabase.co/rest/v1/rpc/public_event_preview', route => route.fulfill({ contentType: 'application/json',
+        body: JSON.stringify([{ title: 'Chá de teste', public_description: '', starts_at: null, image_path: `${userId}/${eventId}/preview-v2-arte.jpg` }]) }))
+      await page.route('https://e2e.supabase.co/storage/v1/object/public/event-public/**', route => route.fulfill({ contentType: 'image/jpeg', body: art }))
+    }
     await page.goto(`/eventos/${eventId}`)
     await page.getByRole('button', { name: 'Convidar alguém' }).click()
     const form = page.getByRole('region', { name: 'Convide alguém especial' })
@@ -2271,6 +2278,42 @@ test.describe('enviar o convite pelo WhatsApp', () => {
     await form.getByRole('button', { name: 'Fechar' }).click()
     await expect(page.getByRole('dialog')).toHaveCount(0)
     await expectAccessible(page)
+  })
+
+  // Foto aparece grande no celular e no computador; a mensagem vai na legenda e também é copiada.
+  test('celular que aceita foto: envia a arte com a mensagem na legenda', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+    await page.addInitScript(() => {
+      const shared: unknown[] = []
+      Object.defineProperty(window, '__shared', { value: shared })
+      Object.defineProperty(navigator, 'canShare', { configurable: true, value: (data: { files?: File[] }) => Boolean(data.files?.length) })
+      Object.defineProperty(navigator, 'share', { configurable: true, value: async (data: { files?: File[]; text?: string }) => {
+        shared.push({ text: data.text, files: (data.files ?? []).map(file => ({ name: file.name, type: file.type, size: file.size })) })
+      } })
+    })
+    const { form, expected } = await created(page, true)
+    await expect(form.getByRole('link', { name: 'Baixar arte' })).toHaveAttribute('download', 'convite.jpg')
+    await form.getByRole('button', { name: 'Enviar pelo WhatsApp' }).click()
+    await expect(form.getByRole('status')).toHaveText('Convite enviado com a arte. Se a mensagem não aparecer junto da foto, cole: ela já foi copiada.')
+    expect(await page.evaluate(() => (window as unknown as { __shared: unknown[] }).__shared))
+      .toEqual([{ text: expected, files: [{ name: 'convite.jpg', type: 'image/jpeg', size: art.length }] }])
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(expected)
+    await expectAccessible(page)
+  })
+
+  test('navegador que não compartilha arquivo: envia só o texto e oferece baixar a arte', async ({ page }) => {
+    await page.addInitScript(() => {
+      const shared: unknown[] = []
+      Object.defineProperty(window, '__shared', { value: shared })
+      Object.defineProperty(navigator, 'canShare', { configurable: true, value: () => false })
+      Object.defineProperty(navigator, 'share', { configurable: true, value: async (data: unknown) => { shared.push(data) } })
+    })
+    const { form, expected } = await created(page, true)
+    await expect(form.getByRole('link', { name: 'Baixar arte' })).toBeVisible()
+    await expect(form.getByText('No computador, baixe a arte, anexe no WhatsApp e cole a mensagem.', { exact: false })).toBeVisible()
+    await form.getByRole('button', { name: 'Enviar pelo WhatsApp' }).click()
+    await expect(form.getByRole('status')).toHaveText('Convite enviado pelo menu de compartilhar.')
+    expect(await page.evaluate(() => (window as unknown as { __shared: unknown[] }).__shared)).toEqual([{ text: expected }])
   })
 
   test('cancelar o menu não avisa nada nem marca como enviado', async ({ page }) => {

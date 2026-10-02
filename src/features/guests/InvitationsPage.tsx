@@ -3,7 +3,7 @@ import type { FormEvent, ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../auth/context'
-import { ensureEventPreview, getEvent, eventKeys } from '../events/api'
+import { ensureEventPreview, getEvent, eventKeys, previewArtFile } from '../events/api'
 import { invitations, responseLabels } from './api'
 import type { Dashboard, DashboardReservation, Invitation, PanelSummary } from './api'
 import { errorMessage } from '../../lib/errors'
@@ -34,6 +34,17 @@ export function InvitationsPage() {
   const [link, setLink] = useState('')
   // Mensagem sugerida para o WhatsApp, com o nome de quem recebe o link novo; o organizador pode editar.
   const [draft, setDraft] = useState('')
+  // Arte do evento carregada junto com o link novo: o toque em "Enviar" já a encontra pronta.
+  const [art, setArt] = useState<{ file: File; url: string } | null>(null)
+  useEffect(() => {
+    if (!link) return
+    let alive = true, url = ''
+    void previewArtFile(id).then(file => {
+      if (!file || !alive) return
+      url = URL.createObjectURL(file); setArt({ file, url })
+    }).catch(() => undefined)
+    return () => { alive = false; if (url) URL.revokeObjectURL(url); setArt(null) }
+  }, [link, id])
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
   const [copyFailed, setCopyFailed] = useState(false)
@@ -98,8 +109,9 @@ export function InvitationsPage() {
   function sent(text: string) { setCopyFailed(false); setCopied(true); setError(''); setFeedbackAt('create'); setNotice(text) }
   async function send() {
     try {
-      const result = await shareInvite(message)
-      if (result === 'shared') sent('Convite enviado pelo menu de compartilhar.')
+      const result = await shareInvite(message, art?.file ?? null)
+      if (result === 'shared-art') sent('Convite enviado com a arte. Se a mensagem não aparecer junto da foto, cole: ela já foi copiada.')
+      else if (result === 'shared') sent('Convite enviado pelo menu de compartilhar.')
       else if (result === 'copied') sent('Mensagem copiada. Cole no WhatsApp da pessoa.')
     } catch { setNotice(''); setCopyFailed(true) }
   }
@@ -141,7 +153,9 @@ export function InvitationsPage() {
           <p id={`${formId}-message-hint`} className="hint mt-2">Sugestão: pode editar o texto. Se o link sair da mensagem, ele volta no fim ao enviar.</p>
           {copyFailed && <p role="status" className="mt-2 font-semibold">Não foi possível copiar. Selecione a mensagem ou o link e copie manualmente.</p>}
           <div className="mt-3 flex flex-wrap gap-3"><Button onClick={() => void send()}>Enviar pelo WhatsApp</Button>
-            <Button variant="secondary" onClick={() => void navigator.clipboard.writeText(message).then(() => sent('Mensagem copiada.')).catch(() => { setNotice(''); setCopyFailed(true) })}>Copiar mensagem</Button></div></div>}
+            <Button variant="secondary" onClick={() => void navigator.clipboard.writeText(message).then(() => sent('Mensagem copiada.')).catch(() => { setNotice(''); setCopyFailed(true) })}>Copiar mensagem</Button>
+            {art && <a className="secondary" href={art.url} download="convite.jpg">Baixar arte</a>}</div>
+          {art && <p className="hint mt-2">No celular, a arte vai como foto, com a mensagem na legenda. No computador, baixe a arte, anexe no WhatsApp e cole a mensagem.</p>}</div>}
         {feedbackPlace === 'create' && feedback}
         <Button variant="ghost" size="sm" className="mt-4" disabled={busy} onClick={() => closeForm(true)}>Fechar</Button>
       </section>}
