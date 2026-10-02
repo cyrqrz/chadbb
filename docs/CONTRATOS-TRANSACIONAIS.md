@@ -70,6 +70,14 @@ Edição usa versão obrigatória, recusa evento encerrado e não altera víncul
 Contagem de comprometimento ocorre depois do bloqueio do item. Não há exclusão
 nem escrita direta de itens pelos clientes ou `service_role`.
 
+Excluir convite (migration `20261002030000`, pedido do titular em 02/10): `organizer_invitations`
+com `p_action='delete'` e `{ "id": uuid }`, só em evento publicado. Apaga respostas registradas,
+reservas (os presentes voltam a ficar disponíveis), sessões, o lembrete (cascata) e o convite;
+grava em `retention_audit` só as contagens (`invitation_erased`). Devolve `{ id, old_preview }`
+para o painel apagar a arte. Erros: `EVENT_NOT_FOUND`, `INVITATION_NOT_FOUND`, `EVENT_NOT_PUBLISHED`.
+Ordem: evento `FOR SHARE` → convite `FOR UPDATE`; o convidado que estava no convite recebe
+`GUEST_SESSION_INVALID`. Diferente de revogar, que só tira o acesso e mantém respostas e presentes.
+
 Prévia por convite (migration `20261002020000`, decisão do titular em 02/10, com aviso em
 `/privacidade`): cada convite tem `preview_id` (uuid público, não é credencial) e `preview_path`.
 O link passa a ser `/c/<evento>/<preview_id>#token`; links antigos `/c/<evento>#token` continuam

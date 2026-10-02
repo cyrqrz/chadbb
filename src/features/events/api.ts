@@ -89,6 +89,7 @@ export async function refreshInvitationPreview(event: EventRecord, invitation: {
   const { data: old, error } = await getClient().rpc('set_invitation_preview', { p_event_id: event.id, p_invitation_id: invitation.id, p_preview_id: invitation.preview_id, p_path: path })
   if (error) { await storage.remove([path]); throw error }
   if (old) await storage.remove([old as string])
+  return art
 }
 // Arte que saiu da prévia de um convite reemitido ou revogado.
 export async function removePreviewArt(path: string) { await getClient().storage.from('event-public').remove([path]) }

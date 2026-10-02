@@ -2283,6 +2283,27 @@ test.describe('convite com a arte do próprio convite', () => {
     await expectAccessible(page)
   })
 
+  // No WhatsApp do computador a prévia do link é miniatura: a imagem colada vai grande, com o link na legenda.
+  test('copiar imagem põe a arte do convite em PNG na área de transferência', async ({ page }) => {
+    await page.addInitScript(() => {
+      const written: { types: string[]; size: number }[] = []
+      Object.defineProperty(window, '__written', { value: written })
+      Object.defineProperty(navigator.clipboard, 'write', { configurable: true, value: async (items: ClipboardItem[]) => {
+        for (const item of items) written.push({ types: [...item.types], size: (await item.getType('image/png')).size })
+      } })
+    })
+    const { form, release } = await setup(page)
+    await expect(form.getByRole('button', { name: 'Copiar imagem' })).toHaveCount(0)
+    release()
+    await form.getByRole('button', { name: 'Copiar imagem' }).click()
+    await expect(form.getByRole('status')).toHaveText('Imagem copiada. No WhatsApp do computador, cole a imagem e, na legenda, cole o link do convite.')
+    const written = await page.evaluate(() => (window as unknown as { __written: { types: string[]; size: number }[] }).__written)
+    expect(written).toHaveLength(1)
+    expect(written[0].types).toEqual(['image/png'])
+    expect(written[0].size).toBeGreaterThan(10_000)
+    await expect(form.getByText('Para a imagem grande: copie a imagem, cole no WhatsApp e, na legenda, cole o link.')).toBeVisible()
+  })
+
   test('se a arte falhar, o link vale com a arte do evento e o painel avisa', async ({ page }) => {
     const { form, release } = await setup(page)
     await page.route('https://e2e.supabase.co/rest/v1/rpc/set_invitation_preview', route => route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ message: 'PREVIEW_CONFLICT' }) }))
@@ -2290,4 +2311,30 @@ test.describe('convite com a arte do próprio convite', () => {
     await expect(form.getByRole('status')).toHaveText('Convite pronto. A arte com o nome não ficou pronta; o link funciona com a arte do evento.')
     await expect(form.getByRole('button', { name: 'Copiar convite' })).toBeEnabled()
   })
+})
+
+test('excluir convite pede confirmação, apaga a arte e avisa acima da lista', async ({ page }) => {
+  const calls: Record<string, unknown>[] = []
+  const removed: unknown[] = []
+  await backend(page, ({ body }) => {
+    calls.push(body)
+    return body.p_action === 'delete' ? { status: 200, json: { id: full.invitations[2].id, old_preview: `${userId}/${eventId}/invite-antiga.jpg` } } : { status: 200, json: full }
+  })
+  await page.route('https://e2e.supabase.co/storage/v1/object/event-public', async route => {
+    removed.push(route.request().postDataJSON()); await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+  })
+  await page.goto(`/eventos/${eventId}/convites`)
+  const card = page.getByRole('listitem').filter({ hasText: 'Convidado fictício 3' })
+  await card.getByRole('button', { name: 'Excluir convite' }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toContainText('Excluir o convite de Convidado fictício 3?')
+  await expect(dialog).toContainText('os presentes voltam a ficar disponíveis. Não dá para desfazer.')
+  await dialog.getByRole('button', { name: 'Cancelar' }).click()
+  expect(calls.filter(body => body.p_action === 'delete')).toHaveLength(0)
+  await confirmAnd(page, 'Convidado fictício 3', 'Excluir convite')
+  await expect(page.getByRole('region', { name: 'Convidados' }).locator('.guests-feedback').getByRole('status'))
+    .toHaveText('Convite excluído. A resposta e os presentes escolhidos por ele foram apagados.')
+  expect(calls.filter(body => body.p_action === 'delete')).toEqual([{ p_event_id: eventId, p_action: 'delete', p_payload: { id: full.invitations[2].id } }])
+  await expect.poll(() => removed).toEqual([{ prefixes: [`${userId}/${eventId}/invite-antiga.jpg`] }])
+  await expectAccessible(page)
 })

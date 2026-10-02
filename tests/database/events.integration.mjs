@@ -1494,3 +1494,36 @@ test('prévia por convite: nome só de convite válido, arte do dono e link reem
   await transition(g.event, 'closed')
   assert.equal((await as(null, 'select * from public.public_invitation_preview($1,$2)', [g.event.id, g.invite.preview_id], 'anon')).rowCount, 0)
 })
+
+test('excluir convite: apaga respostas, reservas, sessões e lembrete; presentes voltam a ficar livres', async () => {
+  const f = await familyFixture()
+  const item = f.snapshot.items.find(i => i.diaper_size === 'P')
+  await guestAction(f.token, 'rsvp', request({ response: 'maybe', attending: 0, version: 1, reminder_email: 'talvez@example.test' }))
+  await guestAction(f.token, 'reserve', request({ item_id: item.id, quantity: 2, version: null }))
+  const keep = await organizerAction(f.event, 'create', { name: 'Fica', kind: 'individual', capacity: 1 })
+  // Outro dono e id de outro evento: não encontra.
+  await assert.rejects(organizerAction(f.event, 'delete', { id: f.invite.id }, bob), /EVENT_NOT_FOUND/)
+  const other = await familyFixture()
+  await assert.rejects(organizerAction(f.event, 'delete', { id: other.invite.id }), /INVITATION_NOT_FOUND/)
+  const deleted = await organizerAction(f.event, 'delete', { id: f.invite.id })
+  assert.equal(deleted.id, f.invite.id); assert.equal(deleted.old_preview, null)
+  const left = async (sql) => Number((await admin.query(sql, [f.invite.id])).rows[0].n)
+  assert.equal(await left('select count(*) n from private.invitations where id=$1'), 0)
+  assert.equal(await left('select count(*) n from public.reservations where invitation_id=$1'), 0)
+  assert.equal(await left('select count(*) n from private.guest_requests where invitation_id=$1'), 0)
+  assert.equal(await left('select count(*) n from private.guest_sessions where invitation_id=$1'), 0)
+  assert.equal(await left('select count(*) n from private.rsvp_reminders where invitation_id=$1'), 0)
+  // O convidado perde o acesso; o painel não mostra mais o convite e o saldo volta.
+  await assert.rejects(guestAction(f.token, 'read'), /GUEST_SESSION_INVALID/)
+  await assert.rejects(guestAction(f.invite.token, 'exchange'), /GUEST_SESSION_INVALID/)
+  const panel = await organizerAction(f.event, 'list')
+  assert.deepEqual(panel.invitations.map(i => i.id), [keep.id])
+  assert.equal(panel.items.find(i => i.id === item.id).committed, 0)
+  // Auditoria só com contagens.
+  const audit = (await admin.query("select * from private.retention_audit where event_id=$1 and status='invitation_erased' order by id desc limit 1", [f.event.id])).rows[0]
+  assert.deepEqual([audit.invitations_removed, audit.reservations_removed, audit.guest_requests_removed, audit.guest_sessions_removed], [1, 1, 2, 1])
+  // Repetir não acha mais; evento encerrado não aceita exclusão.
+  await assert.rejects(organizerAction(f.event, 'delete', { id: f.invite.id }), /INVITATION_NOT_FOUND/)
+  const closed = await transition(other.event, 'closed')
+  await assert.rejects(organizerAction(closed, 'delete', { id: other.invite.id }), /EVENT_NOT_PUBLISHED/)
+})
