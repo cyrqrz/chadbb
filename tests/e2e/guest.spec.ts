@@ -466,17 +466,36 @@ test.describe('G3 · página inicial e prévia', () => {
     await expect(page.getByText('Convites estão em preparação')).toHaveCount(0)
   })
 
-  test('prévia do link com imagem, título e descrição genéricos', async ({ page, request }) => {
-    await page.goto('/')
-    const meta = (property: string) => page.locator(`meta[property="${property}"]`).getAttribute('content')
-    expect(await meta('og:title')).toBe('chadbb · Chá de bebê')
-    expect(await meta('og:description')).toContain('Confirme presença')
-    expect(await meta('og:image')).toBe('https://chadbb.pages.dev/og-image.png')
-    expect(await meta('og:locale')).toBe('pt_BR')
-    expect(await page.locator('meta[name="twitter:card"]').getAttribute('content')).toBe('summary_large_image')
-    const image = await request.get('/og-image.png')
-    expect(image.status()).toBe(200)
-    expect(image.headers()['content-type']).toBe('image/png')
+  // Fase 2: o link novo `/c/<evento>#token` abre o mesmo convite (no Pages, a função troca
+  // só a prévia; aqui o dev entrega convite.html) e o token sai da barra de endereço.
+  test('link com o id do evento abre o convite e o token some do endereço', async ({ page }) => {
+    await backend(page)
+    await page.goto(`/c/20000000-0000-4000-8000-000000000002#${token}`)
+    await expect(page.getByRole('button', { name: 'Confirmar presença' })).toBeVisible()
+    expect(new URL(page.url()).hash).toBe('')
+    expect(new URL(page.url()).pathname).toBe('/c/20000000-0000-4000-8000-000000000002')
+  })
+
+  // Fase 1 do plano do WhatsApp (01/10): a home sai com prévia de produto e só o link do
+  // convite sai com prévia de convite. O WhatsApp lê o HTML do servidor, sem rodar o app:
+  // por isso a conferência é no HTML entregue, e não na página montada.
+  for (const [path, title, description, image] of [
+    ['/', 'chadbb · Organize seu chá de bebê pelo celular', 'Convites pelo WhatsApp', 'og-site.png'],
+    ['/privacidade', 'chadbb · Organize seu chá de bebê pelo celular', 'Convites pelo WhatsApp', 'og-site.png'],
+    ['/convite', 'Você recebeu um convite para um chá de bebê', 'confirmar presença', 'og-convite.png'],
+  ] as const) test(`prévia do link em ${path}: ${image}, genérica e leve`, async ({ request }) => {
+    const html = await (await request.get(path)).text()
+    const meta = (property: string) => html.match(new RegExp(`<meta (?:property|name)="${property}" content="([^"]*)"`))?.[1]
+    expect(meta('og:title')).toBe(title)
+    expect(meta('og:description')).toContain(description)
+    expect(meta('og:image')).toBe(`https://chadbb.pages.dev/${image}`)
+    expect(meta('og:locale')).toBe('pt_BR')
+    expect(meta('twitter:card')).toBe('summary_large_image')
+    const file = await request.get(`/${image}`)
+    expect(file.status()).toBe(200)
+    expect(file.headers()['content-type']).toBe('image/png')
+    // Acima de 300 KB o WhatsApp não mostra a imagem.
+    expect((await file.body()).byteLength).toBeLessThan(300 * 1024)
   })
 
   // Pedido do titular em 2026-09-17: os três passos estavam apagados, só com

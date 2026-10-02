@@ -59,15 +59,10 @@ export async function addCustomTreat(eventId: string, title: string, description
 }
 import { DIAPER_SIZES } from '../../lib/diapers'
 export { DIAPER_SIZES }
-export type DiaperAmounts = Record<(typeof DIAPER_SIZES)[number], number>
-export async function prepareList(eventId: string, diapers?: DiaperAmounts) {
-  const { data, error } = await getClient().rpc('prepare_family_list', diapers ? { p_event_id: eventId, p_diapers: diapers } : { p_event_id: eventId })
+// Lista pronta só de mimos: as fraldas o organizador escolhe, tamanho por tamanho.
+// Devolve quantos mimos entraram (os que já estão na lista são pulados).
+export async function prepareTreatList(eventId: string) {
+  const { data, error } = await getClient().rpc('prepare_treat_list', { p_event_id: eventId })
   if (error) throw error
   return data as number
-}
-// Padrões sugeridos pelo servidor: a tela só os mostra como ponto de partida editável.
-export async function listDefaults() {
-  const { data, error } = await getClient().rpc('family_list_defaults').single()
-  if (error) throw error
-  return data as Partial<DiaperAmounts>
 }

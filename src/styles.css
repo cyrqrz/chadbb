@@ -481,6 +481,17 @@
   /* Atalhos do card de evento: em linha, editar à esquerda e excluir à direita. */
   .card-shortcuts { flex-direction: row; flex-wrap: wrap; align-items: center; }
   .card-shortcuts > .btn-danger:not(:first-child) { margin-inline-start: auto; }
+  /* Texto de apoio entre os atalhos: linha inteira e na cor do texto (o cinza secundário lia como desabilitado). */
+  .card-hint { flex-basis: 100%; color: var(--color-ink); }
+  /* Ícone dos botões com rótulo: nunca encolhe, e segue a cor do texto do botão. */
+  :is(.button, .secondary, .btn-ghost, .btn-danger) > svg { flex-shrink: 0; }
+  /* Lista dentro do card: o divisor separa o cabeçalho das linhas, como nos cards de evento. */
+  .list-card > .item-rows { border-top: 1px solid var(--divider-color); }
+  .list-card > .card-header > .refresh-status { margin-top: -4px; }
+  .card .catalog-rows > li:last-child { border-bottom: 0; }
+  /* Seleção de eventos: o card marcado ganha a borda da marca; a caixa tem área de toque de 44 px. */
+  .card-selected { border-color: var(--color-brand); box-shadow: 0 0 0 1px var(--color-brand), var(--shadow-sm); }
+  .card-select { min-height: var(--touch-min); cursor: pointer; font-weight: 650; }
   .card-disclosure { display: flex; width: 100%; flex-direction: column; gap: 12px; padding-block: 4px 12px; }
   .availability { display: flex; flex-direction: column; gap: 6px; }
   .availability-text { font-weight: 650; font-variant-numeric: tabular-nums; }
@@ -495,6 +506,32 @@
   .field .stepper input:focus { box-shadow: none; }
   .stepper .btn-icon:focus-visible { outline-offset: -3px; }
 
+  /* Barra de ações em lote: caixa de todos (.choice, como a dos cards), contagem e ação numa
+     linha; no celular a ação desce para a largura toda, como os atalhos do card estreito. */
+  .selection-bar { display: flex; flex-direction: column; gap: 0.75rem; }
+  .selection-head { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 0.75rem 1rem; }
+  .selection-count { justify-self: end; color: var(--color-ink); font-variant-numeric: tabular-nums; }
+  .selection-delete { grid-column: 1 / -1; width: 100%; }
+  /* No celular, as ações do topo e as da confirmação em lote ocupam a largura toda, em
+     colunas iguais (topo) ou uma embaixo da outra (confirmação), como no card estreito. */
+  @media (max-width: 639px) {
+    .page-head-actions { display: grid; width: 100%; grid-template-columns: repeat(auto-fit, minmax(min(9.5rem, 100%), 1fr)); }
+    .page-head-actions > *, .selection-bar .flow-actions > * { justify-content: center; }
+    .selection-bar .flow-actions > * { flex: 1 1 100%; }
+  }
+  @media (min-width: 640px) {
+    .selection-head { grid-template-columns: auto 1fr auto; }
+    .selection-count { justify-self: start; }
+    .selection-delete { grid-column: auto; width: auto; }
+  }
+  /* Card de evento estreito (celular): atalhos empilhados na largura toda, como no card de
+     convite; nenhum botão sobra sozinho à direita numa segunda linha. */
+  .event-card { container: event-card / inline-size; }
+  @container event-card (max-width: 26rem) {
+    .event-card .card-disclosure .flow-actions > * { flex: 1 1 100%; justify-content: center; }
+    .event-card .card-shortcuts { flex-direction: column; align-items: stretch; gap: 0.5rem; }
+    .event-card .card-shortcuts > :is(.secondary, .btn-danger) { width: 100%; justify-content: center; margin-inline-start: 0; padding-inline: var(--space-control-x); }
+  }
   /* Card de convidado (G2.1): ações empilham quando o card é estreito. */
   .guest-card { container: guest-card / inline-size; }
   .guest-card .card-actions { align-items: stretch; gap: 0.5rem; }
@@ -529,6 +566,13 @@
   .legal-body { display: flex; min-width: 0; flex-direction: column; gap: 3rem; }
   /* 9rem: no celular estreito o cabeçalho fixo ocupa duas linhas (~130 px). */
   .legal-section, .legal-contact { scroll-margin-top: 9rem; }
+  /* Formulário de contato: uma coluna só (GOV.UK e boas práticas de formulário no celular). */
+  .contact-form { display: flex; width: 100%; flex-direction: column; gap: 1rem; }
+  /* Enviar logo abaixo do último campo: largura toda no celular (alvo grande), natural no computador. */
+  .contact-submit { width: 100%; }
+  @media (min-width: 640px) { .contact-submit { width: auto; align-self: flex-start; } }
+  /* Campo-armadilha fora da tela (e não display: none, que alguns robôs pulam). */
+  .contact-trap { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
   .legal-qa, .legal-terms { max-width: 65ch; margin-top: 1rem; }
   .legal-qa > div { display: grid; gap: 0.25rem; border-top: 1px solid var(--color-line); padding-block: 1rem; }
   .legal-qa dt { font-weight: 700; }

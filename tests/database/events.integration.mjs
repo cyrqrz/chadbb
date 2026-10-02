@@ -1348,3 +1348,65 @@ test('lista pronta ajustável: pacotes por tamanho, omitido usa o padrão, valor
   assert.deepEqual(defaults, { P: 6, M: 19, G: 19, XG: 6 })
   await assert.rejects(as(null, 'select public.family_list_defaults()', [], 'anon'), /permission denied/)
 })
+
+test('lista pronta de mimos: só mimos sugeridos, sem fraldas, idempotente e só para o dono', async () => {
+  const event = await transition(await save(await create(), alice, { date: new Date(Date.now()+30*86400000).toISOString() }), 'published')
+  const prepare = user => as(user, 'select public.prepare_treat_list($1) n', [event.id])
+  await assert.rejects(prepare(bob), /EVENT_NOT_FOUND/)
+  await assert.rejects(as(null, 'select public.prepare_treat_list($1)', [event.id], 'anon'), /permission denied/)
+  const count = sql => as(alice, `select count(*)::int n from public.event_items where event_id=$1 and ${sql}`, [event.id]).then(r => r.rows[0].n)
+  assert.equal((await prepare(alice)).rows[0].n, 23)
+  assert.equal(await count("category='mimo'"), 23)
+  assert.equal(await count("category='fralda'"), 0)
+  assert.equal((await prepare(alice)).rows[0].n, 0)
+  // Mimo removido volta; o que já está fica como está.
+  const one = (await as(alice, "select id, version from public.event_items where event_id=$1 and category='mimo' order by id limit 1", [event.id])).rows[0]
+  await as(alice, 'select public.remove_event_item($1,$2,$3)', [event.id, one.id, one.version])
+  assert.equal((await prepare(alice)).rows[0].n, 1)
+  await transition((await as(alice, 'select * from public.events where id=$1', [event.id])).rows[0], 'closed')
+  await assert.rejects(prepare(alice), /EVENT_CLOSED/)
+})
+
+test('cota do formulário de contato: 3 por minuto por rede e 30 no total, sem afetar as cotas do convidado', async () => {
+  const hit = key => admin.query('select public.check_guest_rate($1) ok', [key]).then(r => r.rows[0].ok)
+  for (let i = 0; i < 3; i++) assert.equal(await hit('contact:198.51.100.7'), true)
+  assert.equal(await hit('contact:198.51.100.7'), false)
+  assert.equal(await hit('contact:198.51.100.8'), true)
+  for (let i = 0; i < 30; i++) assert.equal(await hit('contact-global'), true)
+  assert.equal(await hit('contact-global'), false)
+  // As chaves do convidado seguem com os limites de antes.
+  for (let i = 0; i < 5; i++) assert.equal(await hit('ip:198.51.100.7'), true)
+})
+
+test('prévia pública do evento: arte do dono, leitura só de publicado e só dos campos públicos', async () => {
+  const draft = await save(await create(alice, 'Chá da prévia'), alice, { description: 'Venha celebrar', date: '2035-11-01T15:00:00Z' })
+  const art = `${alice}/${draft.id}/preview-1.jpg`
+  const other = `${alice}/${draft.id}/preview-2.jpg`
+  const register = (user, path) => as(user, 'select public.set_event_preview($1,$2) old', [draft.id, path])
+  // Só registra arte que já está na pasta do evento, no bucket público, e só o dono.
+  await assert.rejects(register(alice, art), /INVALID_PREVIEW/)
+  await as(alice, "insert into storage.objects(bucket_id,name) values ('event-public',$1),('event-public',$2)", [art, other])
+  await assert.rejects(register(bob, art), /EVENT_NOT_FOUND/)
+  await assert.rejects(register(alice, `${bob}/${draft.id}/x.jpg`), /INVALID_PREVIEW/)
+  assert.equal((await register(alice, art)).rows[0].old, null)
+  const read = (role = 'anon') => as(null, 'select * from public.public_event_preview($1)', [draft.id], role)
+  // Rascunho não aparece para ninguém de fora.
+  assert.equal((await read()).rowCount, 0)
+  const published = await transition(draft, 'published')
+  const { rows } = await read()
+  assert.deepEqual(Object.keys(rows[0]).sort(), ['image_path', 'public_description', 'starts_at', 'title'])
+  assert.equal(rows[0].title, 'Chá da prévia')
+  assert.equal(rows[0].image_path, art)
+  assert.equal(new Date(rows[0].starts_at).toISOString(), '2035-11-01T15:00:00.000Z')
+  // Trocar a arte devolve a anterior, para o front apagar o arquivo antigo.
+  assert.equal((await register(alice, other)).rows[0].old, art)
+  assert.equal((await read()).rows[0].image_path, other)
+  // Id inválido ou inexistente: vazio, sem erro.
+  assert.equal((await as(null, 'select * from public.public_event_preview($1)', ['00000000-0000-4000-8000-0000000000ff'], 'anon')).rowCount, 0)
+  await assert.rejects(as(null, 'select * from public.event_previews', [], 'anon'), /permission denied/)
+  await assert.rejects(as(alice, 'select * from public.event_previews'), /permission denied/)
+  // Encerrado sai da prévia; o registro some com o evento.
+  await transition(published, 'closed')
+  assert.equal((await read()).rowCount, 0)
+  await assert.rejects(register(alice, art), /EVENT_CLOSED/)
+})

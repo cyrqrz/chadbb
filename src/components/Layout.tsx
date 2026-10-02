@@ -41,6 +41,6 @@ export function Layout() {
     {!online && <p role="status" className="state state-warning mt-4">Sem conexão. O que está na tela continua visível, mas alterações não serão enviadas até a internet voltar.</p>}
     <main id="conteudo" className="min-w-0 flex-1"><Outlet /></main>
     </div>
-    <SiteFooter compact={pathname === '/convite'} />
+    <SiteFooter compact={pathname === '/convite' || pathname.startsWith('/c/')} />
   </div>
 }

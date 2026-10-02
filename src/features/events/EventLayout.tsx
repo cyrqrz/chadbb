@@ -7,7 +7,7 @@ import { daysUntil, inSetup, pendingSteps, statusLabels } from './model'
 import { SetupDock } from './SetupDock'
 import { live } from '../../lib/query'
 import { useAuth } from '../auth/context'
-import { BackLink, ConfirmDialog, StatusBadge } from '../../components/ui'
+import { BackLink, ConfirmDialog, EyeIcon, StatusBadge } from '../../components/ui'
 import { LoadingState } from '../../components/States'
 
 const tabs = [['', 'Painel'], ['presentes', 'Presentes'], ['dados', 'Dados do evento']] as const
@@ -55,7 +55,7 @@ export function EventLayout() {
         <h1 className="page-title break-words">{event ? event.title || 'Evento sem título' : 'Seu evento'}</h1>
         {event && <p className="text-muted">{when ?? 'Data a definir'}</p>}
       </div>
-      {event !== null && <Link className="secondary self-start" to={`/eventos/${id}/previa`} onClick={guard}>Ver como o convidado vê</Link>}
+      {event !== null && <Link className="secondary self-start" to={`/eventos/${id}/previa`} onClick={guard}><EyeIcon size={18} />Ver como o convidado vê</Link>}
     </header>
     {/* Evento inexistente: a aba mostra “Evento não encontrado”; abas e prévia não levariam a nada. */}
     {showTabs && <nav aria-label="Áreas do evento" className="event-tabs">

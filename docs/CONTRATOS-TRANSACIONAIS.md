@@ -41,6 +41,22 @@ aceita os pacotes por tamanho (`{"P":n,"M":n,"G":n,"XG":n}`, inteiros de 1 a 100
 omitido usa `private.family_list_defaults`, que passam a ser só sugestão. Chave desconhecida ou
 valor inválido devolve `INVALID_QUANTITY` antes de qualquer escrita. `family_list_defaults()`
 entrega os padrões ao front, que os mostra como ponto de partida editável por evento.
+Desde a migration `20261001000000` (decisão do titular em 01/10), a tela não oferece
+mais lista pronta de fraldas: o organizador escolhe tamanhos e pacotes pelo catálogo.
+`prepare_treat_list(p_event_id)` inclui só os mimos sugeridos (`cha:`, ativos, de
+catálogo) que faltam, com as mesmas regras de dono, evento encerrado, dados expurgados
+e homônimos de `prepare_family_list`, e retorna o número de inclusões efetivas.
+`prepare_family_list` e `family_list_defaults` continuam no banco para scripts e testes.
+
+Prévia do link do convite por evento (migration `20261001020000`, decisão do titular em
+01/10): `set_event_preview(p_event_id, p_path)` registra a arte que o navegador do dono
+já enviou para `event-public/<dono>/<evento>/` (recusa outro caminho ou arquivo
+inexistente com `INVALID_PREVIEW`; evento alheio `EVENT_NOT_FOUND`; encerrado
+`EVENT_CLOSED`; expurgado `EVENT_PURGED`) e devolve a arte anterior, que o front apaga.
+Não altera a versão do evento. `public_event_preview(p_event_id)` (anon e authenticated)
+devolve só `title`, `public_description`, `starts_at` e `image_path` de evento
+publicado e não expurgado; vazio em qualquer outro caso. A tabela `event_previews` não
+tem acesso direto pelos clientes.
 Duplicatas legadas não são apagadas nem impedem repetir o mesmo produto; novos
 homônimos são recusados. Renomeação administrativa de produtos não passa por
 esse protocolo de inclusão.

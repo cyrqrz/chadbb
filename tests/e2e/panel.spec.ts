@@ -187,7 +187,7 @@ test('sugestões do catálogo mostram só o que falta na lista', async ({ page }
     '/rest/v1/products': () => ({ status: 200, json: [g, product(2, 'M')], headers: { 'content-range': '0-1/2' } }),
   })
   await page.goto(`/eventos/${eventId}/presentes`)
-  await expect(page.getByRole('button', { name: 'Completar a lista do chá' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Incluir mimos sugeridos' })).toBeVisible()
   const catalog = page.getByRole('region', { name: 'Adicionar à lista' })
   await expect(catalog.getByRole('button', { name: 'Adicionar Fraldas tamanho M à lista' })).toBeVisible()
   // O tamanho G já está na lista: não aparece como sugestão.
@@ -265,17 +265,17 @@ test('remover item já removido em outra aba conta como removido; conflito de ve
   await expect(page.getByRole('status').filter({ hasText: '“Pomada fictícia” saiu da lista.' })).toBeFocused()
 })
 
-test('completar depois de remover diz que o item da lista pronta voltou', async ({ page }) => {
+test('incluir os sugeridos depois de remover diz que o mimo voltou', async ({ page }) => {
   const rows = [{ product_id: '81000000-0000-4000-8000-000000000001', diaper_size: 'P', category: 'fralda', quantity_requested: 6 }]
   await backend(page, () => ({ status: 200, json: full }), undefined, {
     '/rest/v1/event_items': ({ url }) => isListQuery(url) ? { status: 200, json: [], headers: { 'content-range': '*/0' } } : { status: 200, json: rows, headers: { 'content-range': '0-0/1' } },
     '/rest/v1/products': none,
-    '/rest/v1/rpc/prepare_family_list': () => ({ status: 200, json: 1 }),
+    '/rest/v1/rpc/prepare_treat_list': () => ({ status: 200, json: 1 }),
   })
   await page.goto(`/eventos/${eventId}/presentes`)
-  await expect(page.getByText('inclui de novo tudo o que falta, inclusive o que você removeu')).toBeVisible()
-  await page.getByRole('button', { name: 'Completar a lista do chá' }).click()
-  await expect(page.getByRole('status').filter({ hasText: '1 item da lista pronta voltou para a lista.' })).toBeVisible()
+  await expect(page.getByText('inclui de novo os que faltam, inclusive os que você removeu')).toBeVisible()
+  await page.getByRole('button', { name: 'Incluir mimos sugeridos' }).click()
+  await expect(page.getByRole('status').filter({ hasText: '1 mimo sugerido voltou para a lista.' })).toBeVisible()
 })
 
 test('mimo próprio: entra na lista com o selo “Criado por você” e recusa nome repetido', async ({ page }) => {
@@ -319,11 +319,11 @@ test('mimo próprio: entra na lista com o selo “Criado por você” e recusa n
   await expectAccessible(page)
 })
 
-test('lista vazia recomenda a lista pronta do chá', async ({ page }) => {
+test('lista vazia recomenda os mimos sugeridos', async ({ page }) => {
   await backend(page, () => ({ status: 200, json: full }), undefined, { '/rest/v1/event_items': none, '/rest/v1/products': none })
   await page.goto(`/eventos/${eventId}/presentes`)
-  await expect(page.getByRole('region', { name: 'Comece com a lista pronta do chá' })).toContainText('Recomendado')
-  await expect(page.getByRole('button', { name: 'Preparar lista do chá' })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Comece pelos mimos sugeridos' })).toContainText('Recomendado')
+  await expect(page.getByRole('button', { name: 'Incluir mimos sugeridos' })).toBeVisible()
   await expectAccessible(page)
 })
 
@@ -433,7 +433,7 @@ test('erro ao salvar fica na edição, não muda de lugar ao copiar e some ao ca
 
   await create.getByRole('button', { name: 'Copiar convite' }).click()
   await expect(create.getByRole('status')).toHaveText('Link copiado.')
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(`${new URL(page.url()).origin}/convite#${rotated.token}`)
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(`${new URL(page.url()).origin}/c/${eventId}#${rotated.token}`)
   await expect(page.getByRole('alert')).toHaveCount(0)
   await expect(edit.getByRole('status')).toHaveCount(0)
 
@@ -472,7 +472,8 @@ test('editar um convite com link não copiado em "Convidar alguém" pede confirm
   const create = page.getByRole('region', { name: 'Convide alguém especial' })
   await create.getByLabel('Nome da pessoa ou família').fill('Convidado fictício 9')
   await create.getByRole('button', { name: 'Criar convite' }).click()
-  await expect(create.getByLabel('Link para compartilhar')).toHaveValue(/token-ficticio/)
+  // Fase 2: o link leva o id público do evento no caminho (prévia do evento) e o token no #.
+  await expect(create.getByLabel('Link para compartilhar')).toHaveValue(new RegExp(`/c/${eventId}#token-ficticio`))
   await page.getByRole('button', { name: 'Editar convite de Convidado fictício 1' }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog).toContainText('O link deste convite não aparece de novo')
@@ -739,7 +740,7 @@ test.describe('G4b.2 · resumo da lista', () => {
   test('com itens, a lista pronta vira uma ação dentro do resumo, sem cartão próprio', async ({ page }) => {
     await summaryBackend(page)
     await page.goto(`/eventos/${eventId}/presentes`)
-    await expect(summary(page).getByRole('button', { name: 'Completar a lista do chá' })).toBeVisible()
+    await expect(summary(page).getByRole('button', { name: 'Incluir mimos sugeridos' })).toBeVisible()
     await expect(page.getByRole('region', { name: 'Lista pronta do chá' })).toHaveCount(0)
     await expect(page.getByText('Recomendado')).toHaveCount(0)
   })
@@ -747,7 +748,7 @@ test.describe('G4b.2 · resumo da lista', () => {
   test('lista vazia continua com o destaque da lista pronta e sem resumo', async ({ page }) => {
     await backend(page, () => ({ status: 200, json: full }), undefined, { '/rest/v1/event_items': none, '/rest/v1/products': none })
     await page.goto(`/eventos/${eventId}/presentes`)
-    await expect(page.getByRole('button', { name: 'Preparar lista do chá' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Incluir mimos sugeridos' })).toBeVisible()
     await expect(summary(page)).toHaveCount(0)
   })
 
@@ -769,7 +770,7 @@ test.describe('G4b.2 · resumo da lista', () => {
     await expect(summary(page).getByRole('list', { name: 'Pacotes pedidos por tamanho' })).toContainText('M 20 pacotes')
   })
 
-  // QA G4b.2: o botão "Preparar" some quando a lista passa a ter itens.
+  // QA G4b.2: o destaque dos sugeridos some quando a lista passa a ter itens.
   test('QA · preparar a lista vazia não perde o foco e anuncia o resultado', async ({ page }) => {
     let prepared = false
     const rows = [{ product_id: '81000000-0000-4000-8000-000000000001', diaper_size: 'P', category: 'fralda', quantity_requested: 6 }]
@@ -779,47 +780,37 @@ test.describe('G4b.2 · resumo da lista', () => {
         return { status: 200, json, headers: { 'content-range': json.length ? '0-0/1' : '*/0' } }
       },
       '/rest/v1/products': none,
-      '/rest/v1/rpc/prepare_family_list': () => { prepared = true; return { status: 200, json: 1 } },
+      '/rest/v1/rpc/prepare_treat_list': () => { prepared = true; return { status: 200, json: 1 } },
     })
     await page.goto(`/eventos/${eventId}/presentes`)
-    await page.getByRole('button', { name: 'Preparar lista do chá' }).click()
-    await expect(summary(page)).toContainText('Lista do chá preparada.')
+    await page.getByRole('button', { name: 'Incluir mimos sugeridos' }).click()
+    await expect(summary(page)).toContainText('1 mimo sugerido entrou na lista.')
     expect(await page.evaluate(() => document.activeElement?.tagName)).not.toBe('BODY')
   })
 
-  test('lista pronta: pacotes por tamanho vêm sugeridos, são editáveis e seguem no pedido', async ({ page }) => {
+  // 01/10: só os mimos têm lista pronta. As fraldas o organizador monta do zero,
+  // sem números sugeridos e sem consultar os padrões do servidor.
+  test('lista pronta só de mimos: sem pacotes sugeridos e o pedido leva só o evento', async ({ page }) => {
     let sent: unknown = null
+    let defaults = false
     await backend(page, () => ({ status: 200, json: full }), undefined, {
       '/rest/v1/event_items': () => ({ status: 200, json: [], headers: { 'content-range': '*/0' } }),
       '/rest/v1/products': none,
-      '/rest/v1/rpc/family_list_defaults': () => ({ status: 200, json: { P: 6, M: 19, G: 19, XG: 6 } }),
-      '/rest/v1/rpc/prepare_family_list': ({ body }) => { sent = body; return { status: 200, json: 27 } },
+      '/rest/v1/rpc/family_list_defaults': () => { defaults = true; return { status: 200, json: { P: 6, M: 19, G: 19, XG: 6 } } },
+      '/rest/v1/rpc/prepare_treat_list': ({ body }) => { sent = body; return { status: 200, json: 23 } },
     })
     await page.goto(`/eventos/${eventId}/presentes`)
-    const group = page.getByRole('group', { name: 'Pacotes por tamanho na lista pronta' })
-    await expect(group.getByRole('spinbutton', { name: 'Tamanho M' })).toHaveValue('19')
-    await group.getByRole('spinbutton', { name: 'Tamanho M' }).fill('12')
-    await group.getByRole('spinbutton', { name: 'Tamanho XG' }).fill('')
-    await expect(page.getByRole('button', { name: 'Preparar lista do chá' })).toBeDisabled()
-    await group.getByRole('spinbutton', { name: 'Tamanho XG' }).fill('4')
-    await page.getByRole('button', { name: 'Preparar lista do chá' }).click()
-    await expect.poll(() => sent).toEqual({ p_event_id: eventId, p_diapers: { P: 6, M: 12, G: 19, XG: 4 } })
-  })
-
-  test('lista pronta: se os padrões não carregam, ainda prepara com os do servidor', async ({ page }) => {
-    let sent: unknown = null
-    await backend(page, () => ({ status: 200, json: full }), undefined, {
-      '/rest/v1/event_items': () => ({ status: 200, json: [], headers: { 'content-range': '*/0' } }),
-      '/rest/v1/products': none,
-      '/rest/v1/rpc/prepare_family_list': ({ body }) => { sent = body; return { status: 200, json: 27 } },
-    })
-    await page.goto(`/eventos/${eventId}/presentes`)
+    const start = page.getByRole('region', { name: 'Comece pelos mimos sugeridos' })
+    await expect(start).toContainText('As fraldas você monta do seu jeito')
     await expect(page.getByRole('group', { name: 'Pacotes por tamanho na lista pronta' })).toHaveCount(0)
-    await page.getByRole('button', { name: 'Preparar lista do chá' }).click()
+    await expect(start.getByRole('spinbutton')).toHaveCount(0)
+    await start.getByRole('button', { name: 'Incluir mimos sugeridos' }).click()
     await expect.poll(() => sent).toEqual({ p_event_id: eventId })
+    await expect(page.getByRole('status').filter({ hasText: '23 mimos sugeridos entraram na lista.' })).toBeVisible()
+    expect(defaults).toBe(false)
   })
 
-  test('QA · enquanto confere a lista, não oferece "Completar" a quem ainda não tem itens', async ({ page }) => {
+  test('QA · enquanto confere a lista, não oferece o atalho dos sugeridos a quem ainda não tem itens', async ({ page }) => {
     await backend(page, () => ({ status: 200, json: full }), undefined, { '/rest/v1/event_items': none, '/rest/v1/products': none })
     let release = () => {}
     const held = new Promise<void>(resolve => { release = resolve })
@@ -831,9 +822,9 @@ test.describe('G4b.2 · resumo da lista', () => {
     await page.goto(`/eventos/${eventId}/presentes`)
     await expect(page.getByText('Carregando evento…')).toHaveCount(0)
     await expect(page.getByRole('heading', { name: 'Lista de presentes' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Completar a lista do chá' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Incluir mimos sugeridos' })).toHaveCount(0)
     release()
-    await expect(page.getByRole('button', { name: 'Preparar lista do chá' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Incluir mimos sugeridos' })).toBeVisible()
   })
 
   test('QA · resumo cabe em 320 px com texto a 200% e o botão tem 44 px', async ({ page }) => {
@@ -843,7 +834,7 @@ test.describe('G4b.2 · resumo da lista', () => {
     await expect(summary(page)).toContainText('M 19 pacotes')
     await page.addStyleTag({ content: 'html { font-size: 200% !important; }' })
     expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBe(0)
-    const box = await summary(page).getByRole('button', { name: 'Completar a lista do chá' }).boundingBox()
+    const box = await summary(page).getByRole('button', { name: 'Incluir mimos sugeridos' }).boundingBox()
     expect(box!.height).toBeGreaterThanOrEqual(44)
     expect(box!.x + box!.width).toBeLessThanOrEqual(320)
   })
@@ -1034,7 +1025,9 @@ test.describe('G3.1 · cards do organizador', () => {
     for (const [tab, region] of [['Fraldas', 'Fraldas na lista'], ['Mimos', 'Mimos na lista']] as const) {
       await page.getByRole('button', { name: tab, exact: true }).click()
       const section = page.getByRole('region', { name: region })
-      await expect(section.locator('.card')).toHaveCount(1)
+      // 01/10: a seção é o próprio card (cabeçalho, divisor e linhas), sem card dentro.
+      await expect(section).toHaveClass(/\bcard\b/)
+      await expect(section.locator('.card')).toHaveCount(0)
       await expect(section.locator('ul.item-rows > li')).toHaveCount(1)
       // A linha é o próprio item: nenhum card dentro da lista.
       await expect(section.locator('.item-rows .card')).toHaveCount(0)
@@ -1353,7 +1346,7 @@ test.describe('G3.1 · cards do organizador', () => {
     await expect(card.getByRole('button', { name: 'Aumentar pacotes' })).toBeDisabled()
     await expect(card.getByRole('button', { name: 'Atualizar quantidade' })).toHaveCount(0)
     await expect(page.getByRole('region', { name: 'Adicionar à lista' })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: /Lista pronta|Preparar|Completar/ })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /Lista pronta|Preparar|Completar|mimos sugeridos/ })).toHaveCount(0)
     // A regra dos mimos está no presente ("cada convidado informa quantos vai levar"):
     // num chá que já aconteceu ela contradiz o aviso de encerrado logo acima.
     await page.getByRole('button', { name: 'Mimos', exact: true }).click()
@@ -1487,15 +1480,15 @@ test.describe('eventos: excluir evento', () => {
   }
   test.beforeEach(async ({ page }) => { await page.clock.install() })
 
-  test('atalhos ficam fora do link: editar em rascunho e publicado, excluir em rascunho e encerrado', async ({ page }) => {
+  test('atalhos ficam fora do link: editar em rascunho e publicado, excluir em todos (publicado encerra e exclui)', async ({ page }) => {
     const mock = list([event, closed, draft])
     await backend(page, none, mock.events)
     await page.goto('/eventos')
     const card = (title: string) => page.getByRole('article').filter({ has: page.getByRole('heading', { name: title }) })
-    for (const [title, edit, remove] of [['Chá de teste', true, false], ['Chá encerrado', false, true], ['Chá rascunho', true, true]] as const) {
+    for (const [title, edit, remove] of [['Chá de teste', true, 'Encerrar e excluir'], ['Chá encerrado', false, 'Excluir'], ['Chá rascunho', true, 'Excluir']] as const) {
       await expect(card(title).getByRole('link', { name: new RegExp(`${title}.*Ver detalhes`) })).toHaveCount(1)
       await expect(card(title).getByRole('link', { name: `Editar dados de ${title}` })).toHaveCount(edit ? 1 : 0)
-      await expect(card(title).getByRole('button', { name: `Excluir evento ${title}` })).toHaveCount(remove ? 1 : 0)
+      await expect(card(title).getByRole('button', { name: `${remove} evento ${title}`, exact: true })).toHaveCount(1)
       await expect(card(title).locator('a button, a a')).toHaveCount(0)
     }
     await expect(card('Chá de teste').getByRole('link', { name: 'Editar dados de Chá de teste' })).toHaveAttribute('href', `/eventos/${event.id}/dados`)
@@ -1692,6 +1685,127 @@ test.describe('eventos: excluir evento', () => {
     await expire(page)
     await expect(page.getByRole('status').filter({ hasText: '“Chá encerrado” já tinha sido excluído em outra aba.' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Chá encerrado' })).toHaveCount(0)
+  })
+
+  // 01/10: publicado também sai daqui. Encerrar é imediato e sem volta (os convites
+  // param na hora); a exclusão segue o prazo de desfazer, com a versão já encerrada.
+  test('publicado: encerrar e excluir avisa, encerra na hora e desfazer devolve encerrado', async ({ page }) => {
+    const published: EventRecord = { ...event, title: 'Chá publicado', version: 4 }
+    const mock = list([published])
+    const transitions: Record<string, unknown>[] = []
+    await backend(page, none, mock.events, {
+      '/functions/v1/delete-event': mock.remove(),
+      '/rest/v1/rpc/transition_event': ({ body }) => { transitions.push(body); return { status: 200, json: { ...published, status: 'closed', version: 5 } } },
+    })
+    await page.goto('/eventos')
+    const trigger = page.getByRole('button', { name: 'Encerrar e excluir evento Chá publicado' })
+    await trigger.click()
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    const question = page.getByText('Encerrar e excluir “Chá publicado”?')
+    await expect(question).toBeFocused()
+    await expect(question).toContainText('Os convites deixam de funcionar na hora e encerrar não tem volta.')
+    await expect(question).toContainText('se desfizer, o evento continua, mas encerrado')
+    await expectAccessible(page)
+    expect(transitions).toEqual([])
+    await page.getByRole('button', { name: 'Sim, encerrar e excluir' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'excluído.' })).toHaveText('Evento “Chá publicado” excluído.')
+    expect(transitions).toEqual([{ p_event_id: published.id, p_version: 4, p_status: 'closed' }])
+    // O “Desfazer” ignora clique de ponteiro enquanto a lista se rearruma (SETTLE_MS).
+    await page.clock.runFor(700)
+    await page.getByRole('button', { name: 'Desfazer exclusão de “Chá publicado”' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'desfeita' })).toHaveText('Exclusão de “Chá publicado” desfeita. O evento continua, mas encerrado: os convites não funcionam mais.')
+    await expire(page)
+    expect(mock.calls).toEqual([])
+  })
+
+  test('publicado: sem desfazer, a exclusão vai com a versão encerrada; falha ao encerrar não exclui', async ({ page }) => {
+    const published: EventRecord = { ...event, title: 'Chá publicado', version: 4 }
+    const other: EventRecord = { ...event, id: '10000000-0000-4000-8000-000000000009', title: 'Chá que falha', version: 2 }
+    const mock = list([published, other])
+    await backend(page, none, mock.events, {
+      '/functions/v1/delete-event': mock.remove(),
+      '/rest/v1/rpc/transition_event': ({ body }) => body.p_event_id === other.id
+        ? { status: 409, json: { message: 'EVENT_VERSION_CONFLICT', code: 'P0001' } }
+        : { status: 200, json: { ...published, status: 'closed', version: 5 } },
+    })
+    await page.goto('/eventos')
+    await page.getByRole('button', { name: 'Encerrar e excluir evento Chá que falha' }).click()
+    await page.getByRole('button', { name: 'Sim, encerrar e excluir' }).click()
+    await expect(page.getByRole('alert')).toContainText('Não foi possível encerrar “Chá que falha”.')
+    await expect(page.getByRole('heading', { name: 'Chá que falha' })).toBeVisible()
+    await page.getByRole('button', { name: 'Encerrar e excluir evento Chá publicado' }).click()
+    await page.getByRole('button', { name: 'Sim, encerrar e excluir' }).click()
+    await expire(page)
+    await expect.poll(() => mock.calls).toEqual([{ event_id: published.id, version: 5 }])
+  })
+
+  test('seleção em 320 px com texto a 200%: barra e confirmação cabem e os alvos têm 44 px', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 640 })
+    const published: EventRecord = { ...event, title: 'Chá publicado', version: 4 }
+    await backend(page, none, list([published, draft]).events)
+    await page.goto('/eventos')
+    await page.addStyleTag({ content: 'html { font-size: 200% !important; }' })
+    await page.getByRole('button', { name: 'Selecionar' }).click()
+    const bar = page.getByRole('region', { name: 'Seleção de eventos' })
+    await bar.getByRole('checkbox', { name: 'Selecionar todos' }).check()
+    await bar.getByRole('button', { name: 'Excluir selecionados' }).click()
+    for (const target of [bar.getByText('Selecionar todos'), bar.getByRole('button', { name: 'Excluir selecionados' }),
+      bar.getByRole('button', { name: /^Sim, encerrar e excluir/ }), bar.getByRole('button', { name: 'Cancelar', exact: true }), page.getByRole('button', { name: 'Cancelar seleção' })]) {
+      expect((await target.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    await expectAccessible(page)
+  })
+
+  test('seleção: vários eventos com um aviso e um só desfazer; publicados entram no aviso de encerrar', async ({ page }) => {
+    const published: EventRecord = { ...event, title: 'Chá publicado', version: 4 }
+    const mock = list([published, closed, draft])
+    const transitions: Record<string, unknown>[] = []
+    await backend(page, none, mock.events, {
+      '/functions/v1/delete-event': mock.remove(),
+      '/rest/v1/rpc/transition_event': ({ body }) => { transitions.push(body); return { status: 200, json: { ...published, status: 'closed', version: 5 } } },
+    })
+    await page.goto('/eventos')
+    const select = page.getByRole('button', { name: 'Selecionar' })
+    await select.click()
+    await expect(page.getByRole('button', { name: 'Cancelar seleção' })).toHaveAttribute('aria-pressed', 'true')
+    const bar = page.getByRole('region', { name: 'Seleção de eventos' })
+    await expect(bar).toContainText('Nenhum selecionado')
+    await expect(bar.getByRole('button', { name: 'Excluir selecionados' })).toBeDisabled()
+    // Na seleção, os atalhos dão lugar à caixa de marcar (fora do link do card).
+    await expect(page.getByRole('button', { name: /^Excluir evento/ })).toHaveCount(0)
+    await page.getByRole('checkbox', { name: 'Selecionar Chá publicado' }).check()
+    await page.getByRole('checkbox', { name: 'Selecionar Chá rascunho' }).check()
+    await expect(bar).toContainText('2 selecionados')
+    await expectAccessible(page)
+    await bar.getByRole('button', { name: 'Excluir selecionados' }).click()
+    const question = bar.getByText('Excluir 2 eventos?')
+    await expect(question).toBeFocused()
+    await expect(question).toContainText('1 deles está publicado e será encerrado')
+    await bar.getByRole('button', { name: 'Sim, encerrar e excluir 2 eventos' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'excluídos.' })).toHaveText('2 eventos excluídos.')
+    await expect(page.getByRole('heading', { name: 'Chá publicado' })).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: 'Chá rascunho' })).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: 'Chá encerrado' })).toBeVisible()
+    expect(transitions).toHaveLength(1)
+    await page.clock.runFor(700)
+    await page.getByRole('button', { name: 'Desfazer exclusão de 2 eventos' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'desfeita' })).toHaveText('Exclusão de 2 eventos desfeita. Os que estavam publicados continuam, mas encerrados.')
+    await expect(page.getByRole('heading', { name: 'Chá rascunho' })).toBeVisible()
+    await expire(page)
+    expect(mock.calls).toEqual([])
+    // De novo, sem desfazer: um pedido por evento, com a versão de cada um.
+    await page.getByRole('button', { name: 'Selecionar' }).click()
+    const all = bar.getByRole('checkbox', { name: 'Selecionar todos' })
+    await all.check()
+    await expect(bar).toContainText('3 selecionados')
+    await page.getByRole('checkbox', { name: 'Selecionar Chá publicado' }).uncheck()
+    // Parte marcada: a caixa de todos fica no estado parcial (padrão de ações em lote).
+    expect(await all.evaluate(el => (el as HTMLInputElement).indeterminate)).toBe(true)
+    await bar.getByRole('button', { name: 'Excluir selecionados' }).click()
+    await bar.getByRole('button', { name: 'Sim, excluir 2 eventos' }).click()
+    await expire(page)
+    await expect.poll(() => mock.calls).toEqual([{ event_id: closed.id, version: 7 }, { event_id: draft.id, version: 3 }])
   })
 })
 
@@ -1999,8 +2113,9 @@ test.describe('painel: quem não vai e mesmo assim reservou', () => {
     await backend(page, () => ({ status: 200, json: withGift }))
     await page.goto(`/eventos/${eventId}/convites`)
     await page.addStyleTag({ content: 'html { font-size: 200% !important; }' })
+    // Desde 01/10 o tipo do convite é descrição, não selo: ficam a resposta e o presente.
     const badges = card(page, 'Convidado fictício 2').locator('.card-badges .badge')
-    await expect(badges).toHaveCount(3)
+    await expect(badges).toHaveCount(2)
     for (const badge of await badges.all()) await expect(badge).toBeVisible()
     await expectAccessible(page)
   })

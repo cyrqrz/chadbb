@@ -3,14 +3,14 @@ import type { FormEvent, ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../auth/context'
-import { getEvent, eventKeys } from '../events/api'
+import { ensureEventPreview, getEvent, eventKeys } from '../events/api'
 import { invitations, responseLabels } from './api'
 import type { Dashboard, DashboardReservation, Invitation, PanelSummary } from './api'
 import { errorMessage } from '../../lib/errors'
 import { failedLast, live } from '../../lib/query'
 import { useLastError } from '../../lib/useLastError'
 import { EmptyState, ErrorState, LoadingState, RefreshStatus, SuccessMessage } from '../../components/States'
-import { Button, ConfirmDialog, Progress, Skeleton, StatusBadge } from '../../components/ui'
+import { BanIcon, Button, ConfirmDialog, PencilIcon, PlusIcon, Progress, RefreshIcon, Skeleton, StatusBadge } from '../../components/ui'
 import type { StatusTone } from '../../components/ui'
 import { EventNotFound } from '../events/EventLayout'
 import { bySize } from '../../lib/diapers'
@@ -23,6 +23,9 @@ export function InvitationsPage() {
   const key = ['invitations', session?.user.id, id]
   const query = useQuery<Dashboard>({ queryKey: key, queryFn: () => invitations(id), ...live })
   const event = useQuery({ queryKey: [...eventKeys.detail(id), session?.user.id], queryFn: () => getEvent(id), ...live })
+  // Os links saem daqui: garante a arte da prévia de quem publicou antes dela existir.
+  const eventData = event.data
+  useEffect(() => { if (eventData) void ensureEventPreview(eventData).catch(() => undefined) }, [eventData])
   const [editing, setEditing] = useState<Invitation | null>(null)
   const [name, setName] = useState('')
   const [kind, setKind] = useState('individual')
@@ -56,7 +59,7 @@ export function InvitationsPage() {
     setBusy(true); setError(''); setNotice(''); setCopyFailed(false); setFeedbackAt(action === 'update' ? 'edit' : 'create')
     try {
       const result = await invitations(id, action, payload)
-      if (result.token) { setCopied(false); setLink(`${window.location.origin}/convite#${result.token}`); setNotice('Convite pronto. Copie o link e envie pelo WhatsApp.') }
+      if (result.token) { setCopied(false); setLink(`${window.location.origin}/c/${id}#${result.token}`); setNotice('Convite pronto. Copie o link e envie pelo WhatsApp.') }
       else if (action === 'update') { setNotice('Convite atualizado.'); setEditing(null) }
       else setNotice('Convite revogado. O acesso anterior não funciona mais; as respostas e escolhas foram preservadas.')
       if (action === 'create') { setName(''); setInviting(false) }
@@ -106,7 +109,7 @@ export function InvitationsPage() {
     <section className="mt-10" aria-labelledby="invites-title">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div><h2 id="invites-title" className="text-2xl font-semibold">Convidados</h2><p className="mt-1 text-muted">Crie um convite para cada pessoa ou família e envie o link pelo WhatsApp.</p></div>
-        {!closed && <Button id={toggleId} aria-expanded={formOpen} aria-controls={formId} disabled={!ready} onClick={() => { if (formOpen) { closeForm(); return } setEditing(null); setInviting(true) }}>Convidar alguém</Button>}
+        {!closed && <Button id={toggleId} aria-expanded={formOpen} aria-controls={formId} disabled={!ready} onClick={() => { if (formOpen) { closeForm(); return } setEditing(null); setInviting(true) }}><PlusIcon />Convidar alguém</Button>}
       </div>
       {closed ? <p className="notice mt-4">Este evento foi encerrado. Não é possível criar novos convites.</p> :
         !ready && <p className="notice mt-4">Publique o evento em “Dados do evento” para criar ou reemitir convites.</p>}
@@ -164,21 +167,23 @@ function GuestCard({ invitation: inv, sending, canEdit, canRevoke, onEdit, onRot
   // G5.1: cada card cuida do próprio diálogo, para o foco voltar ao botão certo.
   const [confirmAction, setConfirmAction] = useState<'rotate' | 'revoke' | null>(null)
   return <li className="card card-stack guest-card">
+    {/* Mesma anatomia do card de evento: selos de situação no topo, o nome como título
+        e o tipo do convite como descrição; abaixo do divisor, as ações. */}
     <header className="card-header">
       <div className="card-badges">
-        <StatusBadge tone="neutral">{inv.kind === 'family' ? `Família · até ${inv.capacity} pessoas` : 'Individual'}</StatusBadge>
+        <StatusBadge tone={responseTones[inv.response]} icon={responseIcons[inv.response]}>{inv.auto_declined ? 'Não poderá ir (automático)' : responseLabels[inv.response]}{inv.response === 'yes' ? ` · ${inv.attending} pessoa(s)` : ''}</StatusBadge>
+        {sending && <StatusBadge tone="brand">Vai enviar presente</StatusBadge>}
         {inv.revoked && <StatusBadge tone="danger">Acesso revogado</StatusBadge>}
       </div>
-      <h3 className="card-title">{inv.name}</h3>
+      <h3 className="card-title text-h2">{inv.name}</h3>
+      <p className="card-description">{inv.kind === 'family' ? `Família · até ${inv.capacity} pessoas` : 'Individual · 1 pessoa'}</p>
     </header>
-    <p className="card-badges"><StatusBadge tone={responseTones[inv.response]} icon={responseIcons[inv.response]}>{inv.auto_declined ? 'Não poderá ir (automático)' : responseLabels[inv.response]}{inv.response === 'yes' ? ` · ${inv.attending} pessoa(s)` : ''}</StatusBadge>
-      {sending && <StatusBadge tone="brand">Vai enviar presente</StatusBadge>}</p>
     {inv.auto_declined && <p className="hint">Não houve nova resposta após o prazo do lembrete.</p>}
     {inv.revoked && <p className="hint">O link antigo não funciona mais; as respostas e escolhas foram preservadas.</p>}
     <div className="card-actions">
-      <Button variant="secondary" size="sm" disabled={!canEdit} onClick={onEdit}>Editar convite<span className="sr-only"> de {inv.name}</span></Button>
-      <Button variant="ghost" size="sm" disabled={!canEdit} onClick={() => setConfirmAction('rotate')}>Reemitir link</Button>
-      {!inv.revoked && <Button variant="danger" size="sm" disabled={!canRevoke} onClick={() => setConfirmAction('revoke')}>Revogar acesso</Button>}
+      <Button variant="secondary" size="sm" disabled={!canEdit} onClick={onEdit}><PencilIcon size={18} />Editar convite<span className="sr-only"> de {inv.name}</span></Button>
+      <Button variant="ghost" size="sm" disabled={!canEdit} onClick={() => setConfirmAction('rotate')}><RefreshIcon size={18} />Reemitir link</Button>
+      {!inv.revoked && <Button variant="danger" size="sm" disabled={!canRevoke} onClick={() => setConfirmAction('revoke')}><BanIcon size={18} />Revogar acesso</Button>}
     </div>
     <ConfirmDialog open={confirmAction !== null}
       title={confirmAction === 'rotate' ? 'Gerar um novo link e invalidar o anterior?' : 'Revogar este acesso?'}

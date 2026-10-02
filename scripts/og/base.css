@@ -1,0 +1,10 @@
+@font-face { font-family: Fraunces; src: url('../../node_modules/@fontsource-variable/fraunces/files/fraunces-latin-soft-normal.woff2') format('woff2'); font-weight: 100 900; }
+@font-face { font-family: Manrope; src: url('../../node_modules/@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2') format('woff2'); font-weight: 200 800; }
+* { box-sizing: border-box; margin: 0; }
+body { width: 1200px; height: 630px; overflow: hidden; background: #fff8ef; color: #292326; font-family: Manrope, sans-serif; position: relative; }
+.brand { display: flex; align-items: center; gap: 14px; font-weight: 800; font-size: 30px; letter-spacing: -0.01em; }
+.brand i { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 14px; background: #8e3658; color: #fff; font-style: normal; font-size: 26px; }
+.brand b { color: #8e3658; }
+h1 { font-family: Fraunces; font-variation-settings: "SOFT" 100, "WONK" 0; font-weight: 650; letter-spacing: -0.02em; line-height: 1.02; }
+.motif { position: absolute; fill: none; stroke: #8e3658; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.chips { display: flex; gap: 12px; } .chips span { border-radius: 999px; background: #f6e4eb; color: #7a2c4a; padding: 10px 20px; font-weight: 750; font-size: 22px; }

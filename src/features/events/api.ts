@@ -60,6 +60,31 @@ export async function deleteEvent(event: EventRecord) {
   const data = await response.json().catch(() => null)
   if (!response.ok) throw Object.assign(new Error(data?.error ?? 'TEMPORARILY_UNAVAILABLE'), { status: response.status })
 }
+// Prévia do link do convite (fase 2): a arte é desenhada no navegador e guardada na pasta
+// do evento no bucket público, com nome aleatório (como a capa); o banco guarda qual é a
+// atual e devolve a anterior, que é apagada aqui. Falhar não atrapalha salvar/publicar:
+// sem arte, o link sai com a prévia genérica.
+export async function refreshEventPreview(event: EventRecord) {
+  if (event.status === 'closed') return
+  const { drawPreviewArt } = await import('./previewArt')
+  const art = await drawPreviewArt({ title: event.title, startsAt: event.starts_at, cover: event.cover_path ? coverUrl(event.cover_path) : null })
+  const path = `${event.owner_id}/${event.id}/preview-${crypto.randomUUID()}.jpg`
+  const storage = getClient().storage.from('event-public')
+  const upload = await storage.upload(path, art, { contentType: 'image/jpeg', upsert: false })
+  if (upload.error) throw upload.error
+  const { data: old, error } = await getClient().rpc('set_event_preview', { p_event_id: event.id, p_path: path })
+  if (error) { await storage.remove([path]); throw error }
+  if (old) await storage.remove([old as string])
+}
+// Evento publicado sem arte (ex.: publicado antes da fase 2): gera uma vez por sessão.
+const ensured = new Set<string>()
+export async function ensureEventPreview(event: EventRecord) {
+  if (event.status !== 'published' || ensured.has(event.id)) return
+  ensured.add(event.id)
+  const { data, error } = await getClient().rpc('public_event_preview', { p_event_id: event.id })
+  if (error) { ensured.delete(event.id); throw error }
+  if (!(data as { image_path: string | null }[])[0]?.image_path) await refreshEventPreview(event)
+}
 export function coverUrl(path: string) { return getClient().storage.from('event-public').getPublicUrl(path).data.publicUrl }
 export async function uploadCover(event: EventRecord, file: File) {
   const extension = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[file.type]

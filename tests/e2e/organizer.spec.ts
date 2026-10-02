@@ -14,12 +14,15 @@ async function backend(page: Page, signedIn = false) {
   // Mudança aplicada por "outra aba": o servidor muda, mas esta aba recebe VERSION_CONFLICT.
   const elsewhere = new Set<string>()
   const calls: string[] = []
+  // Arte da prévia do link (fase 2): o que foi enviado ao Storage e registrado no banco.
+  const previews: { path: string; type: string; size: number; width: number; height: number }[] = []
+  const registered: unknown[] = []
   if (signedIn) await page.addInitScript(value => localStorage.setItem('sb-e2e-auth-token', JSON.stringify(value)), session())
   await page.route('https://e2e.supabase.co/**', async route => {
     const request = route.request()
     const path = new URL(request.url()).pathname
     calls.push(path)
-    if (path.startsWith('/rest/v1/rpc/') && path !== '/rest/v1/rpc/organizer_invitations') expect(request.headers().accept).toBe('application/vnd.pgrst.object+json')
+    if (path.startsWith('/rest/v1/rpc/') && !['/rest/v1/rpc/organizer_invitations', '/rest/v1/rpc/set_event_preview', '/rest/v1/rpc/public_event_preview'].includes(path)) expect(request.headers().accept).toBe('application/vnd.pgrst.object+json')
     const body = request.headers()['content-type']?.includes('application/json') ? request.postDataJSON() ?? {} : {}
     let json: unknown = {}
     let status = 200
@@ -47,12 +50,27 @@ async function backend(page: Page, signedIn = false) {
     } else if (path === '/rest/v1/rpc/organizer_invitations') json = { rsvp: rsvpFixture, invitations: [], items: [], reservations: [],
       summary: { reminders: { pending: 0, attention: 0 }, invitations: { total: 0, answered: 0, yes: 0, no: 0, maybe: 0, pending: 0, revoked: 0 }, people_confirmed: 0 } }
     else if (['/rest/v1/event_items', '/rest/v1/products'].includes(path)) { json = []; headers['content-range'] = '*/0' }
-    else if (path.startsWith('/storage/v1/object/')) json = { Key: path.split('/object/')[1] }
+    else if (path === '/rest/v1/rpc/set_event_preview') { registered.push(body); json = null }
+    else if (path === '/rest/v1/rpc/public_event_preview') json = []
+    else if (path.startsWith('/storage/v1/object/')) {
+      const buffer = request.method() === 'POST' ? request.postDataBuffer() : null
+      // JPEG: as dimensões ficam no marcador SOF0/SOF2 (0xFFC0/0xFFC2).
+      if (buffer && /\/preview-[^/]+\.jpg$/.test(path)) {
+        // O Storage recebe um multipart: o JPEG começa no marcador SOI (FFD8FF).
+        const start = buffer.indexOf(Buffer.from([0xff, 0xd8, 0xff]))
+        const multipart = request.headers()['content-type']?.startsWith('multipart/')
+        const type = multipart ? /Content-Type: (image\/[a-z]+)/i.exec(buffer.subarray(0, start).toString('latin1'))?.[1] ?? '' : request.headers()['content-type']
+        let at = start + 2
+        while (at < buffer.length - 9 && !(buffer[at] === 0xff && (buffer[at + 1] === 0xc0 || buffer[at + 1] === 0xc2))) at += 2 + buffer.readUInt16BE(at + 2)
+        previews.push({ path: path.split('/event-public/')[1], type, size: buffer.length - start, height: buffer.readUInt16BE(at + 5), width: buffer.readUInt16BE(at + 7) })
+      }
+      json = { Key: path.split('/object/')[1] }
+    }
     else if (!['/auth/v1/otp', '/auth/v1/logout'].includes(path)) { status = 500; json = { message: 'Unexpected test request' } }
     if (elsewhere.delete(path)) { status = 400; json = { message: 'VERSION_CONFLICT', code: 'P0001' } }
     await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(json), headers })
   })
-  return { calls, conflict: () => { conflict = true }, getRecord: () => record, elsewhere: (rpc: string) => elsewhere.add(`/rest/v1/rpc/${rpc}`),
+  return { calls, previews, registered, conflict: () => { conflict = true }, getRecord: () => record, elsewhere: (rpc: string) => elsewhere.add(`/rest/v1/rpc/${rpc}`),
     seed: (fields: Partial<EventRecord>) => { record = { id: eventId, owner_id: userId, type: 'baby_shower', status: 'published', title: 'Chá de bebê da Lia',
       public_description: '', private_address: '', private_instructions: '', starts_at: '2035-09-10T17:30:00Z', ends_at: '2035-09-10T21:00:00Z', personal_data_purged_at: null,
       guests_done_at: null, gifts_done_at: null, cover_path: null, version: 1, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z', ...fields } } }
@@ -358,9 +376,30 @@ test('dados do evento separam o que é público do que é só para convidados', 
   const private_ = page.getByRole('group', { name: 'Só para convidados' })
   await expect(shared).toContainText('Visível na prévia pública')
   await expect(private_).toContainText('Privado')
-  await expect(private_).toContainText('Data, endereço e instruções só aparecem para quem abre o convite pelo link recebido.')
+  // Desde 01/10 (fase 2 da prévia), dia e horário aparecem na prévia do link; endereço e instruções não.
+  await expect(private_).toContainText('Endereço e instruções só aparecem para quem abre o convite pelo link recebido. Não entram na prévia do link, que mostra só o dia e o horário.')
+  await expect(shared).toContainText('dia e horário do evento aparecem na prévia do link')
   await expect(private_.getByLabel('Endereço privado')).toBeVisible()
   // O bloco privado se distingue do público pelo fundo, não só pelo texto.
   const background = (group: typeof shared) => group.evaluate(el => getComputedStyle(el).backgroundColor)
   expect(await background(private_)).not.toBe(await background(shared))
+})
+
+// Fase 2 do plano do WhatsApp: ao salvar, o navegador desenha a arte da prévia do link
+// (título, dia e horário, capa) e a registra; falhar nisso não atrapalha salvar.
+test('salvar gera a arte da prévia do link: JPEG 1200×630 abaixo de 300 KB, na pasta do evento', async ({ page }) => {
+  const mock = await backend(page, true)
+  mock.seed({ status: 'published' })
+  await page.goto(`/eventos/${eventId}/dados`)
+  await page.getByLabel('Nome do evento').fill('Chá da Lia')
+  await page.getByRole('button', { name: 'Salvar alterações' }).click()
+  await expect(page.getByRole('status')).toHaveText('Alterações salvas.')
+  await expect.poll(() => mock.registered.length).toBe(1)
+  const [art] = mock.previews
+  expect(art.path).toMatch(new RegExp(`^${userId}/${eventId}/preview-[0-9a-f-]{36}\\.jpg$`))
+  expect(art.type).toBe('image/jpeg')
+  expect([art.width, art.height]).toEqual([1200, 630])
+  expect(art.size).toBeLessThan(300 * 1024)
+  expect(mock.registered).toEqual([{ p_event_id: eventId, p_path: art.path }])
+  await expect(page.getByText('dia e horário do evento aparecem na prévia do link')).toBeVisible()
 })
