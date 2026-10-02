@@ -70,6 +70,12 @@ Edição usa versão obrigatória, recusa evento encerrado e não altera víncul
 Contagem de comprometimento ocorre depois do bloqueio do item. Não há exclusão
 nem escrita direta de itens pelos clientes ou `service_role`.
 
+Início do evento (migration `20261002010000`, N2 de `SEGURANCA-2026-10-02.md`): a partir
+de `starts_at`, `guest_action` recusa `rsvp`, `reserve` e `swap` com `EVENT_CLOSED`, mesmo
+com o evento `published`; `cancel`, `purchase`, `read` e replay de pedido já confirmado
+continuam. O snapshot do convidado ganha `event.started` (calculado no banco) e o
+convite trava os botões como no evento encerrado.
+
 Encerramento: evento `FOR UPDATE`; transição `published` → `closed`, sem reabertura.
 Publicação: `draft` → `published`, título não vazio e data futura. Bloqueios de
 edição/adição da lista são incompatíveis com o encerramento.

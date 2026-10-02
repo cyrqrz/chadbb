@@ -1,4 +1,5 @@
 // Guest credentials are checked by SQL; the service key stays inside this function.
+import { cleanPayload } from './payload.ts'
 const allowed = (Deno.env.get('GUEST_ALLOWED_ORIGINS') ?? 'http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:4173').split(',')
 const base = Deno.env.get('SUPABASE_URL')!
 const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -45,13 +46,15 @@ Deno.serve(async request => {
     while (true) {
       const { done, value } = await reader.read(); if (done) break
       size += value.byteLength
-      if (size > 16384) { await reader.cancel(); return reply(413, { error: 'INVALID_PAYLOAD' }) }
+      if (size > 2048) { await reader.cancel(); return reply(413, { error: 'INVALID_PAYLOAD' }) }
       text += decoder.decode(value, { stream: true })
     }
     text += decoder.decode()
     body = JSON.parse(text)
   } catch { return reply(400, { error: 'INVALID_PAYLOAD' }) }
   if (!body || typeof body.action !== 'string' || !['exchange', 'read', 'rsvp', 'reserve', 'cancel', 'purchase', 'swap'].includes(body.action)) return reply(400, { error: 'INVALID_ACTION' })
+  const payload = cleanPayload(body.action, body.payload)
+  if (!payload) return reply(400, { error: 'INVALID_PAYLOAD' })
   const token = body.action === 'exchange' ? body.token : request.headers.get('authorization')?.replace(/^Bearer /, '')
   if (typeof token !== 'string' || !/^[a-f0-9]{64}$/.test(token)) return reply(401, { error: 'GUEST_SESSION_INVALID' })
   try {
@@ -63,7 +66,7 @@ Deno.serve(async request => {
     const rateMs = Math.round(performance.now() - started)
     if (!rate.ok) return reply(503, { error: 'TEMPORARILY_UNAVAILABLE' })
     if ((rate.data as unknown) !== true) return reply(429, { error: 'RATE_LIMITED' })
-    const result = await rpc('guest_action', { p_token: token, p_action: body.action, p_payload: body.payload ?? {} })
+    const result = await rpc('guest_action', { p_token: token, p_action: body.action, p_payload: payload })
     // Só tempos e ação, sem token, IP ou dados do convite.
     console.log(JSON.stringify({ timing: 'guest', action: body.action, rate_ms: rateMs, action_ms: Math.round(performance.now() - started) - rateMs, status: result.ok ? 200 : 'error' }))
     if (result.ok) return reply(200, result.data)

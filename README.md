@@ -10,16 +10,21 @@ profissional, acessibilidade e dados confiáveis e atualizados.
 Implementado:
 
 - **Organizador:** entrada por código enviado por e-mail; criação, edição,
-  prévia, publicação e encerramento do evento; capa; etapas guiadas após
-  publicar (convidados e lista de presentes).
-- **Convites:** um link por pessoa ou família, com reemissão e revogação; painel
-  de presença com resumo vindo do banco.
+  prévia, publicação, encerramento e exclusão do evento; capa; etapas guiadas
+  após publicar (convidados e lista de presentes, com mimos próprios).
+- **Convites:** um link por pessoa ou família (`/c/<evento>#token`), com prévia
+  do evento no WhatsApp, reemissão e revogação; painel de presença com resumo
+  vindo do banco.
 - **Convidado:** confirmação de presença com prazo "Confirme até" definido pelo
   servidor; Talvez com lembrete por e-mail ([regras](docs/RSVP-LEMBRETES.md));
-  reserva de fraldas por tamanho e de mimos do catálogo.
+  reserva de fraldas por tamanho (com troca de tamanho) e de mimos, "Já comprei"
+  e cancelamento. A partir do início do evento, presença e novas reservas travam;
+  cancelar e informar compra continuam.
 - **Operação:** retenção e exclusão de dados 30 dias após o término, backups e
-  verificação de saúde; privacidade e termos em `/privacidade`
-  ([contrato do piloto](docs/CONTRATO-PILOTO.md)).
+  verificação de saúde; privacidade, termos e formulário de contato em
+  `/privacidade` ([contrato do piloto](docs/CONTRATO-PILOTO.md)).
+- **Segurança:** RLS restrita e escrita só por funções no banco; auditoria e
+  plano em [SEGURANCA-2026-10-02](docs/SEGURANCA-2026-10-02.md).
 
 Decisões de produto vigentes: [30/09/2026](docs/DECISOES-PRODUTO-2026-09-30.md).
 Ponto de retomada: [troca de máquina](docs/TROCA-DE-MAQUINA.md) e
@@ -30,7 +35,9 @@ Ponto de retomada: [troca de máquina](docs/TROCA-DE-MAQUINA.md) e
 
 Requisitos: Node 22.12+ (linha 22, `.nvmrc`), npm e Docker para o Supabase local.
 No WSL, instale Node dentro da distribuição e habilite a integração Docker
-Desktop com ela. Não misture npm do Windows com Node do Linux.
+Desktop com ela. O Docker Desktop precisa estar aberto no Windows: sem ele,
+`docker` responde que o daemon não está rodando. Não misture npm do Windows com
+Node do Linux.
 
 ```sh
 npm ci
@@ -61,6 +68,27 @@ sudo sysctl --system
 Vale para qualquer máquina nova do projeto e sobrevive ao reinício. Reservar a
 faixa não ocupa as portas: só impede que sejam distribuídas como porta de origem.
 
+### Se o upload no Storage local falhar com `42P10`
+
+Volume local criado antes de 30/09: a versão antiga do Storage criou os índices
+`idx_objects_current_version` e `idx_objects_null_version` sem `COLLATE "C"`, e o
+`IF NOT EXISTS` das migrations novas não os refaz. Depois que a migration 0072 apagou
+o índice antigo, todo upload falha (`there is no unique or exclusion constraint
+matching the ON CONFLICT specification`). Corrigido em 02/10 sem apagar dados,
+recriando os dois índices como o Storage atual define:
+
+```sh
+D() { docker exec supabase_db_chadbb psql -v ON_ERROR_STOP=1 -U supabase_admin -d postgres -tAc "$1"; }
+for spec in "idx_objects_current_version|archived_at IS NULL" "idx_objects_null_version|NOT is_versioned"; do
+  n=${spec%%|*}; w=${spec#*|}
+  D "CREATE UNIQUE INDEX CONCURRENTLY ${n}_c ON storage.objects (bucket_id, name COLLATE \"C\") WHERE $w" &&
+  D "DROP INDEX CONCURRENTLY storage.$n" && D "ALTER INDEX storage.${n}_c RENAME TO $n"
+done
+```
+
+Só no Supabase local: o Storage de produção é gerenciado pelo Supabase. Um `db:reset`
+também resolve, mas apaga os dados locais.
+
 Preencha `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY` com a URL da API e a
 **publishable key** mostradas pelo CLI (`npx supabase status`), e reinicie o Vite.
 Não use a chave `service_role`, uma secret key ou uma chave JWT legada. As duas
@@ -75,12 +103,18 @@ npm run check
 
 Reset e testes usam explicitamente `--local`; não há comandos destrutivos para
 banco remoto nos scripts. Não vincule este ambiente local à produção nem troque
-os scripts por `--linked`/`--db-url`. A migration inicial estabelece permissões;
+os scripts por `--linked`/`--db-url`. Comandos do CLI que gravam em
+`supabase/.temp/` (fora do Git) podem deixar o ref de produção ali: rode sempre
+com `--local` ou `--project-ref` explícito. Para aplicar só as migrations novas
+sem apagar a base local, use `npx supabase migration up --local`. A migration inicial estabelece permissões;
 o catálogo do chá — 4 tamanhos de fralda e os 23 mimos de [FRALDAS-E-MIMOS](docs/FRALDAS-E-MIMOS.md) — entra por migration, sem marcas, preços ou links; `seed.sql` permanece vazio e os testes criam e removem seus próprios dados fictícios.
 Nenhuma pessoa/evento real deve ser cadastrada nesta fase.
 
 A CI (GitHub Actions) roda lint, TypeScript, testes, build, PostgreSQL temporário,
 navegador e Supabase local com testes pgTAP e de API.
+
+Tamanhos máximos dos campos ficam em `src/lib/limits.ts`; `tests/limits.test.ts`
+confere que front, Edge e migrations usam os mesmos números.
 
 ## Testar sem Docker
 
@@ -188,9 +222,10 @@ uso em [foundation](docs/design/foundation.md).
 - `src/features/`: fluxos (auth, eventos, convidados, presentes, privacidade).
 - `src/components/`: interface compartilhada; `src/components/ui/`: componentes do design system.
 - `src/lib/`: configuração, Supabase e TanStack Query.
-- `supabase/migrations/`, `supabase/functions/` (`guest`, `rsvp-reminders`,
-  `retention`, `delete-event`), `supabase/tests/`: backend.
-- `functions/`: reservado para a futura prévia pública no Cloudflare Pages (ainda vazio).
+- `supabase/migrations/`, `supabase/functions/` (`guest`, `contact`,
+  `rsvp-reminders`, `retention`, `delete-event`), `supabase/tests/`: backend.
+- `functions/c/[id].ts`: Pages Function do link `/c/<evento>`, que troca as meta
+  tags do convite pela prévia pública do evento ([plano](docs/PLANO-CONVITE-WHATSAPP.md)).
 - `scripts/`: backup, saúde e modelos de e-mail.
 - `tests/`: unitários, banco PostgreSQL, API Supabase, navegador e e2e (Playwright).
 - `docs/`: decisões, contratos, planos, revisões (`docs/reviews/`) e design (`docs/design/`).
@@ -203,8 +238,10 @@ quando necessário, use um projeto Supabase separado da produção. Não reutili
 dados reais nos previews.
 
 `public/_redirects` prepara fallback das rotas SPA. `public/_headers` configura
-cabeçalhos para arquivos estáticos. A futura Pages Function deverá aplicar seus
-próprios cabeçalhos. Domínio próprio de Supabase exige revisar `connect-src`.
+CSP, HSTS e demais cabeçalhos; a Pages Function `/c/[id]` repete os cabeçalhos
+do `convite.html` que ela devolve. A CSP libera só o projeto Supabase de produção
+(`img-src`/`connect-src`): trocar de projeto ou usar domínio próprio exige
+atualizar `public/_headers` e `tests/headers.test.ts`.
 Verifique `/` e uma rota inexistente após cada deploy.
 
 ## Evidências e pendências

@@ -824,6 +824,31 @@ test('regra confirmada: cota é global por tamanho, sem teto comercial de pacote
   assert.deepEqual(Object.fromEntries(after.items.filter(i => i.category === 'fralda').map(i => [i.diaper_size, i.committed])), { G: 19, M: 19, P: 6, XG: 6 })
 })
 
+test('N2: depois do início, presença, reserva e troca travam; cancelar e informar compra continuam', async () => {
+  const f = await familyFixture(); const item = f.snapshot.items.find(i => i.diaper_size === 'P')
+  const destination = f.snapshot.items.find(i => i.diaper_size === 'M'); const other = f.snapshot.items.find(i => i.diaper_size === 'G')
+  assert.equal(f.snapshot.event.started, false)
+  const payload = request({ item_id: item.id, quantity: 2, version: null })
+  const confirmed = await guestAction(f.token, 'reserve', payload)
+  await guestAction(f.token, 'reserve', request({ item_id: other.id, quantity: 1, version: null }))
+  // Evento ainda publicado, com início um minuto atrás.
+  await admin.query("update public.events set starts_at=clock_timestamp()-interval '1 minute', ends_at=clock_timestamp()+interval '3 hours' where id=$1", [f.event.id])
+  const read = (await guestAction(f.token, 'read')).snapshot
+  assert.equal(read.event.status, 'published'); assert.equal(read.event.started, true)
+  assert.deepEqual((await guestAction(f.token, 'reserve', payload)).result, confirmed.result, 'replay confirmado continua')
+  for (const [action, body] of [
+    ['reserve', { item_id: destination.id, quantity: 1, version: null }],
+    ['reserve', { item_id: item.id, quantity: 3, version: 1 }],
+    ['swap', { from_item_id: item.id, item_id: destination.id, version: 1, destination_version: null }],
+    ['rsvp', { response: 'yes', attending: 1, version: 1 }],
+  ]) await assert.rejects(guestAction(f.token, action, request(body)), /EVENT_CLOSED/)
+  assert.equal((await guestAction(f.token, 'purchase', request({ item_id: item.id, version: 1 }))).result.status, 'purchase_declared')
+  assert.equal((await guestAction(f.token, 'cancel', request({ item_id: other.id, version: 1 }))).result.status, 'cancelled')
+  const dashboard = await organizerAction(f.event, 'list')
+  assert.equal(dashboard.invitations[0].response, 'pending')
+  assert.deepEqual(dashboard.reservations.map(r => [r.diaper_size, r.quantity, r.status]), [['P', 2, 'purchase_declared']])
+})
+
 test('M4: encerramento bloqueia novas mutações, preserva leitura e replay confirmado', async () => {
   const f = await familyFixture(); const item = f.snapshot.items.find(i => i.diaper_size === 'P')
   const destination = f.snapshot.items.find(i => i.diaper_size === 'M')
