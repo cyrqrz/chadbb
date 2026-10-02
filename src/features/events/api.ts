@@ -66,9 +66,9 @@ export async function deleteEvent(event: EventRecord) {
 // sem arte, o link sai com a prévia genérica.
 export async function refreshEventPreview(event: EventRecord) {
   if (event.status === 'closed') return
-  const { drawPreviewArt } = await import('./previewArt')
+  const { drawPreviewArt, PREVIEW_ART_VERSION } = await import('./previewArt')
   const art = await drawPreviewArt({ title: event.title, startsAt: event.starts_at, cover: event.cover_path ? coverUrl(event.cover_path) : null })
-  const path = `${event.owner_id}/${event.id}/preview-${crypto.randomUUID()}.jpg`
+  const path = `${event.owner_id}/${event.id}/preview-${PREVIEW_ART_VERSION}-${crypto.randomUUID()}.jpg`
   const storage = getClient().storage.from('event-public')
   const upload = await storage.upload(path, art, { contentType: 'image/jpeg', upsert: false })
   if (upload.error) throw upload.error
@@ -76,14 +76,17 @@ export async function refreshEventPreview(event: EventRecord) {
   if (error) { await storage.remove([path]); throw error }
   if (old) await storage.remove([old as string])
 }
-// Evento publicado sem arte (ex.: publicado antes da fase 2): gera uma vez por sessão.
+// Evento publicado sem arte (ex.: publicado antes da fase 2) ou com arte de outra versão do
+// desenho: gera uma vez por sessão.
 const ensured = new Set<string>()
 export async function ensureEventPreview(event: EventRecord) {
   if (event.status !== 'published' || ensured.has(event.id)) return
   ensured.add(event.id)
   const { data, error } = await getClient().rpc('public_event_preview', { p_event_id: event.id })
   if (error) { ensured.delete(event.id); throw error }
-  if (!(data as { image_path: string | null }[])[0]?.image_path) await refreshEventPreview(event)
+  const current = (data as { image_path: string | null }[])[0]?.image_path
+  const { PREVIEW_ART_VERSION } = await import('./previewArt')
+  if (!current?.includes(`/preview-${PREVIEW_ART_VERSION}-`)) await refreshEventPreview(event)
 }
 export function coverUrl(path: string) { return getClient().storage.from('event-public').getPublicUrl(path).data.publicUrl }
 export async function uploadCover(event: EventRecord, file: File) {
