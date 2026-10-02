@@ -70,6 +70,22 @@ Edição usa versão obrigatória, recusa evento encerrado e não altera víncul
 Contagem de comprometimento ocorre depois do bloqueio do item. Não há exclusão
 nem escrita direta de itens pelos clientes ou `service_role`.
 
+Prévia por convite (migration `20261002020000`, decisão do titular em 02/10, com aviso em
+`/privacidade`): cada convite tem `preview_id` (uuid público, não é credencial) e `preview_path`.
+O link passa a ser `/c/<evento>/<preview_id>#token`; links antigos `/c/<evento>#token` continuam
+valendo, com a prévia do evento. `organizer_invitations`: `create` devolve também `preview_id`;
+`rotate` gera `preview_id` novo e devolve `preview_id` e `old_preview`; `revoke` devolve
+`old_preview` e `preview_id` nulo. Rotate e revoke limpam `preview_path` (o painel apaga o arquivo).
+`set_invitation_preview(p_event_id, p_invitation_id, p_preview_id, p_path)` (dono, evento
+publicado) registra a arte que o navegador enviou para `event-public/<dono>/<evento>/` e devolve a
+anterior; recusa `preview_id` diferente do atual ou convite revogado com `PREVIEW_CONFLICT`, outro
+caminho ou arquivo inexistente com `INVALID_PREVIEW`, evento alheio `EVENT_NOT_FOUND`, não publicado
+`EVENT_NOT_PUBLISHED`, expurgado `EVENT_PURGED`. Ordem de bloqueio: evento `FOR SHARE` → convite
+`FOR UPDATE`, igual a `organizer_invitations`. `public_invitation_preview(p_event_id, p_preview_id)`
+(anon e authenticated) devolve `title`, `public_description`, `starts_at`, `image_path` (arte do
+convite, ou a do evento) e `guest_name`, só de convite não revogado e não expirado de evento
+publicado e não expurgado; vazio em qualquer outro caso. Pages Function `functions/c/[id]/[invite].ts`.
+
 Início do evento (migration `20261002010000`, N2 de `SEGURANCA-2026-10-02.md`): a partir
 de `starts_at`, `guest_action` recusa `rsvp`, `reserve` e `swap` com `EVENT_CLOSED`, mesmo
 com o evento `published`; `cancel`, `purchase`, `read` e replay de pedido já confirmado

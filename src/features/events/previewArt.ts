@@ -58,7 +58,8 @@ function rounded(context: CanvasRenderingContext2D, x: number, y: number, w: num
   context.beginPath(); context.roundRect(x, y, w, h, r)
 }
 
-export async function drawPreviewArt({ title, startsAt, cover }: { title: string; startsAt: string | null; cover: string | null }): Promise<Blob> {
+// `guest`: arte do convite (02/10), com "Convite para <nome>" no lugar do aviso genérico.
+export async function drawPreviewArt({ title, startsAt, cover, guest = null }: { title: string; startsAt: string | null; cover: string | null; guest?: string | null }): Promise<Blob> {
   await Promise.all([document.fonts.load(`650 64px ${display}`), document.fonts.load(`700 30px ${sans}`)]).catch(() => undefined)
   const canvas = document.createElement('canvas')
   canvas.width = W; canvas.height = H
@@ -74,12 +75,17 @@ export async function drawPreviewArt({ title, startsAt, cover }: { title: string
   // Enfeites nas laterais: só aparecem na prévia larga.
   motif(context, 70, 120, 1, [[cloud, colors.card, colors.brand], [heart, colors.blush, colors.brand]])
   motif(context, 950, 70, 0.9, [[star, null, colors.brand], [sparkles, null, colors.champagne]])
-  // Aviso de convite.
+  // Aviso de convite; no convite, para quem é, em destaque.
   context.textAlign = 'center'; context.textBaseline = 'alphabetic'
   context.fillStyle = colors.brand; context.font = `800 20px ${sans}`; context.letterSpacing = '5px'
-  context.fillText('VOCÊ RECEBEU UM CONVITE', center, 100); context.letterSpacing = '0px'
+  const name = guest?.trim() ?? ''
+  context.fillText(name ? 'CONVITE PARA' : 'VOCÊ RECEBEU UM CONVITE', center, name ? 90 : 100); context.letterSpacing = '0px'
+  if (name) {
+    context.font = `650 40px ${display}`; context.fillStyle = colors.deep
+    context.fillText(lines(context, name, SAFE.width - 70, 1)[0], center, 138)
+  }
   // Capa (recorte quadrado, como object-fit: cover) ou, sem capa, a nuvem com coração.
-  const box = { x: center - 105, y: 124, size: 210 }
+  const box = name ? { x: center - 85, y: 158, size: 170 } : { x: center - 105, y: 124, size: 210 }
   rounded(context, box.x, box.y, box.size, box.size, 28)
   context.save(); context.clip()
   context.fillStyle = colors.soft; context.fillRect(box.x, box.y, box.size, box.size)
@@ -87,7 +93,7 @@ export async function drawPreviewArt({ title, startsAt, cover }: { title: string
   if (image) {
     const side = Math.min(image.naturalWidth, image.naturalHeight)
     context.drawImage(image, (image.naturalWidth - side) / 2, (image.naturalHeight - side) / 2, side, side, box.x, box.y, box.size, box.size)
-  } else motif(context, box.x + 5, box.y + 45, 1, [[cloud, colors.card, colors.brand], [heart, colors.blush, colors.brand]])
+  } else motif(context, box.x + box.size / 2 - 100 * box.size / 210, box.y + 45 * box.size / 210, box.size / 210, [[cloud, colors.card, colors.brand], [heart, colors.blush, colors.brand]])
   context.restore()
   rounded(context, box.x, box.y, box.size, box.size, 28); context.lineWidth = 2; context.strokeStyle = colors.line; context.stroke()
   // Título (até 2 linhas, encolhe se for longo), dia e horário, chamada: centralizados.

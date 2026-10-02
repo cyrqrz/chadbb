@@ -1450,3 +1450,47 @@ test('arte de um snapshot antigo não substitui a arte do evento atualizado', as
   assert.equal((await admin.query('select image_path from public.event_previews where event_id=$1', [first.id])).rows[0].image_path, newArt)
   await assert.rejects(as(alice, 'select public.set_event_preview($1,$2)', [first.id, oldArt]), /does not exist/)
 })
+
+test('prévia por convite: nome só de convite válido, arte do dono e link reemitido sem o nome antigo', async () => {
+  const f = await familyFixture()
+  const { preview_id: previewId } = f.invite
+  assert.match(previewId, /^[0-9a-f-]{36}$/)
+  const read = id => as(null, 'select * from public.public_invitation_preview($1,$2)', [f.event.id, id], 'anon')
+  const register = (user, id, path, inv = f.invite.id) => as(user, 'select public.set_invitation_preview($1,$2,$3,$4) old', [f.event.id, inv, id, path])
+  // Sem arte própria, usa a do evento (aqui nenhuma) e já traz o nome do convite.
+  let { rows } = await read(previewId)
+  assert.deepEqual(Object.keys(rows[0]).sort(), ['guest_name', 'image_path', 'public_description', 'starts_at', 'title'])
+  assert.equal(rows[0].guest_name, 'Família fictícia'); assert.equal(rows[0].image_path, null)
+  // Arte: só o dono, só arquivo da pasta do evento e só com o preview_id atual.
+  const art = `${alice}/${f.event.id}/invite-1.jpg`, other = `${alice}/${f.event.id}/invite-2.jpg`
+  await assert.rejects(register(alice, previewId, art), /INVALID_PREVIEW/)
+  await as(alice, "insert into storage.objects(bucket_id,name) values ('event-public',$1),('event-public',$2)", [art, other])
+  await assert.rejects(register(bob, previewId, art), /EVENT_NOT_FOUND/)
+  await assert.rejects(register(alice, '00000000-0000-4000-8000-0000000000aa', art), /PREVIEW_CONFLICT/)
+  await assert.rejects(register(alice, previewId, `${bob}/${f.event.id}/x.jpg`), /INVALID_PREVIEW/)
+  assert.equal((await register(alice, previewId, art)).rows[0].old, null)
+  assert.equal((await read(previewId)).rows[0].image_path, art)
+  // Id inexistente, de outro evento ou chamado sem papel anon autorizado: vazio ou recusado.
+  assert.equal((await read('00000000-0000-4000-8000-0000000000ff')).rowCount, 0)
+  const other_event = await familyFixture()
+  assert.equal((await as(null, 'select * from public.public_invitation_preview($1,$2)', [other_event.event.id, previewId], 'anon')).rowCount, 0)
+  await assert.rejects(as(null, 'select public.set_invitation_preview($1,$2,$3,$4)', [f.event.id, f.invite.id, previewId, art], 'anon'), /permission denied/)
+  // Reemitir: preview_id novo, o antigo para de mostrar o nome e a arte antiga volta para o painel apagar.
+  const rotated = await organizerAction(f.event, 'rotate', { id: f.invite.id })
+  assert.notEqual(rotated.preview_id, previewId); assert.equal(rotated.old_preview, art)
+  assert.equal((await read(previewId)).rowCount, 0)
+  rows = (await read(rotated.preview_id)).rows
+  assert.equal(rows[0].guest_name, 'Família fictícia'); assert.equal(rows[0].image_path, null)
+  // A arte desenhada para o link antigo não entra no novo.
+  await assert.rejects(register(alice, previewId, other), /PREVIEW_CONFLICT/)
+  assert.equal((await register(alice, rotated.preview_id, other)).rows[0].old, null)
+  // Revogar: sai da prévia, devolve a arte para apagar, e não aceita arte nova.
+  const revoked = await organizerAction(f.event, 'revoke', { id: f.invite.id })
+  assert.equal(revoked.old_preview, other); assert.equal(revoked.preview_id, null)
+  assert.equal((await read(rotated.preview_id)).rowCount, 0)
+  await assert.rejects(register(alice, rotated.preview_id, art), /PREVIEW_CONFLICT/)
+  // Evento encerrado: nenhum convite aparece na prévia.
+  const g = await familyFixture()
+  await transition(g.event, 'closed')
+  assert.equal((await as(null, 'select * from public.public_invitation_preview($1,$2)', [g.event.id, g.invite.preview_id], 'anon')).rowCount, 0)
+})

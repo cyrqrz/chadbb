@@ -30,6 +30,7 @@ export function App() {
         <Route path="/convite" element={<GuestPage />} />
         {/* Link com prévia do evento (fase 2): o id é público, o token segue no #. */}
         <Route path="/c/:eventId" element={<GuestPage />} />
+        <Route path="/c/:eventId/:previewId" element={<GuestPage />} />
         <Route path="/entrar" element={<LoginPage />} />
         <Route path="/privacidade" element={<PrivacyPage />} />
         {SpecimensPage && <Route path="/amostras" element={<SpecimensPage />} />}

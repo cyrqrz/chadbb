@@ -492,6 +492,16 @@ test.describe('G3 · página inicial e prévia', () => {
     expect(new URL(page.url()).pathname).toBe('/c/20000000-0000-4000-8000-000000000002')
   })
 
+  // Desde 02/10 o link leva também o id público do convite (prévia com o nome).
+  test('link com o id do convite abre o mesmo convite e o token some do endereço', async ({ page }) => {
+    await backend(page)
+    const path = '/c/20000000-0000-4000-8000-000000000002/30000000-0000-4000-8000-000000000003'
+    await page.goto(`${path}#${token}`)
+    await expect(page.getByRole('button', { name: 'Confirmar presença' })).toBeVisible()
+    expect(new URL(page.url()).hash).toBe('')
+    expect(new URL(page.url()).pathname).toBe(path)
+  })
+
   // Fase 1 do plano do WhatsApp (01/10): a home sai com prévia de produto e só o link do
   // convite sai com prévia de convite. O WhatsApp lê o HTML do servidor, sem rodar o app:
   // por isso a conferência é no HTML entregue, e não na página montada.

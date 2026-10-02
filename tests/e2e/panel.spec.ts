@@ -2239,3 +2239,55 @@ test('painel lista as fraldas do menor ao maior tamanho, mesmo vindo em ordem al
   await page.goto(`/eventos/${eventId}/convites`)
   await expect(page.getByRole('region', { name: 'Fraldas por tamanho' }).getByRole('heading', { level: 3 })).toHaveText(['Tamanho P', 'Tamanho M', 'Tamanho G', 'Tamanho XG'])
 })
+
+// Prévia por convite (02/10): o link leva o id público do convite, e a arte com o nome é
+// enviada e registrada antes de liberar a cópia, porque o WhatsApp lê a prévia ao colar.
+test.describe('convite com a arte do próprio convite', () => {
+  const previewId = '30000000-0000-4000-8000-000000000003'
+  async function setup(page: Page, reply: ReturnType<Reply> = { status: 200, json: { id: 'novo', token: 'token-ficticio', preview_id: previewId } }) {
+    const registered: Record<string, unknown>[] = []
+    const uploads: string[] = []
+    let release = () => {}
+    const held = new Promise<void>(resolve => { release = resolve })
+    await backend(page, actions({ create: reply }), undefined, {
+      '/rest/v1/rpc/set_invitation_preview': ({ body }) => { registered.push(body); return { status: 200, json: null } },
+    })
+    await page.route('https://e2e.supabase.co/storage/v1/object/event-public/**', async route => {
+      if (route.request().method() !== 'POST') return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+      uploads.push(new URL(route.request().url()).pathname.split('/event-public/')[1])
+      await held
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ Key: 'ok' }) })
+    })
+    await page.goto(`/eventos/${eventId}`)
+    await page.getByRole('button', { name: 'Convidar alguém' }).click()
+    const form = page.getByRole('region', { name: 'Convide alguém especial' })
+    await form.getByLabel('Nome da pessoa ou família').fill('Família Fictícia')
+    await form.getByRole('button', { name: 'Criar convite' }).click()
+    return { form, registered, uploads, release }
+  }
+
+  test('link com o id do convite; a cópia espera a arte com o nome ser registrada', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+    const { form, registered, uploads, release } = await setup(page)
+    const link = `${new URL(page.url()).origin}/c/${eventId}/${previewId}#token-ficticio`
+    await expect(form.getByLabel('Link para compartilhar')).toHaveValue(link)
+    await expect(form.getByRole('button', { name: 'Preparando a arte…' })).toBeDisabled()
+    await expect.poll(() => uploads.length).toBe(1)
+    expect(uploads[0]).toMatch(new RegExp(`^${userId}/${eventId}/invite-[0-9a-f-]{36}\\.jpg$`))
+    release()
+    await expect(form.getByRole('status')).toHaveText('Convite pronto. Copie o link e envie pelo WhatsApp.')
+    expect(registered).toEqual([{ p_event_id: eventId, p_invitation_id: 'novo', p_preview_id: previewId, p_path: uploads[0] }])
+    await form.getByRole('button', { name: 'Copiar convite' }).click()
+    await expect(form.getByRole('status')).toHaveText('Link copiado.')
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(link)
+    await expectAccessible(page)
+  })
+
+  test('se a arte falhar, o link vale com a arte do evento e o painel avisa', async ({ page }) => {
+    const { form, release } = await setup(page)
+    await page.route('https://e2e.supabase.co/rest/v1/rpc/set_invitation_preview', route => route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ message: 'PREVIEW_CONFLICT' }) }))
+    release()
+    await expect(form.getByRole('status')).toHaveText('Convite pronto. A arte com o nome não ficou pronta; o link funciona com a arte do evento.')
+    await expect(form.getByRole('button', { name: 'Copiar convite' })).toBeEnabled()
+  })
+})

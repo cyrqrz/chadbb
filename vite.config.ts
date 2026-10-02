@@ -5,11 +5,12 @@ import tailwindcss from '@tailwindcss/vite'
 
 // Duas páginas com o mesmo app: index.html (prévia de produto) e convite.html (prévia
 // de convite para o WhatsApp). No Pages, /convite é entregue por convite.html, e /c/:id
-// pela Pages Function (functions/c/[id].ts), que troca a prévia pela do evento; aqui o dev
+// e /c/:id/:convite pelas Pages Functions (functions/c/), que trocam a prévia pela do evento
+// ou do convite; aqui o dev
 // e o preview entregam convite.html nos dois, com a prévia genérica.
 const inviteEntry: Connect.NextHandleFunction = (request, _response, next) => {
   if (request.url && /^\/convite\/?(\?|$)/.test(request.url)) request.url = request.url.replace(/^\/convite\/?/, '/convite.html')
-  else if (request.url && /^\/c\/[^/?]+\/?(\?|$)/.test(request.url)) request.url = request.url.replace(/^\/c\/[^/?]+\/?/, '/convite.html')
+  else if (request.url && /^\/c\/[^/?]+(\/[^/?]+)?\/?(\?|$)/.test(request.url)) request.url = request.url.replace(/^\/c\/[^/?]+(\/[^/?]+)?\/?/, '/convite.html')
   next()
 }
 const invitePage: Plugin = {

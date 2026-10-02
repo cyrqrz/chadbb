@@ -3,7 +3,7 @@ import type { FormEvent, ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../auth/context'
-import { ensureEventPreview, getEvent, eventKeys } from '../events/api'
+import { ensureEventPreview, getEvent, eventKeys, refreshInvitationPreview, removePreviewArt } from '../events/api'
 import { invitations, responseLabels } from './api'
 import type { Dashboard, DashboardReservation, Invitation, PanelSummary } from './api'
 import { errorMessage } from '../../lib/errors'
@@ -31,6 +31,8 @@ export function InvitationsPage() {
   const [kind, setKind] = useState('individual')
   const [capacity, setCapacity] = useState('2')
   const [link, setLink] = useState('')
+  // A arte do convite fica pronta antes de liberar a cópia: o WhatsApp lê a prévia ao colar o link.
+  const [preparing, setPreparing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
   const [copyFailed, setCopyFailed] = useState(false)
@@ -59,7 +61,19 @@ export function InvitationsPage() {
     setBusy(true); setError(''); setNotice(''); setCopyFailed(false); setFeedbackAt(action === 'update' ? 'edit' : 'create')
     try {
       const result = await invitations(id, action, payload)
-      if (result.token) { setCopied(false); setLink(`${window.location.origin}/c/${id}#${result.token}`); setNotice('Convite pronto. Copie o link e envie pelo WhatsApp.') }
+      // Arte que saiu da prévia (reemitir ou revogar): apagar o arquivo é melhor esforço.
+      if (result.old_preview) void removePreviewArt(result.old_preview).catch(() => undefined)
+      if (result.token) {
+        // Desde 02/10 o link leva o id público do convite (prévia com o nome); sem ele, o do evento.
+        setCopied(false); setLink(`${window.location.origin}/c/${id}${result.preview_id ? `/${result.preview_id}` : ''}#${result.token}`)
+        const who = action === 'create' ? name : query.data?.invitations.find(inv => inv.id === payload.id)?.name ?? ''
+        let ready = false
+        if (result.preview_id && event.data) {
+          setPreparing(true)
+          try { await refreshInvitationPreview(event.data, { id: result.id, name: who, preview_id: result.preview_id }); ready = true } catch { /* o link vale com a arte do evento */ } finally { setPreparing(false) }
+        }
+        setNotice(ready || !result.preview_id ? 'Convite pronto. Copie o link e envie pelo WhatsApp.' : 'Convite pronto. A arte com o nome não ficou pronta; o link funciona com a arte do evento.')
+      }
       else if (action === 'update') { setNotice('Convite atualizado.'); setEditing(null) }
       else setNotice('Convite revogado. O acesso anterior não funciona mais; as respostas e escolhas foram preservadas.')
       if (action === 'create') { setName(''); setInviting(false) }
@@ -119,7 +133,7 @@ export function InvitationsPage() {
         <label className="field">Tipo de convite<select value={kind} disabled={busy || !ready} onChange={e => setKind(e.target.value)}><option value="individual">Individual</option><option value="family">Família</option></select></label>
         {kind === 'family' && <label className="field">Máximo de pessoas neste convite<input type="number" min={1} max={50} required value={capacity} disabled={busy || !ready} onChange={e => setCapacity(e.target.value)} /></label>}
         <button className="button justify-center" disabled={busy || !ready}>{busy ? 'Aguarde…' : 'Criar convite'}</button></form>
-        {link && <div className="notice mt-5"><label className="field">Link para compartilhar<input ref={linkField} readOnly value={link} onFocus={e => e.target.select()} /></label><p className="hint mt-2">Guarde este link. Por segurança, ele só aparece na emissão.</p>{copyFailed && <p role="status" className="mt-2 font-semibold">Não foi possível copiar. Selecione o campo do link e copie manualmente.</p>}<button className="secondary mt-3" onClick={() => void navigator.clipboard.writeText(link).then(() => { setCopyFailed(false); setCopied(true); setError(''); setFeedbackAt('create'); setNotice('Link copiado.') }).catch(() => { setNotice(''); setCopyFailed(true) })}>Copiar convite</button></div>}
+        {link && <div className="notice mt-5"><label className="field">Link para compartilhar<input ref={linkField} readOnly value={link} onFocus={e => e.target.select()} /></label><p className="hint mt-2">Guarde este link. Por segurança, ele só aparece na emissão.</p>{copyFailed && <p role="status" className="mt-2 font-semibold">Não foi possível copiar. Selecione o campo do link e copie manualmente.</p>}<button className="secondary mt-3" disabled={preparing} onClick={() => void navigator.clipboard.writeText(link).then(() => { setCopyFailed(false); setCopied(true); setError(''); setFeedbackAt('create'); setNotice('Link copiado.') }).catch(() => { setNotice(''); setCopyFailed(true) })}>{preparing ? 'Preparando a arte…' : 'Copiar convite'}</button></div>}
         {feedbackPlace === 'create' && feedback}
         <Button variant="ghost" size="sm" className="mt-4" disabled={busy} onClick={() => closeForm(true)}>Fechar</Button>
       </section>}
