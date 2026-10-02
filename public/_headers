@@ -1,6 +1,8 @@
 /*
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
   X-Content-Type-Options: nosniff
+  Cross-Origin-Opener-Policy: same-origin
   Referrer-Policy: no-referrer
   X-Frame-Options: DENY
   Permissions-Policy: camera=(), microphone=(), geolocation=()
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self' data:; img-src 'self' data: https://*.supabase.co; connect-src 'self' https://*.supabase.co; object-src 'none'; frame-src https://www.google.com https://maps.google.com; base-uri 'self'; frame-ancestors 'none'; form-action 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self' data:; img-src 'self' data: https://fcykqrlnofmdtmewlejr.supabase.co; connect-src 'self' https://fcykqrlnofmdtmewlejr.supabase.co; object-src 'none'; frame-src https://www.google.com https://maps.google.com; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; upgrade-insecure-requests

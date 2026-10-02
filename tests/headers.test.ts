@@ -27,4 +27,17 @@ describe('CSP de produção', () => {
   test('frame-src libera só o mapa do Google', () => {
     expect(directive('frame-src')).toBe('frame-src https://www.google.com https://maps.google.com')
   })
+
+  // Recursos só do próprio projeto Supabase: um XSS não consegue enviar dados para outro projeto *.supabase.co.
+  test('img-src e connect-src liberam só o projeto de produção', () => {
+    for (const name of ['img-src', 'connect-src']) {
+      expect(directive(name)).not.toContain('*')
+      expect(directive(name)).toContain('https://fcykqrlnofmdtmewlejr.supabase.co')
+    }
+  })
+
+  test('HSTS e isolamento de janela', () => {
+    expect(headers).toMatch(/Strict-Transport-Security: max-age=\d{8,}/)
+    expect(headers).toContain('Cross-Origin-Opener-Policy: same-origin')
+  })
 })
