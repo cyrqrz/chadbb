@@ -1382,7 +1382,8 @@ test('prévia pública do evento: arte do dono, leitura só de publicado e só d
   const draft = await save(await create(alice, 'Chá da prévia'), alice, { description: 'Venha celebrar', date: '2035-11-01T15:00:00Z' })
   const art = `${alice}/${draft.id}/preview-1.jpg`
   const other = `${alice}/${draft.id}/preview-2.jpg`
-  const register = (user, path) => as(user, 'select public.set_event_preview($1,$2) old', [draft.id, path])
+  let version = draft.version
+  const register = (user, path) => as(user, 'select public.set_event_preview($1,$2,$3) old', [draft.id, path, version])
   // Só registra arte que já está na pasta do evento, no bucket público, e só o dono.
   await assert.rejects(register(alice, art), /INVALID_PREVIEW/)
   await as(alice, "insert into storage.objects(bucket_id,name) values ('event-public',$1),('event-public',$2)", [art, other])
@@ -1393,6 +1394,7 @@ test('prévia pública do evento: arte do dono, leitura só de publicado e só d
   // Rascunho não aparece para ninguém de fora.
   assert.equal((await read()).rowCount, 0)
   const published = await transition(draft, 'published')
+  version = published.version
   const { rows } = await read()
   assert.deepEqual(Object.keys(rows[0]).sort(), ['image_path', 'public_description', 'starts_at', 'title'])
   assert.equal(rows[0].title, 'Chá da prévia')
@@ -1409,4 +1411,17 @@ test('prévia pública do evento: arte do dono, leitura só de publicado e só d
   await transition(published, 'closed')
   assert.equal((await read()).rowCount, 0)
   await assert.rejects(register(alice, art), /EVENT_CLOSED/)
+})
+
+test('arte de um snapshot antigo não substitui a arte do evento atualizado', async () => {
+  const first = await save(await create())
+  const second = await save(first, alice, { title: 'Título atualizado' })
+  const oldArt = `${alice}/${first.id}/old.jpg`
+  const newArt = `${alice}/${first.id}/new.jpg`
+  await as(alice, "insert into storage.objects(bucket_id,name) values ('event-public',$1),('event-public',$2)", [oldArt, newArt])
+  await as(alice, 'select public.set_event_preview($1,$2,$3)', [second.id, newArt, second.version])
+  await assert.rejects(as(alice, 'select public.set_event_preview($1,$2,$3)', [first.id, oldArt, first.version]), /VERSION_CONFLICT/)
+  await assert.rejects(as(alice, 'select public.set_event_preview($1,$2,$3)', [first.id, oldArt, null]), /VERSION_CONFLICT/)
+  assert.equal((await admin.query('select image_path from public.event_previews where event_id=$1', [first.id])).rows[0].image_path, newArt)
+  await assert.rejects(as(alice, 'select public.set_event_preview($1,$2)', [first.id, oldArt]), /does not exist/)
 })

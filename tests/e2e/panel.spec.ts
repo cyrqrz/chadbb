@@ -1718,6 +1718,43 @@ test.describe('eventos: excluir evento', () => {
     expect(mock.calls).toEqual([])
   })
 
+  test('publicado: sair enquanto encerra conclui a exclusão com a versão encerrada', async ({ page }) => {
+    const published: EventRecord = { ...event, title: 'Chá publicado', version: 4 }
+    const mock = list([published])
+    const transitions: Record<string, unknown>[] = []
+    await backend(page, none, mock.events, {
+      '/functions/v1/delete-event': mock.remove(),
+      '/rest/v1/rpc/transition_event': ({ body }) => {
+        transitions.push(body)
+        return { status: 200, json: { ...published, status: 'closed', version: 5 } }
+      },
+    })
+    let release = () => {}
+    const held = new Promise<void>(resolve => { release = resolve })
+    let closing = false
+    await page.route('https://e2e.supabase.co/rest/v1/rpc/transition_event', async route => {
+      closing = true
+      await held
+      await route.fallback()
+    })
+    await page.goto('/eventos')
+    await page.getByRole('button', { name: 'Encerrar e excluir evento Chá publicado' }).click()
+    await page.getByRole('button', { name: 'Sim, encerrar e excluir' }).click()
+    await expect.poll(() => closing).toBe(true)
+    try {
+      // Navegação interna desmonta a lista antes de o servidor confirmar o encerramento.
+      await page.getByRole('banner').getByRole('link', { name: 'chadbb, início', exact: true }).click()
+      await expect(page).toHaveURL('/')
+      await expect(page.getByRole('heading', { name: 'Seus eventos', exact: true })).toHaveCount(0)
+      expect(mock.calls).toEqual([])
+    } finally { release() }
+    await expect.poll(() => mock.calls).toEqual([{ event_id: published.id, version: 5 }])
+    expect(transitions).toEqual([{ p_event_id: published.id, p_version: 4, p_status: 'closed' }])
+    // Não sobra um contador que envie uma segunda exclusão depois de sair.
+    await expire(page)
+    expect(mock.calls).toEqual([{ event_id: published.id, version: 5 }])
+  })
+
   test('publicado: sem desfazer, a exclusão vai com a versão encerrada; falha ao encerrar não exclui', async ({ page }) => {
     const published: EventRecord = { ...event, title: 'Chá publicado', version: 4 }
     const other: EventRecord = { ...event, id: '10000000-0000-4000-8000-000000000009', title: 'Chá que falha', version: 2 }

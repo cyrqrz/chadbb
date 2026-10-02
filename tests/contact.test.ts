@@ -13,6 +13,16 @@ const send = (handler: (r: Request) => Promise<Response>, body: unknown, headers
   handler(new Request('http://local.test', { method: 'POST', headers: { origin, 'content-type': 'application/json', 'cf-connecting-ip': '203.0.113.9', ...headers }, body: JSON.stringify(body) }))
 
 describe('formulário de contato', () => {
+  it('recusa nomes herdados do protótipo como assunto', async () => {
+    const { handler, rpc, transport } = setup()
+    for (const topic of ['constructor', 'toString', '__proto__']) {
+      const response = await send(handler, { ...valid, topic })
+      expect(response.status).toBe(400)
+      expect(await response.json()).toEqual({ error: 'INVALID_FIELD', field: 'topic' })
+    }
+    expect(rpc).not.toHaveBeenCalled()
+    expect(transport).not.toHaveBeenCalled()
+  })
   it('recusa origem desconhecida, método e payload sem consultar cota nem enviar', async () => {
     const { handler, rpc, transport } = setup()
     expect((await send(handler, valid, { origin: 'https://golpe.example' })).status).toBe(403)

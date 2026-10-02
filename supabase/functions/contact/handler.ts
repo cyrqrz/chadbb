@@ -54,7 +54,7 @@ export function createContactHandler({ allowed, apiKey, from, to, rpc, transport
     if (field('website')) return reply(200, { ok: true })
     const invalid = !form.name || form.name.length > limits.name || !singleLine(form.name) ? 'name'
       : form.email.length > limits.email || !singleLine(form.email) || !emailPattern.test(form.email) ? 'email'
-      : !(form.topic in topics) ? 'topic'
+      : !Object.hasOwn(topics, form.topic) ? 'topic'
       : form.message.length < 10 || form.message.length > limits.message ? 'message'
       : form.details.length > limits.details ? 'details' : null
     if (invalid) return reply(400, { error: 'INVALID_FIELD', field: invalid })

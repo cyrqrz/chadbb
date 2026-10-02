@@ -25,7 +25,7 @@ export function withEventPreview(html: string, preview: PublicPreview, supabaseU
   const when = preview.starts_at ? previewDate(preview.starts_at) : ''
   const description = clip([when, preview.public_description.trim() || 'Toque no link para confirmar presença e escolher o presente.'].filter(Boolean).join('. '), 200)
   const set = (page: string, property: string, value: string) =>
-    page.replace(new RegExp(`(<meta property="${property}" content=")[^"]*(")`), `$1${escape(value)}$2`)
+    page.replace(new RegExp(`(<meta property="${property}" content=")[^"]*(")`), (_match, before: string, after: string) => `${before}${escape(value)}${after}`)
   let page = set(html, 'og:title', `Convite: ${title}`)
   page = set(page, 'og:description', description)
   page = set(page, 'og:image:alt', `Convite: ${[title, when].filter(Boolean).join(', ')}`)
@@ -33,5 +33,5 @@ export function withEventPreview(html: string, preview: PublicPreview, supabaseU
     page = set(page, 'og:image', previewImageUrl(supabaseUrl, preview.image_path))
     page = set(page, 'og:image:type', 'image/jpeg')
   }
-  return page.replace(/<title>[^<]*<\/title>/, `<title>Convite · ${escape(title)}</title>`)
+  return page.replace(/<title>[^<]*<\/title>/, () => `<title>Convite · ${escape(title)}</title>`)
 }

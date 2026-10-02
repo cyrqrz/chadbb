@@ -49,10 +49,15 @@ e homônimos de `prepare_family_list`, e retorna o número de inclusões efetiva
 `prepare_family_list` e `family_list_defaults` continuam no banco para scripts e testes.
 
 Prévia do link do convite por evento (migration `20261001020000`, decisão do titular em
-01/10): `set_event_preview(p_event_id, p_path)` registra a arte que o navegador do dono
+01/10; correção de concorrência em `20261002000000`):
+`set_event_preview(p_event_id, p_path, p_version)` registra a arte que o navegador do dono
 já enviou para `event-public/<dono>/<evento>/` (recusa outro caminho ou arquivo
 inexistente com `INVALID_PREVIEW`; evento alheio `EVENT_NOT_FOUND`; encerrado
 `EVENT_CLOSED`; expurgado `EVENT_PURGED`) e devolve a arte anterior, que o front apaga.
+Exige a versão do snapshot usado para desenhar a arte; sob o lock do evento,
+recusa versão diferente ou nula com `VERSION_CONFLICT`. O cliente remove o upload
+recusado. A assinatura antiga sem versão é removida: clientes antigos precisam
+recarregar a página para registrar nova arte; a leitura da arte existente continua.
 Não altera a versão do evento. `public_event_preview(p_event_id)` (anon e authenticated)
 devolve só `title`, `public_description`, `starts_at` e `image_path` de evento
 publicado e não expurgado; vazio em qualquer outro caso. A tabela `event_previews` não
