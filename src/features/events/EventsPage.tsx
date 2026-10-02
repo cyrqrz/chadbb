@@ -54,6 +54,8 @@ export function EventsPage() {
   const [closing, setClosing] = useState(false)
   const [pending, setPending] = useState<Pending | null>(null)
   const pendingRef = useRef<Pending | null>(null)
+  const mounted = useRef(true)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   // Cards escondidos: a exclusão está no prazo de desfazer ou a caminho do servidor.
   const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set())
   const [restored, setRestored] = useState<string | null>(null)
@@ -111,6 +113,11 @@ export function EventsPage() {
     for (const { event, title } of entries) {
       if (event.status !== 'published') { items.push({ event, title, closed: false }); continue }
       try { items.push({ event: await transitionEvent(event, 'closed'), title, closed: true }) } catch (cause) { failed.push({ title, cause }) }
+    }
+    // Saiu da tela enquanto o servidor encerrava: não há mais prazo de desfazer, exclui já.
+    if (!mounted.current) {
+      void Promise.allSettled(items.map(item => deleteEvent(item.event))).finally(() => cache.invalidateQueries({ queryKey: eventKeys.all }))
+      return items.length > 0
     }
     setClosing(false)
     if (failed.length) setFailure({ titles: failed.map(entry => entry.title), cause: failed[0].cause, closing: true })

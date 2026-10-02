@@ -13,6 +13,15 @@ const meta = (page: string, property: string) => page.match(new RegExp(`<meta pr
 const preview = { title: 'Chá da Liz', public_description: 'Venha celebrar com a gente!', starts_at: '2026-11-01T15:00:00Z', image_path: 'u/e/preview-1.jpg' }
 
 describe('prévia do convite por evento', () => {
+  it('preserva cifrões do texto sem interpretar padrões de substituição', () => {
+    const title = "Preço $& $1 $' $` $$"
+    const page = withEventPreview(html, { ...preview, title, public_description: title }, 'https://abc.supabase.co')
+    const shown = title.replace('&', '&amp;')
+    expect(meta(page, 'og:title')).toBe(`Convite: ${shown}`)
+    expect(meta(page, 'og:description')).toBe(`domingo, 1 de novembro, 12h. ${shown}`)
+    expect(page).toContain(`<title>Convite · ${shown}</title>`)
+    expect(page.match(/<title>/g)).toHaveLength(1)
+  })
   it('data no horário de Brasília, com o dia da semana e a hora', () => {
     expect(previewDate('2026-11-01T15:00:00Z')).toBe('domingo, 1 de novembro, 12h')
     expect(previewDate('2026-11-01T15:30:00Z')).toBe('domingo, 1 de novembro, 12h30')

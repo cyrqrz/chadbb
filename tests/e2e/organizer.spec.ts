@@ -400,6 +400,6 @@ test('salvar gera a arte da prévia do link: JPEG 1200×630 abaixo de 300 KB, na
   expect(art.type).toBe('image/jpeg')
   expect([art.width, art.height]).toEqual([1200, 630])
   expect(art.size).toBeLessThan(300 * 1024)
-  expect(mock.registered).toEqual([{ p_event_id: eventId, p_path: art.path }])
+  expect(mock.registered).toEqual([{ p_event_id: eventId, p_path: art.path, p_version: 2 }])
   await expect(page.getByText('dia e horário do evento aparecem na prévia do link')).toBeVisible()
 })

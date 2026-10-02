@@ -72,7 +72,7 @@ export async function refreshEventPreview(event: EventRecord) {
   const storage = getClient().storage.from('event-public')
   const upload = await storage.upload(path, art, { contentType: 'image/jpeg', upsert: false })
   if (upload.error) throw upload.error
-  const { data: old, error } = await getClient().rpc('set_event_preview', { p_event_id: event.id, p_path: path })
+  const { data: old, error } = await getClient().rpc('set_event_preview', { p_event_id: event.id, p_path: path, p_version: event.version })
   if (error) { await storage.remove([path]); throw error }
   if (old) await storage.remove([old as string])
 }

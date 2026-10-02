@@ -32,16 +32,35 @@ try {
   record('edge guest responde', false, 'sonda não completou')
 }
 
-// 2. O bundle publicado tem a configuração pública e nenhum segredo.
+// 2. Inspeciona os módulos e preloads declarados no HTML publicado.
+// O build com duas páginas divide a configuração entre chunks e muda o nome da entrada.
 try {
   const page = await getFresh(SITE)
-  const asset = page.text.match(/\/assets\/index-[A-Za-z0-9_-]+\.js/)?.[0]
-  if (!asset) throw new Error('bundle não localizado')
-  const bundle = (await get(`${SITE}${asset}`)).text
+  if (page.status !== 200) throw new Error('HTML indisponível')
+  const assets = new Set()
+  for (const tag of page.text.match(/<(?:script|link)\b[^>]*>/gi) ?? []) {
+    const attrs = Object.fromEntries([...tag.matchAll(/([\w-]+)\s*=\s*(["'])(.*?)\2/g)].map(match => [match[1].toLowerCase(), match[3]]))
+    const path = /^<script\b/i.test(tag) && attrs.type === 'module' ? attrs.src
+      : /^<link\b/i.test(tag) && attrs.rel === 'modulepreload' ? attrs.href : null
+    if (!path) continue
+    const url = new URL(path, SITE)
+    if (url.origin === SITE && url.pathname.endsWith('.js')) assets.add(url.href)
+  }
+  if (!assets.size) throw new Error('módulos não localizados')
+  const bundles = await Promise.all([...assets].map(async url => {
+    const asset = await get(url)
+    if (asset.status !== 200 || /^\s*<(?:!doctype|html)\b/i.test(asset.text)) throw new Error('módulo indisponível')
+    return asset.text
+  }))
+  const bundle = bundles.join('\n')
   const configured = new RegExp(`https://${REF}\\.supabase\\.co`).test(bundle) && /sb_publishable_[A-Za-z0-9_-]+/.test(bundle)
-  const leaked = /sb_secret_|service_role/.test(bundle)
-  record('frontend configurado', configured, configured ? asset : `${asset} sem URL/chave pública — variáveis do Pages ausentes`)
-  record('frontend sem segredo', !leaked, leaked ? 'CHAVE SECRETA NO BUNDLE' : 'nenhum sb_secret_/service_role')
+  // O SDK contém os nomes dos prefixos; só uma credencial completa indica vazamento.
+  const privilegedJwt = [...bundle.matchAll(/\beyJ[A-Za-z0-9_-]*\.([A-Za-z0-9_-]+)\.[A-Za-z0-9_-]+/g)].some(match => {
+    try { return JSON.parse(Buffer.from(match[1], 'base64url').toString()).role === 'service_role' } catch { return false }
+  })
+  const leaked = /sb_secret_[A-Za-z0-9_-]+/.test(bundle) || privilegedJwt
+  record('frontend configurado', configured, configured ? `${assets.size} módulos conferidos` : 'módulos sem URL/chave pública esperadas')
+  record('frontend sem segredo', !leaked, leaked ? 'CHAVE SECRETA NOS MÓDULOS' : 'nenhuma credencial secreta nos módulos declarados no HTML')
 } catch {
   record('frontend configurado', false, 'site não respondeu como esperado')
 }
