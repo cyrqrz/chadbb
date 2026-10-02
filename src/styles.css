@@ -329,7 +329,10 @@
      superfície e faixa de destaque em vez de ficar sob um fio. */
   .login-guest { margin-top: 2rem; border: 1px solid color-mix(in srgb, var(--color-brand) 20%, var(--color-line)); border-inline-start: 4px solid var(--color-brand); border-radius: var(--radius-field); background: var(--color-brand-soft); padding: 1rem 1.125rem; color: var(--color-ink); }
   .login-guest strong { color: var(--color-brand-hover); font-weight: 700; }
-  .login-aside { display: flex; align-items: center; min-width: 0; background: radial-gradient(90% 70% at 100% 0%, var(--color-brand-soft) 0%, transparent 70%), var(--color-blush); padding: clamp(1rem, 5vw, 3.5rem); }
+  /* Coluna, como o .baby-welcome da home: o motivo fica em cima e a lista usa a largura
+     toda. Em linha, o motivo (que não encolhe) espremia os cards no celular. */
+  .login-aside { display: flex; flex-direction: column; justify-content: center; gap: 1.25rem; min-width: 0; background: radial-gradient(90% 70% at 100% 0%, var(--color-brand-soft) 0%, transparent 70%), var(--color-blush); padding: clamp(1rem, 5vw, 3.5rem); }
+  .login-aside .baby-motif { align-self: center; }
   .login-features { display: grid; gap: 0.75rem; width: 100%; margin: 0; padding: 0; list-style: none; }
   .login-feature { display: flex; gap: 1rem; align-items: flex-start; border-radius: var(--radius-surface); background: var(--color-surface); padding: 1rem 1.2rem; box-shadow: var(--shadow-sm); transition: transform var(--duration-normal) var(--ease-standard), box-shadow var(--duration-normal); }
   .login-feature:hover { transform: translateX(4px); box-shadow: var(--shadow-md); }

@@ -17,6 +17,8 @@ async function backend(page: Page, signedIn = false) {
   // Arte da prévia do link (fase 2): o que foi enviado ao Storage e registrado no banco.
   const previews: { path: string; type: string; size: number; width: number; height: number }[] = []
   const registered: unknown[] = []
+  // Arte que o evento já tem na prévia pública (null: nenhuma).
+  let currentPreview: string | null = null
   if (signedIn) await page.addInitScript(value => localStorage.setItem('sb-e2e-auth-token', JSON.stringify(value)), session())
   await page.route('https://e2e.supabase.co/**', async route => {
     const request = route.request()
@@ -51,7 +53,7 @@ async function backend(page: Page, signedIn = false) {
       summary: { reminders: { pending: 0, attention: 0 }, invitations: { total: 0, answered: 0, yes: 0, no: 0, maybe: 0, pending: 0, revoked: 0 }, people_confirmed: 0 } }
     else if (['/rest/v1/event_items', '/rest/v1/products'].includes(path)) { json = []; headers['content-range'] = '*/0' }
     else if (path === '/rest/v1/rpc/set_event_preview') { registered.push(body); json = null }
-    else if (path === '/rest/v1/rpc/public_event_preview') json = []
+    else if (path === '/rest/v1/rpc/public_event_preview') json = currentPreview ? [{ title: '', public_description: '', starts_at: null, image_path: currentPreview }] : []
     else if (path.startsWith('/storage/v1/object/')) {
       const buffer = request.method() === 'POST' ? request.postDataBuffer() : null
       // JPEG: as dimensões ficam no marcador SOF0/SOF2 (0xFFC0/0xFFC2).
@@ -70,7 +72,7 @@ async function backend(page: Page, signedIn = false) {
     if (elsewhere.delete(path)) { status = 400; json = { message: 'VERSION_CONFLICT', code: 'P0001' } }
     await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(json), headers })
   })
-  return { calls, previews, registered, conflict: () => { conflict = true }, getRecord: () => record, elsewhere: (rpc: string) => elsewhere.add(`/rest/v1/rpc/${rpc}`),
+  return { calls, previews, registered, setPreview: (path: string | null) => { currentPreview = path }, conflict: () => { conflict = true }, getRecord: () => record, elsewhere: (rpc: string) => elsewhere.add(`/rest/v1/rpc/${rpc}`),
     seed: (fields: Partial<EventRecord>) => { record = { id: eventId, owner_id: userId, type: 'baby_shower', status: 'published', title: 'Chá de bebê da Lia',
       public_description: '', private_address: '', private_instructions: '', starts_at: '2035-09-10T17:30:00Z', ends_at: '2035-09-10T21:00:00Z', personal_data_purged_at: null,
       guests_done_at: null, gifts_done_at: null, cover_path: null, version: 1, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z', ...fields } } }
@@ -387,6 +389,28 @@ test('dados do evento separam o que é público do que é só para convidados', 
 
 // Fase 2 do plano do WhatsApp: ao salvar, o navegador desenha a arte da prévia do link
 // (título, dia e horário, capa) e a registra; falhar nisso não atrapalha salvar.
+// Arte de 02/10: o essencial fica no quadrado central que o WhatsApp do computador recorta.
+// Eventos já publicados com a arte antiga ganham a nova uma vez, ao abrir o painel.
+test('painel refaz a arte da prévia de versão antiga e mantém a atual', async ({ page }) => {
+  const mock = await backend(page, true)
+  mock.seed({ status: 'published' })
+  mock.setPreview(`${userId}/${eventId}/preview-11111111-1111-4111-8111-111111111111.jpg`)
+  await page.goto(`/eventos/${eventId}`)
+  await expect.poll(() => mock.registered.length).toBe(1)
+  expect(mock.previews[0].path).toMatch(new RegExp(`^${userId}/${eventId}/preview-v2-[0-9a-f-]{36}\\.jpg$`))
+  expect([mock.previews[0].width, mock.previews[0].height]).toEqual([1200, 630])
+})
+test('painel não refaz a arte que já está na versão atual', async ({ page }) => {
+  const mock = await backend(page, true)
+  mock.seed({ status: 'published' })
+  mock.setPreview(`${userId}/${eventId}/preview-v2-22222222-2222-4222-8222-222222222222.jpg`)
+  await page.goto(`/eventos/${eventId}`)
+  await expect.poll(() => mock.calls.includes('/rest/v1/rpc/public_event_preview')).toBe(true)
+  await page.waitForTimeout(500)
+  expect(mock.registered).toHaveLength(0)
+  expect(mock.previews).toHaveLength(0)
+})
+
 test('salvar gera a arte da prévia do link: JPEG 1200×630 abaixo de 300 KB, na pasta do evento', async ({ page }) => {
   const mock = await backend(page, true)
   mock.seed({ status: 'published' })
@@ -396,7 +420,7 @@ test('salvar gera a arte da prévia do link: JPEG 1200×630 abaixo de 300 KB, na
   await expect(page.getByRole('status')).toHaveText('Alterações salvas.')
   await expect.poll(() => mock.registered.length).toBe(1)
   const [art] = mock.previews
-  expect(art.path).toMatch(new RegExp(`^${userId}/${eventId}/preview-[0-9a-f-]{36}\\.jpg$`))
+  expect(art.path).toMatch(new RegExp(`^${userId}/${eventId}/preview-v2-[0-9a-f-]{36}\\.jpg$`))
   expect(art.type).toBe('image/jpeg')
   expect([art.width, art.height]).toEqual([1200, 630])
   expect(art.size).toBeLessThan(300 * 1024)

@@ -2,7 +2,8 @@
 // pela Pages Function `/c/:id` (meta tags) e pela arte gerada no navegador: a mesma data
 // nos dois lugares. Só dados públicos por decisão do titular (01/10): título, descrição
 // pública, dia e horário e a arte. Endereço e instruções nunca entram.
-export type PublicPreview = { title: string; public_description: string; starts_at: string | null; image_path: string | null }
+// `guest_name` só vem na prévia por convite (`public_invitation_preview`).
+export type PublicPreview = { title: string; public_description: string; starts_at: string | null; image_path: string | null; guest_name?: string | null }
 
 const zone = 'America/Sao_Paulo'
 // “domingo, 1 de novembro, 12h” (ou 12h30), no horário de Brasília.
@@ -26,12 +27,14 @@ export function withEventPreview(html: string, preview: PublicPreview, supabaseU
   const description = clip([when, preview.public_description.trim() || 'Toque no link para confirmar presença e escolher o presente.'].filter(Boolean).join('. '), 200)
   const set = (page: string, property: string, value: string) =>
     page.replace(new RegExp(`(<meta property="${property}" content=")[^"]*(")`), (_match, before: string, after: string) => `${before}${escape(value)}${after}`)
-  let page = set(html, 'og:title', `Convite: ${title}`)
+  const guest = clip(preview.guest_name?.trim() ?? '', 60)
+  const heading = guest ? `Convite para ${guest}: ${title}` : `Convite: ${title}`
+  let page = set(html, 'og:title', heading)
   page = set(page, 'og:description', description)
-  page = set(page, 'og:image:alt', `Convite: ${[title, when].filter(Boolean).join(', ')}`)
+  page = set(page, 'og:image:alt', `${guest ? `Convite para ${guest}` : 'Convite'}: ${[title, when].filter(Boolean).join(', ')}`)
   if (preview.image_path) {
     page = set(page, 'og:image', previewImageUrl(supabaseUrl, preview.image_path))
     page = set(page, 'og:image:type', 'image/jpeg')
   }
-  return page.replace(/<title>[^<]*<\/title>/, () => `<title>Convite · ${escape(title)}</title>`)
+  return page.replace(/<title>[^<]*<\/title>/, () => `<title>${escape(guest ? `Convite para ${guest} · ${title}` : `Convite · ${title}`)}</title>`)
 }

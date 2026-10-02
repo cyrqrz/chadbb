@@ -3,14 +3,14 @@ import type { FormEvent, ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../auth/context'
-import { ensureEventPreview, getEvent, eventKeys } from '../events/api'
+import { ensureEventPreview, getEvent, eventKeys, refreshInvitationPreview, removePreviewArt } from '../events/api'
 import { invitations, responseLabels } from './api'
 import type { Dashboard, DashboardReservation, Invitation, PanelSummary } from './api'
 import { errorMessage } from '../../lib/errors'
 import { failedLast, live } from '../../lib/query'
 import { useLastError } from '../../lib/useLastError'
 import { EmptyState, ErrorState, LoadingState, RefreshStatus, SuccessMessage } from '../../components/States'
-import { BanIcon, Button, ConfirmDialog, PencilIcon, PlusIcon, Progress, RefreshIcon, Skeleton, StatusBadge } from '../../components/ui'
+import { BanIcon, Button, CheckIcon, ConfirmDialog, PencilIcon, PlusIcon, Progress, RefreshIcon, Skeleton, StatusBadge, TrashIcon } from '../../components/ui'
 import type { StatusTone } from '../../components/ui'
 import { EventNotFound } from '../events/EventLayout'
 import { bySize } from '../../lib/diapers'
@@ -31,6 +31,11 @@ export function InvitationsPage() {
   const [kind, setKind] = useState('individual')
   const [capacity, setCapacity] = useState('2')
   const [link, setLink] = useState('')
+  // A arte do convite fica pronta antes de liberar a cópia: o WhatsApp lê a prévia ao colar o link.
+  const [preparing, setPreparing] = useState(false)
+  // Arte do convite recém-emitido, para colar como foto no WhatsApp do computador (lá a prévia
+  // do link é só miniatura; foto com o link na legenda fica grande, como no celular).
+  const [art, setArt] = useState<Blob | null>(null)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
   const [copyFailed, setCopyFailed] = useState(false)
@@ -45,6 +50,10 @@ export function InvitationsPage() {
   const toggleId = useId()
   const [copied, setCopied] = useState(false)
   const [confirmClose, setConfirmClose] = useState<{ fromInside: boolean; thenEdit?: Invitation } | null>(null)
+  // Seleção de vários convites (02/10), no padrão de "Seus eventos": excluir em lote, tudo ou nada.
+  const [selecting, setSelecting] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [confirmBatch, setConfirmBatch] = useState(false)
   // Ao fechar pelo botão de dentro do formulário, o foco volta para “Convidar alguém”.
   const refocus = useRef(false)
   useEffect(() => { if (inviting) nameField.current?.focus() }, [inviting])
@@ -59,8 +68,27 @@ export function InvitationsPage() {
     setBusy(true); setError(''); setNotice(''); setCopyFailed(false); setFeedbackAt(action === 'update' ? 'edit' : 'create')
     try {
       const result = await invitations(id, action, payload)
-      if (result.token) { setCopied(false); setLink(`${window.location.origin}/c/${id}#${result.token}`); setNotice('Convite pronto. Copie o link e envie pelo WhatsApp.') }
+      // Arte que saiu da prévia (reemitir ou revogar): apagar o arquivo é melhor esforço.
+      if (result.old_preview) void removePreviewArt(result.old_preview).catch(() => undefined)
+      for (const path of result.old_previews ?? []) void removePreviewArt(path).catch(() => undefined)
+      if (result.token) {
+        // Desde 02/10 o link leva o id público do convite (prévia com o nome); sem ele, o do evento.
+        setCopied(false); setLink(`${window.location.origin}/c/${id}${result.preview_id ? `/${result.preview_id}` : ''}#${result.token}`)
+        const who = action === 'create' ? name : query.data?.invitations.find(inv => inv.id === payload.id)?.name ?? ''
+        let ready = false
+        if (result.preview_id && event.data) {
+          setPreparing(true)
+          try { setArt(await refreshInvitationPreview(event.data, { id: result.id, name: who, preview_id: result.preview_id })); ready = true } catch { /* o link vale com a arte do evento */ } finally { setPreparing(false) }
+        }
+        setNotice(ready || !result.preview_id ? 'Convite pronto. Copie o link e envie pelo WhatsApp.' : 'Convite pronto. A arte com o nome não ficou pronta; o link funciona com a arte do evento.')
+      }
       else if (action === 'update') { setNotice('Convite atualizado.'); setEditing(null) }
+      else if (action === 'delete') setNotice('Convite excluído. A resposta e os presentes escolhidos por ele foram apagados.')
+      else if (action === 'delete_many') {
+        const n = (result.ids as string[]).length
+        setNotice(n === 1 ? 'Convite excluído. A resposta e os presentes escolhidos por ele foram apagados.' : `${n} convites excluídos. As respostas e os presentes escolhidos por eles foram apagados.`)
+        setSelected(new Set()); setConfirmBatch(false); setSelecting(false)
+      }
       else setNotice('Convite revogado. O acesso anterior não funciona mais; as respostas e escolhas foram preservadas.')
       if (action === 'create') { setName(''); setInviting(false) }
       await cache.invalidateQueries({ queryKey: key })
@@ -83,7 +111,7 @@ export function InvitationsPage() {
   // O aviso fica junto do que o provocou: formulário de convite, edição ou a lista.
   const feedbackPlace = editing && feedbackAt === 'edit' ? 'edit' : formOpen && feedbackAt === 'create' ? 'create' : 'list'
   function doCloseForm(fromInside: boolean) {
-    setInviting(false); setLink(''); setNotice(''); setError(''); setCopied(false)
+    setInviting(false); setLink(''); setArt(null); setNotice(''); setError(''); setCopied(false)
     refocus.current = fromInside
   }
   function closeForm(fromInside = false) {
@@ -109,7 +137,10 @@ export function InvitationsPage() {
     <section className="mt-10" aria-labelledby="invites-title">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div><h2 id="invites-title" className="text-2xl font-semibold">Convidados</h2><p className="mt-1 text-muted">Crie um convite para cada pessoa ou família e envie o link pelo WhatsApp.</p></div>
-        {!closed && <Button id={toggleId} aria-expanded={formOpen} aria-controls={formId} disabled={!ready} onClick={() => { if (formOpen) { closeForm(); return } setEditing(null); setInviting(true) }}><PlusIcon />Convidar alguém</Button>}
+        {!closed && <div className="flow-actions">
+        {ready && data.invitations.length > 0 && <Button variant="secondary" aria-pressed={selecting} disabled={busy} onClick={() => { setSelecting(!selecting); setSelected(new Set()); setConfirmBatch(false) }}>
+          <CheckIcon />{selecting ? <>Cancelar<span className="sr-only"> seleção</span></> : 'Selecionar'}</Button>}
+        <Button id={toggleId} aria-expanded={formOpen} aria-controls={formId} disabled={!ready} onClick={() => { if (formOpen) { closeForm(); return } setEditing(null); setInviting(true) }}><PlusIcon />Convidar alguém</Button></div>}
       </div>
       {closed ? <p className="notice mt-4">Este evento foi encerrado. Não é possível criar novos convites.</p> :
         !ready && <p className="notice mt-4">Publique o evento em “Dados do evento” para criar ou reemitir convites.</p>}
@@ -119,7 +150,10 @@ export function InvitationsPage() {
         <label className="field">Tipo de convite<select value={kind} disabled={busy || !ready} onChange={e => setKind(e.target.value)}><option value="individual">Individual</option><option value="family">Família</option></select></label>
         {kind === 'family' && <label className="field">Máximo de pessoas neste convite<input type="number" min={1} max={50} required value={capacity} disabled={busy || !ready} onChange={e => setCapacity(e.target.value)} /></label>}
         <button className="button justify-center" disabled={busy || !ready}>{busy ? 'Aguarde…' : 'Criar convite'}</button></form>
-        {link && <div className="notice mt-5"><label className="field">Link para compartilhar<input ref={linkField} readOnly value={link} onFocus={e => e.target.select()} /></label><p className="hint mt-2">Guarde este link. Por segurança, ele só aparece na emissão.</p>{copyFailed && <p role="status" className="mt-2 font-semibold">Não foi possível copiar. Selecione o campo do link e copie manualmente.</p>}<button className="secondary mt-3" onClick={() => void navigator.clipboard.writeText(link).then(() => { setCopyFailed(false); setCopied(true); setError(''); setFeedbackAt('create'); setNotice('Link copiado.') }).catch(() => { setNotice(''); setCopyFailed(true) })}>Copiar convite</button></div>}
+        {link && <div className="notice mt-5"><label className="field">Link para compartilhar<input ref={linkField} readOnly value={link} onFocus={e => e.target.select()} /></label><p className="hint mt-2">Guarde este link. Por segurança, ele só aparece na emissão.</p>{copyFailed && <p role="status" className="mt-2 font-semibold">Não foi possível copiar. Selecione o campo do link e copie manualmente.</p>}<button className="secondary mt-3" disabled={preparing} onClick={() => void navigator.clipboard.writeText(link).then(() => { setCopyFailed(false); setCopied(true); setError(''); setFeedbackAt('create'); setNotice('Link copiado.') }).catch(() => { setNotice(''); setCopyFailed(true) })}>{preparing ? 'Preparando a arte…' : 'Copiar convite'}</button>
+          {art && typeof ClipboardItem !== 'undefined' && <>
+            <button className="secondary mt-3 ml-3" onClick={() => void copyArt(art).then(() => { setCopyFailed(false); setError(''); setFeedbackAt('create'); setNotice('Imagem copiada. No WhatsApp do computador, cole a imagem e, na legenda, cole o link do convite.') }).catch(() => { setNotice(''); setCopyFailed(true) })}>Copiar imagem</button>
+            <p className="hint mt-2">No WhatsApp do computador, o link aparece pequeno. Para a imagem grande: copie a imagem, cole no WhatsApp e, na legenda, cole o link.</p></>}</div>}
         {feedbackPlace === 'create' && feedback}
         <Button variant="ghost" size="sm" className="mt-4" disabled={busy} onClick={() => closeForm(true)}>Fechar</Button>
       </section>}
@@ -134,10 +168,16 @@ export function InvitationsPage() {
         {feedbackPlace === 'edit' && feedback}
       </section>}
       {!data.invitations.length ? <div className="mt-5"><EmptyState title="Nenhum convite ainda.">{closed ? 'Este evento foi encerrado sem convites.' : ready ? 'Use “Convidar alguém” para criar o primeiro convite.' : 'Depois de publicar o evento, use “Convidar alguém” para criar o primeiro convite.'}</EmptyState></div> :
-      <ul className="mt-5 grid gap-4 md:grid-cols-2">{data.invitations.map(inv => <GuestCard key={inv.id} invitation={inv} sending={inv.response === 'no' && sendingGift.has(inv.id)} canEdit={!busy && ready} canRevoke={!busy}
+      <>{selecting && ready && <SelectionBar invitations={data.invitations.filter(inv => selected.has(inv.id))} total={data.invitations.length} confirming={confirmBatch} busy={busy}
+        onAll={on => { setSelected(on ? new Set(data.invitations.map(inv => inv.id)) : new Set()); setConfirmBatch(false) }}
+        onDelete={() => setConfirmBatch(true)} onCancel={() => setConfirmBatch(false)}
+        onConfirm={ids => void act('delete_many', { ids })} />}
+      <ul className="mt-5 grid gap-4 md:grid-cols-2">{data.invitations.map(inv => <GuestCard key={inv.id} invitation={inv}
+        selecting={selecting && ready} selected={selected.has(inv.id)} onSelect={on => { setSelected(current => { const next = new Set(current); if (on) next.add(inv.id); else next.delete(inv.id); return next }); setConfirmBatch(false) }} sending={inv.response === 'no' && sendingGift.has(inv.id)} canEdit={!busy && ready} canRevoke={!busy}
         onEdit={() => startEdit(inv)}
         onRotate={() => void act('rotate', { id: inv.id })}
-        onRevoke={() => void act('revoke', { id: inv.id })} />)}</ul>}
+        onRevoke={() => void act('revoke', { id: inv.id })}
+        onDelete={() => void act('delete', { id: inv.id })} />)}</ul></>}
     </section>
 
     <Diapers items={bySize(data.items.filter(item => item.category === 'fralda'))} eventId={id} />
@@ -161,12 +201,13 @@ const responseIcons: Partial<Record<Invitation['response'], string>> = { no: '�
 
 // G2.1: uma ação de edição (secundária), reemitir como auxiliar e revogar como
 // destrutiva; o nome do convidado fica só no título e no nome acessível.
-function GuestCard({ invitation: inv, sending, canEdit, canRevoke, onEdit, onRotate, onRevoke }: {
-  invitation: Invitation; sending: boolean; canEdit: boolean; canRevoke: boolean; onEdit: () => void; onRotate: () => void; onRevoke: () => void
+function GuestCard({ invitation: inv, sending, canEdit, canRevoke, onEdit, onRotate, onRevoke, onDelete, selecting, selected, onSelect }: {
+  invitation: Invitation; sending: boolean; canEdit: boolean; canRevoke: boolean; onEdit: () => void; onRotate: () => void; onRevoke: () => void; onDelete: () => void
+  selecting: boolean; selected: boolean; onSelect: (on: boolean) => void
 }) {
   // G5.1: cada card cuida do próprio diálogo, para o foco voltar ao botão certo.
-  const [confirmAction, setConfirmAction] = useState<'rotate' | 'revoke' | null>(null)
-  return <li className="card card-stack guest-card">
+  const [confirmAction, setConfirmAction] = useState<'rotate' | 'revoke' | 'delete' | null>(null)
+  return <li className={`card card-stack guest-card${selected ? ' card-selected' : ''}`}>
     {/* Mesma anatomia do card de evento: selos de situação no topo, o nome como título
         e o tipo do convite como descrição; abaixo do divisor, as ações. */}
     <header className="card-header">
@@ -181,17 +222,49 @@ function GuestCard({ invitation: inv, sending, canEdit, canRevoke, onEdit, onRot
     {inv.auto_declined && <p className="hint">Não houve nova resposta após o prazo do lembrete.</p>}
     {inv.revoked && <p className="hint">O link antigo não funciona mais; as respostas e escolhas foram preservadas.</p>}
     <div className="card-actions">
+      {/* Na seleção, as ações viram a caixa de marcar, como nos cards de evento. */}
+      {selecting ? <label className="choice card-select"><input type="checkbox" checked={selected} onChange={e => onSelect(e.target.checked)} />Selecionar<span className="sr-only"> {inv.name}</span></label> : <>
       <Button variant="secondary" size="sm" disabled={!canEdit} onClick={onEdit}><PencilIcon size={18} />Editar convite<span className="sr-only"> de {inv.name}</span></Button>
       <Button variant="ghost" size="sm" disabled={!canEdit} onClick={() => setConfirmAction('rotate')}><RefreshIcon size={18} />Reemitir link</Button>
       {!inv.revoked && <Button variant="danger" size="sm" disabled={!canRevoke} onClick={() => setConfirmAction('revoke')}><BanIcon size={18} />Revogar acesso</Button>}
+      <Button variant="danger" size="sm" disabled={!canEdit} onClick={() => setConfirmAction('delete')}><TrashIcon size={18} />Excluir convite<span className="sr-only"> de {inv.name}</span></Button></>}
     </div>
     <ConfirmDialog open={confirmAction !== null}
-      title={confirmAction === 'rotate' ? 'Gerar um novo link e invalidar o anterior?' : 'Revogar este acesso?'}
-      description="Respostas e presentes serão mantidos." confirmLabel={confirmAction === 'rotate' ? 'Gerar novo link' : 'Revogar acesso'}
-      tone={confirmAction === 'revoke' ? 'danger' : 'default'}
+      title={confirmAction === 'rotate' ? 'Gerar um novo link e invalidar o anterior?' : confirmAction === 'delete' ? `Excluir o convite de ${inv.name}?` : 'Revogar este acesso?'}
+      description={confirmAction === 'delete' ? 'O convite, a resposta e os presentes escolhidos serão apagados, e os presentes voltam a ficar disponíveis. Não dá para desfazer.' : 'Respostas e presentes serão mantidos.'}
+      confirmLabel={confirmAction === 'rotate' ? 'Gerar novo link' : confirmAction === 'delete' ? 'Excluir convite' : 'Revogar acesso'}
+      tone={confirmAction === 'rotate' ? 'default' : 'danger'}
       onCancel={() => setConfirmAction(null)}
-      onConfirm={() => { const action = confirmAction; setConfirmAction(null); if (action === 'rotate') onRotate(); else if (action === 'revoke') onRevoke() }} />
+      onConfirm={() => { const action = confirmAction; setConfirmAction(null); if (action === 'rotate') onRotate(); else if (action === 'revoke') onRevoke(); else if (action === 'delete') onDelete() }} />
   </li>
+}
+
+// Barra da seleção, no padrão de "Seus eventos" (SelectionBar de EventsPage): "Selecionar
+// todos" (marcado, parcial ou vazio), contagem anunciada e exclusão com confirmação na barra.
+function SelectionBar({ invitations: chosen, total, confirming, busy, onAll, onDelete, onCancel, onConfirm }: {
+  invitations: Invitation[]; total: number; confirming: boolean; busy: boolean; onAll: (on: boolean) => void; onDelete: () => void; onCancel: () => void; onConfirm: (ids: string[]) => void
+}) {
+  const question = useRef<HTMLParagraphElement>(null)
+  const all = useRef<HTMLInputElement>(null)
+  useEffect(() => { if (confirming) question.current?.focus() }, [confirming])
+  const count = chosen.length
+  const partial = count > 0 && count < total
+  useEffect(() => { if (all.current) all.current.indeterminate = partial }, [partial])
+  const noun = count === 1 ? '1 convite' : `${count} convites`
+  return <section aria-label="Seleção de convites" className="card selection-bar mt-5">
+    <div className="selection-head">
+      <label className="choice selection-all"><input ref={all} type="checkbox" checked={count > 0 && count === total} onChange={e => onAll(e.target.checked)} />Selecionar todos</label>
+      <p className="selection-count" aria-live="polite">{count ? `${count} selecionado${count === 1 ? '' : 's'}` : 'Nenhum selecionado'}</p>
+      <Button variant="danger" size="sm" className="selection-delete" disabled={!count || busy} aria-expanded={confirming} onClick={onDelete}><TrashIcon size={18} />Excluir selecionados</Button>
+    </div>
+    {confirming && count > 0 && <div className="card-disclosure selection-confirm">
+      <p ref={question} tabIndex={-1}>Excluir {noun}? Os convites, as respostas e os presentes escolhidos serão apagados, e os presentes voltam a ficar disponíveis. Não dá para desfazer.</p>
+      <div className="flow-actions">
+        <Button variant="danger" size="sm" className="btn-danger-strong" busy={busy} onClick={() => onConfirm(chosen.map(inv => inv.id))}><TrashIcon size={18} />{busy ? 'Excluindo…' : `Sim, excluir ${noun}`}</Button>
+        <Button variant="ghost" size="sm" disabled={busy} onClick={onCancel}>Cancelar</Button>
+      </div>
+    </div>}
+  </section>
 }
 
 // G5.2: forma do resumo (dois cards) e dos primeiros convites, sem esperar dado nenhum.
@@ -301,4 +374,16 @@ function Choices({ reservations }: { reservations: DashboardReservation[] }) {
       </div>
     })}
   </section>
+}
+
+// A área de transferência aceita PNG em todos os navegadores; a arte é JPEG. A conversão vai como
+// promessa dentro do ClipboardItem: o Safari exige que `write` saia no próprio clique.
+function copyArt(art: Blob) {
+  const png = createImageBitmap(art).then(bitmap => {
+    const canvas = document.createElement('canvas')
+    canvas.width = bitmap.width; canvas.height = bitmap.height
+    canvas.getContext('2d')!.drawImage(bitmap, 0, 0)
+    return new Promise<Blob>((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('PNG_FAILED')), 'image/png'))
+  })
+  return navigator.clipboard.write([new ClipboardItem({ 'image/png': png })])
 }

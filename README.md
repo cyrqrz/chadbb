@@ -12,9 +12,9 @@ Implementado:
 - **Organizador:** entrada por código enviado por e-mail; criação, edição,
   prévia, publicação, encerramento e exclusão do evento; capa; etapas guiadas
   após publicar (convidados e lista de presentes, com mimos próprios).
-- **Convites:** um link por pessoa ou família (`/c/<evento>#token`), com prévia
-  do evento no WhatsApp, reemissão e revogação; painel de presença com resumo
-  vindo do banco.
+- **Convites:** um link por pessoa ou família (`/c/<evento>/<convite>#token`), com
+  prévia no WhatsApp com o nome do convidado e a arte do convite, reemissão e
+  revogação; painel de presença com resumo vindo do banco.
 - **Convidado:** confirmação de presença com prazo "Confirme até" definido pelo
   servidor; Talvez com lembrete por e-mail ([regras](docs/RSVP-LEMBRETES.md));
   reserva de fraldas por tamanho (com troca de tamanho) e de mimos, "Já comprei"
@@ -224,8 +224,9 @@ uso em [foundation](docs/design/foundation.md).
 - `src/lib/`: configuração, Supabase e TanStack Query.
 - `supabase/migrations/`, `supabase/functions/` (`guest`, `contact`,
   `rsvp-reminders`, `retention`, `delete-event`), `supabase/tests/`: backend.
-- `functions/c/[id].ts`: Pages Function do link `/c/<evento>`, que troca as meta
-  tags do convite pela prévia pública do evento ([plano](docs/PLANO-CONVITE-WHATSAPP.md)).
+- `functions/c/`: Pages Functions do link do convite. `/c/<evento>` troca as meta tags
+  pela prévia do evento; `/c/<evento>/<convite>`, pela do convite, com o nome do convidado
+  ([plano](docs/PLANO-CONVITE-WHATSAPP.md)). Lógica comum em `src/lib/invitePage.ts`.
 - `scripts/`: backup, saúde e modelos de e-mail.
 - `tests/`: unitários, banco PostgreSQL, API Supabase, navegador e e2e (Playwright).
 - `docs/`: decisões, contratos, planos, revisões (`docs/reviews/`) e design (`docs/design/`).
@@ -238,7 +239,7 @@ quando necessário, use um projeto Supabase separado da produção. Não reutili
 dados reais nos previews.
 
 `public/_redirects` prepara fallback das rotas SPA. `public/_headers` configura
-CSP, HSTS e demais cabeçalhos; a Pages Function `/c/[id]` repete os cabeçalhos
+CSP, HSTS e demais cabeçalhos; as Pages Functions de `/c/` repetem os cabeçalhos
 do `convite.html` que ela devolve. A CSP libera só o projeto Supabase de produção
 (`img-src`/`connect-src`): trocar de projeto ou usar domínio próprio exige
 atualizar `public/_headers` e `tests/headers.test.ts`.

@@ -5,12 +5,12 @@ import { ContactForm } from './ContactForm'
 
 // Texto aprovado pelo titular em 30/09 (T4 de docs/DECISOES-PRODUTO-2026-09-30.md).
 // Descreve o que o sistema faz: mudar retenção, dados ou fornecedores exige mudar aqui.
-const UPDATED = '1 de outubro de 2026'
+const UPDATED = '2 de outubro de 2026'
 
 // Pergunta e resposta: quem chega pelo convite procura uma dúvida, não lê de cima a baixo.
 const guestAnswers = [
   ['Quem decide sobre seus dados', 'A família que organizou o evento cadastrou seu nome e enviou o convite. O chadbb guarda e processa esses dados em nome dela.'],
-  ['O que guardamos', 'O nome do convite, sua resposta e o número de pessoas, e os presentes que você reservar ou informar como comprados. O e-mail é pedido só se você escolher “Talvez”, serve apenas para um lembrete e é apagado quando deixa de ser necessário.'],
+  ['O que guardamos', 'O nome do convite, sua resposta e o número de pessoas, e os presentes que você reservar ou informar como comprados. O e-mail é pedido só se você escolher “Talvez”, serve apenas para um lembrete e é apagado quando deixa de ser necessário. O nome do convite aparece na prévia do link enviado pelo WhatsApp (título e imagem), para quem tiver o link; o WhatsApp pode guardar essa prévia.'],
   ['O que não fazemos', 'Sem anúncios e sem rastreadores. Para evitar abusos, o endereço IP da conexão é guardado embaralhado por poucos minutos.'],
   ['Por quanto tempo', 'Até 30 dias depois do fim do evento. Depois, nome, respostas, presentes e e-mail são apagados de vez. As cópias de segurança são cifradas e expiram em até 30 dias depois disso.'],
   ['Onde ficam', 'Banco de dados no Supabase (São Paulo), site e cópias de segurança na Cloudflare, envio de e-mails pela Resend. Alguns desses serviços podem usar servidores fora do Brasil.'],
@@ -20,7 +20,7 @@ const guestAnswers = [
 const organizerTerms = [
   'O chadbb está em fase de testes: é gratuito e funciona por convite. Pode mudar ou parar, e você será avisado com antecedência.',
   'Cadastre só quem você convidaria de qualquer forma e só o necessário. Não coloque dados sensíveis nas instruções.',
-  'Você responde pelo conteúdo do evento. A imagem de capa e a arte da prévia do link do convite (com título, dia e horário) ficam acessíveis a quem tiver o endereço delas; use só imagens autorizadas.',
+  'Você responde pelo conteúdo do evento. A imagem de capa e as artes da prévia do link (a do evento, com título, dia e horário, e a de cada convite, que também traz o nome do convidado) ficam acessíveis a quem tiver o endereço delas; use só imagens autorizadas.',
   'Seu e-mail é guardado para o login. Do evento, 30 dias depois do fim, ficam só o título e as datas. Para apagar sua conta, use o contato.',
   'Fazemos backup diário, mas não garantimos disponibilidade contínua.',
   'O chadbb não vende nem intermedia pagamentos. As compras de presentes são feitas diretamente nas lojas.',

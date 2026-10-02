@@ -18,6 +18,7 @@ const event: EventRecord = { id: eventId, owner_id: userId, type: 'baby_shower',
 
 async function organizerBackend(page: Page) {
   const calls: string[] = []
+  const creates: string[] = []
   let record = event
   const dashboard: Dashboard = { rsvp: rsvpFixture, invitations: [], items: [], reservations: [],
     summary: { reminders: { pending: 0, attention: 0 }, invitations: { total: 0, answered: 0, yes: 0, no: 0, maybe: 0, pending: 0, revoked: 0 }, people_confirmed: 0 } }
@@ -26,7 +27,9 @@ async function organizerBackend(page: Page) {
     const url = new URL(route.request().url())
     const path = url.pathname
     calls.push(path)
-    const body = route.request().postDataJSON() ?? {}
+    // A arte da prévia do WhatsApp sobe como multipart ao abrir o painel; só JSON é lido.
+    const body = route.request().headers()['content-type']?.includes('application/json') ? route.request().postDataJSON() ?? {} : {}
+    if (path === '/rest/v1/rpc/organizer_invitations' && body.p_action === 'create') creates.push(path)
     let json: unknown = {}
     if (path === '/auth/v1/user') json = session().user
     else if (path === '/rest/v1/events') json = [record]
@@ -35,7 +38,7 @@ async function organizerBackend(page: Page) {
     else if (['/rest/v1/event_items', '/rest/v1/products'].includes(path)) { json = []; }
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(json), headers: { 'content-range': '0-0/1' } })
   })
-  return { calls }
+  return { calls, creates }
 }
 
 // `context.setOffline` derruba de verdade a rede, inclusive o WebSocket de HMR do
@@ -85,10 +88,10 @@ test('criar convite offline avisa sem chamar o servidor', async ({ page, context
   await context.setOffline(true)
   await page.getByRole('button', { name: 'Convidar alguém' }).click()
   await page.getByLabel('Nome da pessoa ou família').fill('Convidado offline')
-  const before = mock.calls.length
   await page.getByRole('button', { name: 'Criar convite' }).click()
   await expect(page.getByRole('alert')).toContainText('Sem conexão')
-  expect(mock.calls.length).toBe(before)
+  // Conta só a criação: o envio da arte da prévia começa ao abrir o painel, antes de ficar offline.
+  expect(mock.creates).toHaveLength(0)
 })
 
 const guestToken = 'a'.repeat(64)

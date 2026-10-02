@@ -1450,3 +1450,120 @@ test('arte de um snapshot antigo não substitui a arte do evento atualizado', as
   assert.equal((await admin.query('select image_path from public.event_previews where event_id=$1', [first.id])).rows[0].image_path, newArt)
   await assert.rejects(as(alice, 'select public.set_event_preview($1,$2)', [first.id, oldArt]), /does not exist/)
 })
+
+test('prévia por convite: nome só de convite válido, arte do dono e link reemitido sem o nome antigo', async () => {
+  const f = await familyFixture()
+  const { preview_id: previewId } = f.invite
+  assert.match(previewId, /^[0-9a-f-]{36}$/)
+  const read = id => as(null, 'select * from public.public_invitation_preview($1,$2)', [f.event.id, id], 'anon')
+  const register = (user, id, path, inv = f.invite.id) => as(user, 'select public.set_invitation_preview($1,$2,$3,$4) old', [f.event.id, inv, id, path])
+  // Sem arte própria, usa a do evento (aqui nenhuma) e já traz o nome do convite.
+  let { rows } = await read(previewId)
+  assert.deepEqual(Object.keys(rows[0]).sort(), ['guest_name', 'image_path', 'public_description', 'starts_at', 'title'])
+  assert.equal(rows[0].guest_name, 'Família fictícia'); assert.equal(rows[0].image_path, null)
+  // Arte: só o dono, só arquivo da pasta do evento e só com o preview_id atual.
+  const art = `${alice}/${f.event.id}/invite-1.jpg`, other = `${alice}/${f.event.id}/invite-2.jpg`
+  await assert.rejects(register(alice, previewId, art), /INVALID_PREVIEW/)
+  await as(alice, "insert into storage.objects(bucket_id,name) values ('event-public',$1),('event-public',$2)", [art, other])
+  await assert.rejects(register(bob, previewId, art), /EVENT_NOT_FOUND/)
+  await assert.rejects(register(alice, '00000000-0000-4000-8000-0000000000aa', art), /PREVIEW_CONFLICT/)
+  await assert.rejects(register(alice, previewId, `${bob}/${f.event.id}/x.jpg`), /INVALID_PREVIEW/)
+  assert.equal((await register(alice, previewId, art)).rows[0].old, null)
+  assert.equal((await read(previewId)).rows[0].image_path, art)
+  // Id inexistente, de outro evento ou chamado sem papel anon autorizado: vazio ou recusado.
+  assert.equal((await read('00000000-0000-4000-8000-0000000000ff')).rowCount, 0)
+  const other_event = await familyFixture()
+  assert.equal((await as(null, 'select * from public.public_invitation_preview($1,$2)', [other_event.event.id, previewId], 'anon')).rowCount, 0)
+  await assert.rejects(as(null, 'select public.set_invitation_preview($1,$2,$3,$4)', [f.event.id, f.invite.id, previewId, art], 'anon'), /permission denied/)
+  // Reemitir: preview_id novo, o antigo para de mostrar o nome e a arte antiga volta para o painel apagar.
+  const rotated = await organizerAction(f.event, 'rotate', { id: f.invite.id })
+  assert.notEqual(rotated.preview_id, previewId); assert.equal(rotated.old_preview, art)
+  assert.equal((await read(previewId)).rowCount, 0)
+  rows = (await read(rotated.preview_id)).rows
+  assert.equal(rows[0].guest_name, 'Família fictícia'); assert.equal(rows[0].image_path, null)
+  // A arte desenhada para o link antigo não entra no novo.
+  await assert.rejects(register(alice, previewId, other), /PREVIEW_CONFLICT/)
+  assert.equal((await register(alice, rotated.preview_id, other)).rows[0].old, null)
+  // Revogar: sai da prévia, devolve a arte para apagar, e não aceita arte nova.
+  const revoked = await organizerAction(f.event, 'revoke', { id: f.invite.id })
+  assert.equal(revoked.old_preview, other); assert.equal(revoked.preview_id, null)
+  assert.equal((await read(rotated.preview_id)).rowCount, 0)
+  await assert.rejects(register(alice, rotated.preview_id, art), /PREVIEW_CONFLICT/)
+  // Evento encerrado: nenhum convite aparece na prévia.
+  const g = await familyFixture()
+  await transition(g.event, 'closed')
+  assert.equal((await as(null, 'select * from public.public_invitation_preview($1,$2)', [g.event.id, g.invite.preview_id], 'anon')).rowCount, 0)
+})
+
+test('excluir convite: apaga respostas, reservas, sessões e lembrete; presentes voltam a ficar livres', async () => {
+  const f = await familyFixture()
+  const item = f.snapshot.items.find(i => i.diaper_size === 'P')
+  await guestAction(f.token, 'rsvp', request({ response: 'maybe', attending: 0, version: 1, reminder_email: 'talvez@example.test' }))
+  await guestAction(f.token, 'reserve', request({ item_id: item.id, quantity: 2, version: null }))
+  const keep = await organizerAction(f.event, 'create', { name: 'Fica', kind: 'individual', capacity: 1 })
+  // Outro dono e id de outro evento: não encontra.
+  await assert.rejects(organizerAction(f.event, 'delete', { id: f.invite.id }, bob), /EVENT_NOT_FOUND/)
+  const other = await familyFixture()
+  await assert.rejects(organizerAction(f.event, 'delete', { id: other.invite.id }), /INVITATION_NOT_FOUND/)
+  const deleted = await organizerAction(f.event, 'delete', { id: f.invite.id })
+  assert.equal(deleted.id, f.invite.id); assert.equal(deleted.old_preview, null)
+  const left = async (sql) => Number((await admin.query(sql, [f.invite.id])).rows[0].n)
+  assert.equal(await left('select count(*) n from private.invitations where id=$1'), 0)
+  assert.equal(await left('select count(*) n from public.reservations where invitation_id=$1'), 0)
+  assert.equal(await left('select count(*) n from private.guest_requests where invitation_id=$1'), 0)
+  assert.equal(await left('select count(*) n from private.guest_sessions where invitation_id=$1'), 0)
+  assert.equal(await left('select count(*) n from private.rsvp_reminders where invitation_id=$1'), 0)
+  // O convidado perde o acesso; o painel não mostra mais o convite e o saldo volta.
+  await assert.rejects(guestAction(f.token, 'read'), /GUEST_SESSION_INVALID/)
+  await assert.rejects(guestAction(f.invite.token, 'exchange'), /GUEST_SESSION_INVALID/)
+  const panel = await organizerAction(f.event, 'list')
+  assert.deepEqual(panel.invitations.map(i => i.id), [keep.id])
+  assert.equal(panel.items.find(i => i.id === item.id).committed, 0)
+  // Auditoria só com contagens.
+  const audit = (await admin.query("select * from private.retention_audit where event_id=$1 and status='invitation_erased' order by id desc limit 1", [f.event.id])).rows[0]
+  assert.deepEqual([audit.invitations_removed, audit.reservations_removed, audit.guest_requests_removed, audit.guest_sessions_removed], [1, 1, 2, 1])
+  // Repetir não acha mais; evento encerrado não aceita exclusão.
+  await assert.rejects(organizerAction(f.event, 'delete', { id: f.invite.id }), /INVITATION_NOT_FOUND/)
+  const closed = await transition(other.event, 'closed')
+  await assert.rejects(organizerAction(closed, 'delete', { id: other.invite.id }), /EVENT_NOT_PUBLISHED/)
+})
+
+test('excluir vários convites: tudo ou nada, presentes liberados e uma auditoria só com contagens', async () => {
+  const f = await familyFixture()
+  const item = f.snapshot.items.find(i => i.diaper_size === 'M')
+  await guestAction(f.token, 'reserve', request({ item_id: item.id, quantity: 3, version: null }))
+  const second = await organizerAction(f.event, 'create', { name: 'Segundo', kind: 'individual', capacity: 1 })
+  const keep = await organizerAction(f.event, 'create', { name: 'Fica', kind: 'individual', capacity: 1 })
+  const other = await familyFixture()
+  // Um id de outro evento derruba o lote inteiro: nada é apagado.
+  await assert.rejects(organizerAction(f.event, 'delete_many', { ids: [f.invite.id, other.invite.id] }), /INVITATION_NOT_FOUND/)
+  assert.equal((await organizerAction(f.event, 'list')).invitations.length, 3)
+  for (const ids of [[], 'x', null]) await assert.rejects(organizerAction(f.event, 'delete_many', { ids }), /INVALID_PAYLOAD/)
+  await assert.rejects(organizerAction(f.event, 'delete_many', { ids: [f.invite.id] }, bob), /EVENT_NOT_FOUND/)
+  // Ids repetidos contam uma vez.
+  const deleted = await organizerAction(f.event, 'delete_many', { ids: [f.invite.id, second.id, f.invite.id] })
+  assert.deepEqual([...deleted.ids].sort(), [f.invite.id, second.id].sort()); assert.deepEqual(deleted.old_previews, [])
+  const panel = await organizerAction(f.event, 'list')
+  assert.deepEqual(panel.invitations.map(i => i.id), [keep.id])
+  assert.equal(panel.items.find(i => i.id === item.id).committed, 0)
+  await assert.rejects(guestAction(f.token, 'read'), /GUEST_SESSION_INVALID/)
+  const audit = (await admin.query("select * from private.retention_audit where event_id=$1 and status='invitation_erased' order by id desc limit 1", [f.event.id])).rows[0]
+  assert.deepEqual([audit.invitations_removed, audit.reservations_removed], [2, 1])
+  // Evento encerrado não aceita lote.
+  const closed = await transition(other.event, 'closed')
+  await assert.rejects(organizerAction(closed, 'delete_many', { ids: [other.invite.id] }), /EVENT_NOT_PUBLISHED/)
+})
+
+test('dois lotes ao mesmo tempo com convites em comum não travam: um apaga, o outro não acha', async () => {
+  const f = await familyFixture()
+  const b = await organizerAction(f.event, 'create', { name: 'B', kind: 'individual', capacity: 1 })
+  const c = await organizerAction(f.event, 'create', { name: 'C', kind: 'individual', capacity: 1 })
+  const results = await Promise.allSettled([
+    organizerAction(f.event, 'delete_many', { ids: [c.id, b.id, f.invite.id] }),
+    organizerAction(f.event, 'delete_many', { ids: [f.invite.id, b.id] }),
+  ])
+  assert.equal(results.filter(r => r.status === 'fulfilled').length, 1)
+  const rejected = results.find(r => r.status === 'rejected')
+  assert.match(String(rejected.reason?.message), /INVITATION_NOT_FOUND/)
+  assert.equal((await organizerAction(f.event, 'list')).invitations.length, results[0].status === 'fulfilled' ? 0 : 1)
+})

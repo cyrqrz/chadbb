@@ -1,10 +1,15 @@
 import { previewDate } from '../../lib/eventPreview'
 
 // Arte da prévia do link do convite (WhatsApp), desenhada no navegador do organizador:
-// 1200×630, JPEG abaixo de 300 KB (acima disso o WhatsApp não mostra a imagem). Layout
-// aprovado pelo titular em 01/10: aviso de convite, capa à esquerda, título, dia e
-// horário à direita; marca e assinatura embaixo. Cores e fontes do tema bebê.
+// 1200×630, JPEG abaixo de 300 KB (acima disso o WhatsApp não mostra a imagem). Desde
+// 02/10 tudo o que importa fica na faixa central de 630 px: o WhatsApp do computador mostra
+// só um quadrado recortado do centro, e o layout antigo (capa à esquerda, título à direita)
+// virava meio urso e meio título. Marca, assinatura e enfeites ficam nas laterais.
 const W = 1200, H = 630
+// Muda quando o desenho muda: artes de outra versão são refeitas ao abrir o painel.
+export const PREVIEW_ART_VERSION = 'v2'
+// Faixa central que o WhatsApp do computador recorta (quadrado de 630 px).
+const SAFE = { left: (W - H) / 2, width: H }
 const colors = { cream: '#fff8ef', card: '#fffdf9', line: '#ecd3dc', brand: '#8e3658', deep: '#6f2645', ink: '#292326', muted: '#4a4045', soft: '#f6e4eb', blush: '#f2c4d4', champagne: '#d8bc86' }
 const display = '"Fraunces Variable", Georgia, serif'
 const sans = '"Manrope Variable", system-ui, sans-serif'
@@ -53,7 +58,8 @@ function rounded(context: CanvasRenderingContext2D, x: number, y: number, w: num
   context.beginPath(); context.roundRect(x, y, w, h, r)
 }
 
-export async function drawPreviewArt({ title, startsAt, cover }: { title: string; startsAt: string | null; cover: string | null }): Promise<Blob> {
+// `guest`: arte do convite (02/10), com "Convite para <nome>" no lugar do aviso genérico.
+export async function drawPreviewArt({ title, startsAt, cover, guest = null }: { title: string; startsAt: string | null; cover: string | null; guest?: string | null }): Promise<Blob> {
   await Promise.all([document.fonts.load(`650 64px ${display}`), document.fonts.load(`700 30px ${sans}`)]).catch(() => undefined)
   const canvas = document.createElement('canvas')
   canvas.width = W; canvas.height = H
@@ -65,12 +71,21 @@ export async function drawPreviewArt({ title, startsAt, cover }: { title: string
   glow.addColorStop(0, colors.soft); glow.addColorStop(1, colors.card)
   rounded(context, 40, 40, W - 80, H - 80, 36); context.fillStyle = glow; context.fill()
   context.lineWidth = 2; context.strokeStyle = colors.line; context.stroke()
-  // Aviso de convite com estrelinhas.
-  context.fillStyle = colors.brand; context.font = `800 22px ${sans}`; context.letterSpacing = '5px'
-  context.textBaseline = 'alphabetic'; context.fillText('VOCÊ RECEBEU UM CONVITE', 110, 118); context.letterSpacing = '0px'
-  motif(context, 980, 66, 0.9, [[star, null, colors.brand], [sparkles, null, colors.champagne]])
+  const center = W / 2
+  // Enfeites nas laterais: só aparecem na prévia larga.
+  motif(context, 70, 120, 1, [[cloud, colors.card, colors.brand], [heart, colors.blush, colors.brand]])
+  motif(context, 950, 70, 0.9, [[star, null, colors.brand], [sparkles, null, colors.champagne]])
+  // Aviso de convite; no convite, para quem é, em destaque.
+  context.textAlign = 'center'; context.textBaseline = 'alphabetic'
+  context.fillStyle = colors.brand; context.font = `800 20px ${sans}`; context.letterSpacing = '5px'
+  const name = guest?.trim() ?? ''
+  context.fillText(name ? 'CONVITE PARA' : 'VOCÊ RECEBEU UM CONVITE', center, name ? 90 : 100); context.letterSpacing = '0px'
+  if (name) {
+    context.font = `650 40px ${display}`; context.fillStyle = colors.deep
+    context.fillText(lines(context, name, SAFE.width - 70, 1)[0], center, 138)
+  }
   // Capa (recorte quadrado, como object-fit: cover) ou, sem capa, a nuvem com coração.
-  const box = { x: 110, y: 160, size: 300 }
+  const box = name ? { x: center - 85, y: 158, size: 170 } : { x: center - 105, y: 124, size: 210 }
   rounded(context, box.x, box.y, box.size, box.size, 28)
   context.save(); context.clip()
   context.fillStyle = colors.soft; context.fillRect(box.x, box.y, box.size, box.size)
@@ -78,33 +93,37 @@ export async function drawPreviewArt({ title, startsAt, cover }: { title: string
   if (image) {
     const side = Math.min(image.naturalWidth, image.naturalHeight)
     context.drawImage(image, (image.naturalWidth - side) / 2, (image.naturalHeight - side) / 2, side, side, box.x, box.y, box.size, box.size)
-  } else motif(context, box.x + 10, box.y + 70, 1.4, [[cloud, colors.card, colors.brand], [heart, colors.blush, colors.brand]])
+  } else motif(context, box.x + box.size / 2 - 100 * box.size / 210, box.y + 45 * box.size / 210, box.size / 210, [[cloud, colors.card, colors.brand], [heart, colors.blush, colors.brand]])
   context.restore()
   rounded(context, box.x, box.y, box.size, box.size, 28); context.lineWidth = 2; context.strokeStyle = colors.line; context.stroke()
-  // Título (até 3 linhas, encolhe se for longo), dia e horário, chamada.
-  const left = 460, width = W - left - 110
-  let size = 76, titleLines: string[] = []
-  for (; size >= 48; size -= 4) {
+  // Título (até 2 linhas, encolhe se for longo), dia e horário, chamada: centralizados.
+  const width = SAFE.width - 70
+  let size = 64, titleLines: string[] = []
+  for (; size >= 44; size -= 4) {
     context.font = `650 ${size}px ${display}`
-    titleLines = lines(context, title.trim() || 'Chá de bebê', width, 3)
-    if (titleLines.length <= 2 || size === 48) break
+    titleLines = lines(context, title.trim() || 'Chá de bebê', width, 2)
+    // Para no primeiro tamanho em que o título cabe inteiro em 2 linhas; no menor, corta com “…”.
+    if (lines(context, title.trim() || 'Chá de bebê', width, 99).length <= 2) break
   }
   context.fillStyle = colors.deep
-  let y = 230
-  for (const line of titleLines) { context.fillText(line, left, y); y += size * 1.08 }
+  let y = 330 + size
+  for (const line of titleLines) { context.fillText(line, center, y); y += size * 1.05 }
+  y += 4
   if (startsAt) {
-    context.font = `700 32px ${sans}`; context.fillStyle = colors.brand
+    context.font = `700 28px ${sans}`; context.fillStyle = colors.brand
     const when = previewDate(startsAt)
-    context.fillText(when.charAt(0).toUpperCase() + when.slice(1), left, y + 18); y += 50
+    context.fillText(when.charAt(0).toUpperCase() + when.slice(1), center, y); y += 40
   }
-  context.font = `600 26px ${sans}`; context.fillStyle = colors.muted
-  context.fillText('Toque no link para confirmar presença', left, y + 26)
-  // Marca e assinatura.
-  rounded(context, 110, 500, 44, 44, 12); context.fillStyle = colors.brand; context.fill()
-  context.fillStyle = '#fff'; context.font = `800 22px ${sans}`; context.textAlign = 'center'; context.fillText('c', 132, 529); context.textAlign = 'left'
-  context.fillStyle = colors.ink; context.font = `800 26px ${sans}`; context.fillText('chadbb', 168, 531)
-  context.fillStyle = colors.brand; context.fillText('.', 168 + context.measureText('chadbb').width, 531)
-  context.font = `700 22px ${sans}`; context.textAlign = 'right'; context.fillText('Pequenos começos, muito amor.', W - 110, 531)
+  context.font = `600 22px ${sans}`; context.fillStyle = colors.muted
+  context.fillText('Toque no link para confirmar presença', center, y)
+  // Marca à esquerda e assinatura à direita, fora do recorte central.
+  context.textAlign = 'left'
+  rounded(context, 80, 512, 40, 40, 11); context.fillStyle = colors.brand; context.fill()
+  context.fillStyle = '#fff'; context.font = `800 20px ${sans}`; context.textAlign = 'center'; context.fillText('c', 100, 539); context.textAlign = 'left'
+  context.fillStyle = colors.ink; context.font = `800 24px ${sans}`; context.fillText('chadbb', 132, 540)
+  context.fillStyle = colors.brand; context.fillText('.', 132 + context.measureText('chadbb').width, 540)
+  context.font = `700 20px ${sans}`; context.textAlign = 'right'
+  context.fillText('Pequenos começos,', W - 80, 518); context.fillText('muito amor.', W - 80, 544); context.textAlign = 'left'
   // JPEG: com foto de capa, PNG passaria fácil dos 300 KB.
   for (const quality of [0.86, 0.75, 0.6]) {
     const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', quality))
