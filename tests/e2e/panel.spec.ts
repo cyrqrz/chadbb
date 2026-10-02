@@ -82,7 +82,8 @@ async function backend(page: Page, dashboard: Reply, events: Reply = () => ({ st
   await page.route('https://e2e.supabase.co/**', async route => {
     const url = new URL(route.request().url())
     const path = url.pathname
-    const body = route.request().postDataJSON() ?? {}
+    // A arte da prévia do WhatsApp sobe como multipart ao abrir o painel; só JSON é lido.
+    const body = route.request().headers()['content-type']?.includes('application/json') ? route.request().postDataJSON() ?? {} : {}
     let result: ReturnType<Reply> = { status: 500, json: { message: 'Unexpected test request' } }
     if (path === '/auth/v1/user') result = { status: 200, json: session().user }
     else if (path === '/rest/v1/events') result = events({ url, body })
