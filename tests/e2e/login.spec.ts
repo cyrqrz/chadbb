@@ -370,3 +370,19 @@ test('a tela de entrada fala só do código, sem prometer link no e-mail', async
   await expect(main).not.toContainText('O link do e-mail')
   await expect(page.getByRole('status')).toContainText('lixo eletrônico')
 })
+
+// O motivo decorativo ficava ao lado da lista e não encolhia: no celular os cards viravam
+// uma tira e o texto quebrava letra a letra (iPhone, 02/10). A lista usa a largura toda.
+test('cards do painel lateral usam a largura toda no celular e no computador', async ({ page }) => {
+  await auth(page)
+  for (const width of [320, 390, 1280]) {
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto('/entrar')
+    const aside = await page.locator('.login-aside').boundingBox()
+    const list = await page.locator('.login-features').boundingBox()
+    const padding = await page.locator('.login-aside').evaluate(el => parseFloat(getComputedStyle(el).paddingLeft) + parseFloat(getComputedStyle(el).paddingRight))
+    expect(Math.round(list!.width), `${width} px`).toBe(Math.round(aside!.width - padding))
+    const title = await page.getByRole('heading', { name: 'Confirmação de presença' }).boundingBox()
+    expect(title!.height, `${width} px: título em no máximo duas linhas`).toBeLessThan(64)
+  }
+})
