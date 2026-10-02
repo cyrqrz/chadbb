@@ -1,3 +1,4 @@
+import { usePageTitle } from '../../lib/usePageTitle'
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
@@ -21,6 +22,7 @@ export function InvitePreview() {
   const { id = '' } = useParams()
   const { session } = useAuth()
   const event = useQuery({ queryKey: [...eventKeys.detail(id), session?.user.id], queryFn: () => getEvent(id), retry: false, ...live })
+  usePageTitle(event.data ? `Prévia do convite · ${event.data.title || 'Evento sem título'}` : 'Prévia do convite')
   const panel = useQuery<Dashboard>({ queryKey: ['invitations', session?.user.id, id], queryFn: () => invitations(id), ...live })
   // Rascunho ainda não tem painel de convites: a volta é para os dados do evento.
   const draft = event.data?.status === 'draft'

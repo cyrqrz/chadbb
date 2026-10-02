@@ -1,3 +1,4 @@
+import { usePageTitle } from '../../lib/usePageTitle'
 import { BabyMotif } from '../../components/BabyMotif'
 import { useState } from 'react'
 import { EmptyState, ErrorState, LoadingState, SuccessMessage } from '../../components/States'
@@ -11,6 +12,7 @@ const colors = [
 ] as const
 
 export function SpecimensPage() {
+  usePageTitle('Amostras')
   const [tab, setTab] = useState<'fralda' | 'mimo'>('fralda')
   const [busy, setBusy] = useState(false)
   const [advanceBusy, setAdvanceBusy] = useState(false)

@@ -1,3 +1,4 @@
+import { usePageTitle } from '../../lib/usePageTitle'
 import { BabyMotif } from '../../components/BabyMotif'
 import { useEffect, useId, useRef, useState } from 'react'
 import type { ReactNode, RefObject } from 'react'
@@ -29,6 +30,8 @@ export function GuestPage() {
   const [access, setAccess] = useState<{ token: string; snapshot: Snapshot } | null>(null)
   const [error, setError] = useState<unknown>(null)
   const opening = useRef<ReturnType<typeof openInvite> | null>(null)
+  // Com o convite aberto, quem dá o título é o GuestEvent (com o nome do evento).
+  usePageTitle(access ? undefined : 'Convite')
   useEffect(() => {
     let active = true
     let attempt = 0
@@ -90,6 +93,8 @@ export function GuestEvent({ access, preview = false }: { access: { token: strin
   const query = useQuery({ queryKey: key, queryFn: async ({ signal }) => (await guestCall(access.token, 'read', {}, signal)).snapshot,
     initialData: access.snapshot, ...live, enabled: q => !preview && !expired && !(q.state.error instanceof GuestError && q.state.error.status === 401), retry: false })
   useEffect(() => () => { cache.removeQueries({ queryKey: key }) }, [cache, key])
+  // Na prévia do organizador, o título é o da prévia (InvitePreview).
+  usePageTitle(preview ? undefined : `Convite · ${(query.data ?? access.snapshot).event.title}`)
   // `where` permite responder onde a pessoa clicou: o cancelamento pedido no
   // aviso da presença não pode aparecer lá embaixo, no cartão do presente
   // (que pode estar até em outra aba).
@@ -319,6 +324,11 @@ function GuestGift({ item, alternatives, busy, closed, save, feedback }: { item:
   const available = item.available
   const full = available === 0 && !active
   const purchaseHint = useId()
+  // "Já comprei" e "Cancelar reserva" somem depois de dar certo: o foco ia para o início
+  // da página (WCAG 2.4.3). Ele vai para o aviso do próprio cartão, que diz o que mudou.
+  const feedbackArea = useRef<HTMLDivElement>(null)
+  const [focusFeedback, setFocusFeedback] = useState(0)
+  useEffect(() => { if (focusFeedback) feedbackArea.current?.focus() }, [focusFeedback])
   async function submit(event: FormEvent) {
     event.preventDefault()
     if (!/^[0-9]+$/.test(quantity) || Number(quantity) < 1 || Number(quantity) > 1000) return
@@ -354,15 +364,16 @@ function GuestGift({ item, alternatives, busy, closed, save, feedback }: { item:
         enquanto esta pessoa escolhia a quantidade (regra 7 do AGENTS.md). */}
     {!purchased && full && !active && draft && <p role="status" className="hint">Este tamanho completou enquanto você escolhia. Sua quantidade não foi enviada; escolha outro tamanho, se houver.</p>}
     {draft && draft.version !== (own?.version ?? null) && <p role="status">A escolha mudou em outra sessão. <button type="button" className="text-link" onClick={() => setDraft(null)}>Usar escolha atual</button></p>}
-    {feedback}
+    {feedback && <div ref={feedbackArea} tabIndex={-1} className="flex flex-col gap-3">{feedback}</div>}
     {active && <div className="card-actions">
       {canSwap && <button type="button" className="btn-ghost btn-sm" aria-expanded={swapOpen} aria-controls={swapId} onClick={() => setSwapOpen(!swapOpen)}>Trocar tamanho <span aria-hidden="true">{swapOpen ? '˄' : '›'}</span></button>}
       {canSwap && swapOpen && <div id={swapId} className="card-disclosure">
         <label className="field">Novo tamanho<select ref={swapSelect} disabled={busy} value={destination} onChange={e => setDestination(e.target.value)}><option value="">Escolha outro tamanho</option>{swapTargets.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.diaper_size} · {candidate.available ?? 0} disponíveis</option>)}</select></label>
         <Button variant="secondary" size="sm" className="self-start" busy={busy} disabled={!destination} onClick={swap}>Confirmar troca</Button>
       </div>}
-      {!purchased && <Button variant="ghost" size="sm" disabled={busy} aria-describedby={purchaseHint} onClick={() => void save('purchase', { item_id: item.id, version: own.version })}>Já comprei</Button>}
-      <Button variant="danger" size="sm" disabled={busy} onClick={() => void save('cancel', { item_id: item.id, version: own.version }).then(done => { if (done) setDraft(null) })}>Cancelar reserva</Button>
+      {/* busy (aria-disabled), e não disabled: durante o envio o foco fica no botão. */}
+      {!purchased && <Button variant="ghost" size="sm" busy={busy} aria-describedby={purchaseHint} onClick={() => void save('purchase', { item_id: item.id, version: own.version }).then(done => { if (done) setFocusFeedback(n => n + 1) })}>Já comprei</Button>}
+      <Button variant="danger" size="sm" busy={busy} onClick={() => void save('cancel', { item_id: item.id, version: own.version }).then(done => { if (done) { setDraft(null); setFocusFeedback(n => n + 1) } })}>Cancelar reserva</Button>
       {!purchased && <p id={purchaseHint} className="hint">“Já comprei” só avisa a organização que você já tem o presente. O site não faz pagamento nem confere a compra.</p>}
     </div>}
   </article>

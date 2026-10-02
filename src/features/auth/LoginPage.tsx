@@ -1,3 +1,4 @@
+import { usePageTitle } from '../../lib/usePageTitle'
 import { BabyMotif } from '../../components/BabyMotif'
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
@@ -19,6 +20,7 @@ export function RequireAuth() {
   return session ? <Outlet /> : <Navigate to="/entrar" replace state={{ from: `${location.pathname}${location.search}` }} />
 }
 export function AuthCallback() {
+  usePageTitle('Entrar')
   const { session, loading, error } = useAuth()
   // Uma vez por montagem: `takeDestination` consome o destino, e recalcular a
   // cada render devolveria "/eventos" na segunda passada.
@@ -57,6 +59,7 @@ function codeFailure(cause: unknown) {
 }
 
 export function LoginPage() {
+  usePageTitle('Entrar')
   const { session, loading } = useAuth()
   const location = useLocation()
   const from = safeInternalPath((location.state as { from?: unknown } | null)?.from)

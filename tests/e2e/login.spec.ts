@@ -331,7 +331,7 @@ test.describe('voltar à página pedida depois de entrar', () => {
 
   // Redirecionamento aberto: um destino externo guardado levaria a pessoa, logo
   // depois de entrar, a um site que imita o chadbb.
-  test('destino externo guardado à força é ignorado', async ({ page }) => {
+  test('destino externo guardado à força é ignorado', async ({ page, baseURL }) => {
     await auth(page)
     await page.addInitScript(value => localStorage.setItem('sb-e2e-auth-token', JSON.stringify(value)), session())
     await page.goto('/entrar')
@@ -339,7 +339,7 @@ test.describe('voltar à página pedida depois de entrar', () => {
       JSON.stringify({ path: '//evil.example/eventos', at: Date.now() })))
     await page.goto('/auth/callback')
     await expect(page).toHaveURL(/\/eventos$/)
-    expect(new URL(page.url()).host, 'a pessoa não pode sair do site').toBe('127.0.0.1:4173')
+    expect(new URL(page.url()).host, 'a pessoa não pode sair do site').toBe(new URL(baseURL!).host)
     await expect(page.getByRole('heading', { name: 'Seus eventos' })).toBeVisible()
   })
 })
@@ -378,10 +378,16 @@ test('cards do painel lateral usam a largura toda no celular e no computador', a
   for (const width of [320, 390, 1280]) {
     await page.setViewportSize({ width, height: 900 })
     await page.goto('/entrar')
-    const aside = await page.locator('.login-aside').boundingBox()
-    const list = await page.locator('.login-features').boundingBox()
-    const padding = await page.locator('.login-aside').evaluate(el => parseFloat(getComputedStyle(el).paddingLeft) + parseFloat(getComputedStyle(el).paddingRight))
-    expect(Math.round(list!.width), `${width} px`).toBe(Math.round(aside!.width - padding))
+    await page.locator('.login-features').waitFor()
+    await page.evaluate(() => document.fonts.ready)
+    // Medir no mesmo frame evita comparar larguras de dois layouts durante o carregamento.
+    const gap = await page.locator('.login-aside').evaluate(el => {
+      const style = getComputedStyle(el)
+      const available = el.getBoundingClientRect().width - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
+        - parseFloat(style.borderLeftWidth) - parseFloat(style.borderRightWidth)
+      return Math.abs(el.querySelector('.login-features')!.getBoundingClientRect().width - available)
+    })
+    expect(gap, `${width} px: a lista ocupa a largura disponível`).toBeLessThan(1)
     const title = await page.getByRole('heading', { name: 'Confirmação de presença' }).boundingBox()
     expect(title!.height, `${width} px: título em no máximo duas linhas`).toBeLessThan(64)
   }

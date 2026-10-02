@@ -1,3 +1,4 @@
+import { usePageTitle } from '../../lib/usePageTitle'
 import { BabyMotif } from '../../components/BabyMotif'
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
@@ -40,6 +41,7 @@ const faq: [string, ReactNode][] = [
 const cloud = <svg className="step-cloud" viewBox="36 14 124 52" fill="none" aria-hidden="true" focusable="false"><path d="M56 62h79c16 0 20-19 6-24-3-19-29-20-34-4-13-15-36-6-35 10-14-6-28 13-16 18Z" /></svg>
 
 export function HomePage() {
+  usePageTitle(null)
   const { session } = useAuth()
   const { hash } = useLocation()
   // Links do rodapé (/#como-funciona, /#duvidas): o roteador não rola até a âncora sozinho.

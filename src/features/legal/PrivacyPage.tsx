@@ -1,3 +1,4 @@
+import { usePageTitle } from '../../lib/usePageTitle'
 import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { CONTACT } from '../../lib/contact'
@@ -27,6 +28,7 @@ const organizerTerms = [
 ]
 
 export function PrivacyPage() {
+  usePageTitle('Privacidade e termos')
   const { hash } = useLocation()
   // A página chega por import tardio: a âncora ainda não existia quando o navegador tentou rolar.
   useEffect(() => { if (hash) document.getElementById(hash.slice(1))?.scrollIntoView() }, [hash])

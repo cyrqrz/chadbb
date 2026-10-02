@@ -1,5 +1,5 @@
 import { SiteFooter } from './SiteFooter'
-import { useLayoutEffect, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { Link, Outlet, useLocation, useNavigationType } from 'react-router-dom'
 import { useAuth } from '../features/auth/context'
 import { supabase } from '../lib/supabase'
@@ -17,6 +17,19 @@ export function Layout() {
   // rola até a seção; “voltar” do navegador (POP) mantém a posição. `instant`
   // porque o CSS rola suave: a página nova apareceria no rodapé subindo animada.
   useLayoutEffect(() => { if (navigation !== 'POP' && !hash) window.scrollTo({ top: 0, left: 0, behavior: 'instant' }) }, [pathname, hash, navigation])
+  // WCAG 2.4.11: o cabeçalho é fixo, e o controle que recebia o foco ao voltar com
+  // Shift+Tab (ou ao pular para uma âncora) ficava inteiro embaixo dele. A altura real,
+  // que cresce com o texto ampliado, vira o scroll-padding-top do html (styles.css).
+  const header = useRef<HTMLElement>(null)
+  useLayoutEffect(() => {
+    const element = header.current
+    if (!element || typeof ResizeObserver === 'undefined') return
+    const measure = () => document.documentElement.style.setProperty('--header-height', `${element.offsetHeight}px`)
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(false)
   async function signOut() {
@@ -27,7 +40,7 @@ export function Layout() {
   // O rodapé fica fora da coluna central para a barra vinho ocupar a largura toda.
   return <div className="flex min-h-screen flex-col"><div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-6 md:px-12">
     <a href="#conteudo" className="skip-link">Pular para o conteúdo</a>
-    <header className="site-header border-b border-stone-300">
+    <header ref={header} className="site-header border-b border-stone-300">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-4">
         <Link to="/" aria-label="chadbb, início" className="brand inline-flex min-h-11 items-center gap-2.5 text-xl font-extrabold tracking-tight"><span className="brand-mark" aria-hidden="true">c</span>chadbb<span className="-ml-2.5 text-brand" aria-hidden="true">.</span></Link>
         <nav aria-label="Menu principal" className="flex flex-wrap items-center gap-1 text-sm">

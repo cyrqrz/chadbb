@@ -1,3 +1,4 @@
+import { usePageTitle } from '../../lib/usePageTitle'
 import { Suspense, useState } from 'react'
 import type { MouseEvent } from 'react'
 import { Link, NavLink, Navigate, Outlet, useMatch, useNavigate, useParams } from 'react-router-dom'
@@ -47,6 +48,8 @@ export function EventLayout() {
   // Enquanto o evento carrega, a tela de dados fica sem abas: evita que apareçam e sumam.
   const showTabs = event !== null && !(onData && (!event || inSetup(event)))
   const docked = Boolean(event && pendingSteps(event).length)
+  const onGifts = useMatch('/eventos/:id/presentes') !== null
+  usePageTitle(`${onGifts ? 'Presentes' : onData ? 'Dados do evento' : 'Painel'} · ${event ? event.title || 'Evento sem título' : 'Seu evento'}`)
   return <section className={docked ? 'page page-docked' : 'page'}>
     <BackLink to="/eventos">Seus eventos</BackLink>
     <header className="event-header">

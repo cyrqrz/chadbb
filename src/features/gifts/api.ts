@@ -66,3 +66,17 @@ export async function prepareTreatList(eventId: string) {
   if (error) throw error
   return data as number
 }
+// Lote (seleção e "Adicionar todos os tamanhos"): entram todos ou nenhum. Devolve os
+// produtos que entraram; o que já estava na lista é pulado, sem somar pacotes.
+export async function addItems(eventId: string, items: { product_id: string; quantity: number | null }[]) {
+  const { data, error } = await getClient().rpc('add_event_items', { p_event_id: eventId, p_items: items })
+  if (error) throw error
+  return data as string[]
+}
+// Saem todos ou nenhum. Com reserva ativa (ITEM_HAS_RESERVATIONS) ou versão antiga
+// (ITEM_VERSION_CONFLICT), `details` traz os ids dos itens, para a tela dizer quais.
+export async function removeItems(eventId: string, items: Pick<EventItem, 'id' | 'version'>[]) {
+  const { data, error } = await getClient().rpc('remove_event_items', { p_event_id: eventId, p_items: items.map(({ id, version }) => ({ id, version })) })
+  if (error) throw error
+  return data as string[]
+}

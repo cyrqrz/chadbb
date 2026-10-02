@@ -135,6 +135,9 @@
 
 @layer base {
   html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+  /* WCAG 2.4.11: rolagem por foco ou âncora para abaixo do cabeçalho fixo. A altura real
+     vem do Layout (--header-height) e acompanha o texto ampliado e as duas linhas do celular. */
+  html { scroll-padding-top: calc(var(--header-height, 0px) + 0.75rem); }
   body { margin: 0; background: var(--color-canvas); color: var(--color-ink); overflow-wrap: anywhere; font-family: var(--font-sans); font-size: var(--text-body); line-height: var(--text-body--line-height); -webkit-font-smoothing: antialiased; }
   h1 { font-size: var(--text-display); line-height: var(--text-display--line-height); letter-spacing: -0.035em; font-weight: 750; text-wrap: balance; }
   h2, h3 { text-wrap: balance; letter-spacing: -0.015em; }
@@ -294,7 +297,7 @@
   .invite-art-month::first-letter { text-transform: uppercase; }
   .invite-art-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.25rem; margin-top: 1.25rem; border-top: 1px solid color-mix(in srgb, var(--color-brand) 30%, transparent); padding-top: 1rem; }
   .invite-message { max-width: 60ch; margin-top: 2.5rem; border-inline-start: 3px solid var(--color-blush); padding-inline-start: 1.25rem; font-family: var(--font-sans); font-size: var(--invite-message-size); line-height: var(--invite-message-leading); white-space: pre-line; }
-  .invite-section { display: flex; flex-direction: column; gap: 1rem; margin-top: 3rem; border-top: 1px solid var(--color-border-subtle); padding-top: 2.5rem; scroll-margin-top: 5rem; }
+  .invite-section { display: flex; flex-direction: column; gap: 1rem; margin-top: 3rem; border-top: 1px solid var(--color-border-subtle); padding-top: 2.5rem; }
   .invite-section:focus { outline: none; }
   .invite-section:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 6px; }
   .invite-section-title { font-family: var(--font-display); font-size: clamp(1.75rem, 4vw, 2.25rem); font-weight: 560; line-height: 1.15; letter-spacing: -0.01em; }
@@ -512,9 +515,14 @@
   /* Barra de ações em lote: caixa de todos (.choice, como a dos cards), contagem e ação numa
      linha; no celular a ação desce para a largura toda, como os atalhos do card estreito. */
   .selection-bar { display: flex; flex-direction: column; gap: 0.75rem; }
-  .selection-head { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 0.75rem 1rem; }
-  .selection-count { justify-self: end; color: var(--color-ink); font-variant-numeric: tabular-nums; }
-  .selection-delete { grid-column: 1 / -1; width: 100%; }
+  /* Flex com quebra, e não grade: com o overflow-wrap: anywhere do body, a coluna da grade
+     encolhia até uma letra por linha a 320 px com texto a 200%; aqui o item desce inteiro. */
+  .selection-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1rem; }
+  .selection-count { flex: 1 1 auto; text-align: end; color: var(--color-ink); font-variant-numeric: tabular-nums; }
+  :is(.selection-action, .selection-delete) { flex-basis: 100%; }
+  /* Dentro de outro card (lista de presentes), a barra é uma faixa entre divisores: dois
+     recuos de card somados roubavam a largura no celular. */
+  .card .selection-bar { border: 0; border-top: 1px solid var(--divider-color); border-radius: 0; background: none; box-shadow: none; padding: 12px 0; }
   /* No celular, as ações do topo e as da confirmação em lote ocupam a largura toda, em
      colunas iguais (topo) ou uma embaixo da outra (confirmação), como no card estreito. */
   @media (max-width: 639px) {
@@ -523,9 +531,8 @@
     .selection-bar .flow-actions > * { flex: 1 1 100%; }
   }
   @media (min-width: 640px) {
-    .selection-head { grid-template-columns: auto 1fr auto; }
-    .selection-count { justify-self: start; }
-    .selection-delete { grid-column: auto; width: auto; }
+    .selection-count { text-align: start; }
+    :is(.selection-action, .selection-delete) { flex-basis: auto; }
   }
   /* Card de evento estreito (celular): atalhos empilhados na largura toda, como no card de
      convite; nenhum botão sobra sozinho à direita numa segunda linha. */
@@ -561,14 +568,11 @@
   .form-section-legend { float: left; width: 100%; margin-bottom: 0.75rem; font-size: var(--text-h3); font-weight: 650; }
   .form-section-legend + p { clear: both; }
   /* Privacidade e termos: a promessa em Fraunces é o único destaque; o resto é pergunta e resposta. */
-  /* scroll-margin: o cabeçalho fixo cobriria o título ao pular para a âncora. */
   .legal-promise { max-width: 32ch; margin-top: 1rem; text-wrap: balance; font-family: var(--font-display); font-size: clamp(1.375rem, 1.1rem + 1.2vw, 1.875rem); line-height: 1.3; font-weight: 450; }
   .legal { display: grid; gap: 1.5rem; margin-top: 2rem; }
   .legal-nav ul { display: flex; flex-wrap: wrap; margin-inline-start: -0.5rem; }
   .legal-nav .nav-link { padding-inline: 0.5rem; }
   .legal-body { display: flex; min-width: 0; flex-direction: column; gap: 3rem; }
-  /* 9rem: no celular estreito o cabeçalho fixo ocupa duas linhas (~130 px). */
-  .legal-section, .legal-contact { scroll-margin-top: 9rem; }
   /* Formulário de contato: uma coluna só (GOV.UK e boas práticas de formulário no celular). */
   .contact-form { display: flex; width: 100%; flex-direction: column; gap: 1rem; }
   /* Enviar logo abaixo do último campo: largura toda no celular (alvo grande), natural no computador. */
@@ -651,7 +655,7 @@
   /* Home (referências de 01/10): título em tinta com uma palavra em vinho; etapas em
      nuvens com seta curva; faixa rosada de benefícios; perguntas que abrem e fecham. */
   .home-section { padding-block: 3.5rem; }
-  .home-title { margin-bottom: 2.5rem; font-family: var(--font-display); font-variation-settings: "SOFT" var(--title-softness); font-size: var(--text-h1); line-height: var(--text-h1--line-height); font-weight: 650; text-align: center; color: var(--color-ink); scroll-margin-top: 6rem; }
+  .home-title { margin-bottom: 2.5rem; font-family: var(--font-display); font-variation-settings: "SOFT" var(--title-softness); font-size: var(--text-h1); line-height: var(--text-h1--line-height); font-weight: 650; text-align: center; color: var(--color-ink); }
   .home-title:focus { outline: none; }
   .title-accent { color: var(--color-brand); }
   .home-steps { display: grid; gap: 2.5rem; }

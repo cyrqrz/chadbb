@@ -7,6 +7,7 @@ import { Layout } from './components/Layout'
 import { AuthProvider } from './features/auth/AuthProvider'
 import { AuthCallback, LoginPage, RequireAuth } from './features/auth/LoginPage'
 import { LoadingState } from './components/States'
+import { usePageTitle } from './lib/usePageTitle'
 
 const EventsPage = lazy(() => import('./features/events/EventsPage').then(m => ({ default: m.EventsPage })))
 const EventLayout = lazy(() => import('./features/events/EventLayout').then(m => ({ default: m.EventLayout })))
@@ -45,8 +46,13 @@ export function App() {
           </Route>
           <Route path="/eventos/:id/previa" element={<InvitePreview />} />
         </Route>
-        <Route path="*" element={<section className="py-24"><h1>Página não encontrada</h1><p className="mt-4">Confira o endereço ou volte ao início.</p><a className="button mt-8" href="/">Voltar ao início</a></section>} />
+        <Route path="*" element={<NotFound />} />
       </Route></Routes>
     </Suspense>
   </AuthProvider></BrowserRouter></QueryClientProvider>
+}
+
+function NotFound() {
+  usePageTitle('Página não encontrada')
+  return <section className="py-24"><h1>Página não encontrada</h1><p className="mt-4">Confira o endereço ou volte ao início.</p><a className="button mt-8" href="/">Voltar ao início</a></section>
 }

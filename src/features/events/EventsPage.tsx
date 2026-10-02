@@ -1,3 +1,4 @@
+import { usePageTitle } from '../../lib/usePageTitle'
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
@@ -10,7 +11,7 @@ import { failedLast, live } from '../../lib/query'
 import { useLastError } from '../../lib/useLastError'
 import { ErrorState, LoadingState, RefreshStatus, SlowRefresh } from '../../components/States'
 import { useAuth } from '../auth/context'
-import { Button, CheckIcon, Pagination, PencilIcon, PlusIcon, Skeleton, StatusBadge, TrashIcon } from '../../components/ui'
+import { Button, CheckIcon, Pagination, PencilIcon, PlusIcon, SelectionBar, Skeleton, StatusBadge, TrashIcon } from '../../components/ui'
 
 // Exclusão com desfazer: o card some na hora, mas o pedido só vai ao servidor
 // depois de UNDO_MS. Desfazer dentro do prazo não chega ao servidor. Sair da tela
@@ -38,6 +39,7 @@ const noticeText: Record<Notice['kind'], (items: Item[]) => string> = {
 }
 
 export function EventsPage() {
+  usePageTitle('Seus eventos')
   const { session } = useAuth()
   const [page, setPage] = useState(0)
   const [creating, setCreating] = useState(false)
@@ -167,7 +169,7 @@ export function EventsPage() {
         {pending && pending.key === notice.id && <UndoAction key={pending.key} subject={subject(pending.items)} settleUntil={settling} onUndo={undo} onExpire={() => void commit(pending)} />}
       </div>}
       {failure && <p role="alert" className="error mt-8">Não foi possível {failure.closing ? 'encerrar' : 'excluir'} {failure.titles.map(title => `“${title}”`).join(', ')}. {errorMessage(failure.cause)}</p>}
-      {selecting && !!query.data.events.length && <SelectionBar events={query.data.events.filter(event => selected.has(event.id) && !hidden.has(event.id))} total={query.data.events.filter(event => !hidden.has(event.id)).length} confirming={confirmBatch} busy={closing}
+      {selecting && !!query.data.events.length && <EventSelectionBar events={query.data.events.filter(event => selected.has(event.id) && !hidden.has(event.id))} total={query.data.events.filter(event => !hidden.has(event.id)).length} confirming={confirmBatch} busy={closing}
         onAll={on => { setSelected(on ? new Set(query.data.events.filter(event => !hidden.has(event.id)).map(event => event.id)) : new Set()); setConfirmBatch(false) }}
         onDelete={() => setConfirmBatch(true)} onCancel={() => setConfirmBatch(false)}
         onConfirm={events => void remove(events.map(event => ({ event, title: event.title || 'Evento sem título' })))} />}
@@ -218,35 +220,20 @@ function UndoAction({ subject, settleUntil, onUndo, onExpire }: { subject: strin
   </div>
 }
 
-// Barra de ações em lote (padrão do Shopify Polaris e afins): caixa “Selecionar todos”
-// (marcada, parcial ou vazia), a contagem ao lado e a ação na mesma linha; no celular, a
-// ação desce para a largura toda. Excluir vários sempre confirma; se houver publicados, o
-// aviso diz que encerrar não tem volta.
-function SelectionBar({ events, total, confirming, busy, onAll, onDelete, onCancel, onConfirm }: {
+// Seleção de eventos na barra comum. Excluir vários sempre confirma; se houver publicados,
+// o aviso diz que encerrar não tem volta.
+function EventSelectionBar({ events, total, confirming, busy, onAll, onDelete, onCancel, onConfirm }: {
   events: EventRecord[]; total: number; confirming: boolean; busy: boolean; onAll: (on: boolean) => void; onDelete: () => void; onCancel: () => void; onConfirm: (events: EventRecord[]) => void
 }) {
-  const question = useRef<HTMLParagraphElement>(null)
-  const all = useRef<HTMLInputElement>(null)
-  useEffect(() => { if (confirming) question.current?.focus() }, [confirming])
   const count = events.length
-  const partial = count > 0 && count < total
-  useEffect(() => { if (all.current) all.current.indeterminate = partial }, [partial])
   const published = events.filter(event => event.status === 'published').length
   const noun = count === 1 ? '1 evento' : `${count} eventos`
-  return <section aria-label="Seleção de eventos" className="card selection-bar mt-8">
-    <div className="selection-head">
-      <label className="choice selection-all"><input ref={all} type="checkbox" checked={count > 0 && count === total} onChange={e => onAll(e.target.checked)} />Selecionar todos</label>
-      <p className="selection-count" aria-live="polite">{count ? `${count} selecionado${count === 1 ? '' : 's'}` : 'Nenhum selecionado'}</p>
-      <Button variant="danger" size="sm" className="selection-delete" disabled={!count || busy} aria-expanded={confirming} onClick={onDelete}><TrashIcon size={18} />Excluir selecionados</Button>
-    </div>
-    {confirming && count > 0 && <div className="card-disclosure selection-confirm">
-      <p ref={question} tabIndex={-1}>Excluir {noun}? Convites, respostas e reservas serão apagados.{published ? ` ${published === 1 ? '1 deles está publicado e será encerrado' : `${published} deles estão publicados e serão encerrados`}: os convites deixam de funcionar e encerrar não tem volta.` : ''} Você terá {UNDO_MS / 1000} segundos para desfazer a exclusão.</p>
-      <div className="flow-actions">
-        <Button variant="danger" size="sm" className="btn-danger-strong" busy={busy} onClick={() => onConfirm(events)}><TrashIcon size={18} />{busy ? 'Encerrando…' : published ? `Sim, encerrar e excluir ${noun}` : `Sim, excluir ${noun}`}</Button>
-        <Button variant="ghost" size="sm" disabled={busy} onClick={onCancel}>Cancelar</Button>
-      </div>
-    </div>}
-  </section>
+  return <SelectionBar label="Seleção de eventos" count={count} total={total} onAll={onAll}
+    action={{ label: 'Excluir selecionados', icon: <TrashIcon size={18} />, variant: 'danger', disabled: !count || busy, expanded: confirming, onClick: onDelete }}
+    confirm={confirming && count > 0 ? {
+      question: <>Excluir {noun}? Convites, respostas e reservas serão apagados.{published ? ` ${published === 1 ? '1 deles está publicado e será encerrado' : `${published} deles estão publicados e serão encerrados`}: os convites deixam de funcionar e encerrar não tem volta.` : ''} Você terá {UNDO_MS / 1000} segundos para desfazer a exclusão.</>,
+      icon: <TrashIcon size={18} />, label: busy ? 'Encerrando…' : published ? `Sim, encerrar e excluir ${noun}` : `Sim, excluir ${noun}`, busy, onConfirm: () => onConfirm(events), onCancel,
+    } : null} />
 }
 
 // O link cobre o conteúdo; abaixo do divisor ficam os atalhos. “Editar dados” em

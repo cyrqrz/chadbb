@@ -10,7 +10,7 @@ import { errorMessage } from '../../lib/errors'
 import { failedLast, live } from '../../lib/query'
 import { useLastError } from '../../lib/useLastError'
 import { EmptyState, ErrorState, LoadingState, RefreshStatus, SuccessMessage } from '../../components/States'
-import { BanIcon, Button, CheckIcon, ConfirmDialog, PencilIcon, PlusIcon, Progress, RefreshIcon, Skeleton, StatusBadge, TrashIcon } from '../../components/ui'
+import { BanIcon, Button, CheckIcon, ConfirmDialog, PencilIcon, PlusIcon, Progress, RefreshIcon, SelectionBar as BatchSelectionBar, Skeleton, StatusBadge, TrashIcon } from '../../components/ui'
 import type { StatusTone } from '../../components/ui'
 import { EventNotFound } from '../events/EventLayout'
 import { bySize } from '../../lib/diapers'
@@ -239,32 +239,19 @@ function GuestCard({ invitation: inv, sending, canEdit, canRevoke, onEdit, onRot
   </li>
 }
 
-// Barra da seleção, no padrão de "Seus eventos" (SelectionBar de EventsPage): "Selecionar
-// todos" (marcado, parcial ou vazio), contagem anunciada e exclusão com confirmação na barra.
+// A mesma barra de seleção dos eventos e da lista de presentes.
 function SelectionBar({ invitations: chosen, total, confirming, busy, onAll, onDelete, onCancel, onConfirm }: {
   invitations: Invitation[]; total: number; confirming: boolean; busy: boolean; onAll: (on: boolean) => void; onDelete: () => void; onCancel: () => void; onConfirm: (ids: string[]) => void
 }) {
-  const question = useRef<HTMLParagraphElement>(null)
-  const all = useRef<HTMLInputElement>(null)
-  useEffect(() => { if (confirming) question.current?.focus() }, [confirming])
   const count = chosen.length
-  const partial = count > 0 && count < total
-  useEffect(() => { if (all.current) all.current.indeterminate = partial }, [partial])
   const noun = count === 1 ? '1 convite' : `${count} convites`
-  return <section aria-label="Seleção de convites" className="card selection-bar mt-5">
-    <div className="selection-head">
-      <label className="choice selection-all"><input ref={all} type="checkbox" checked={count > 0 && count === total} onChange={e => onAll(e.target.checked)} />Selecionar todos</label>
-      <p className="selection-count" aria-live="polite">{count ? `${count} selecionado${count === 1 ? '' : 's'}` : 'Nenhum selecionado'}</p>
-      <Button variant="danger" size="sm" className="selection-delete" disabled={!count || busy} aria-expanded={confirming} onClick={onDelete}><TrashIcon size={18} />Excluir selecionados</Button>
-    </div>
-    {confirming && count > 0 && <div className="card-disclosure selection-confirm">
-      <p ref={question} tabIndex={-1}>Excluir {noun}? Os convites, as respostas e os presentes escolhidos serão apagados, e os presentes voltam a ficar disponíveis. Não dá para desfazer.</p>
-      <div className="flow-actions">
-        <Button variant="danger" size="sm" className="btn-danger-strong" busy={busy} onClick={() => onConfirm(chosen.map(inv => inv.id))}><TrashIcon size={18} />{busy ? 'Excluindo…' : `Sim, excluir ${noun}`}</Button>
-        <Button variant="ghost" size="sm" disabled={busy} onClick={onCancel}>Cancelar</Button>
-      </div>
-    </div>}
-  </section>
+  return <BatchSelectionBar label="Seleção de convites" className="mt-5" count={count} total={total} onAll={onAll}
+    action={{ label: 'Excluir selecionados', icon: <TrashIcon size={18} />, variant: 'danger', disabled: !count || busy, expanded: confirming, onClick: onDelete }}
+    confirm={confirming && count > 0 ? {
+      question: `Excluir ${noun}? Os convites, as respostas e os presentes escolhidos serão apagados, e os presentes voltam a ficar disponíveis. Não dá para desfazer.`,
+      label: busy ? 'Excluindo…' : `Sim, excluir ${noun}`, icon: <TrashIcon size={18} />, busy,
+      onConfirm: () => onConfirm(chosen.map(inv => inv.id)), onCancel,
+    } : null} />
 }
 
 // G5.2: forma do resumo (dois cards) e dos primeiros convites, sem esperar dado nenhum.
