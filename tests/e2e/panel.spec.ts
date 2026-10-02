@@ -2338,3 +2338,51 @@ test('excluir convite pede confirmação, apaga a arte e avisa acima da lista', 
   await expect.poll(() => removed).toEqual([{ prefixes: [`${userId}/${eventId}/invite-antiga.jpg`] }])
   await expectAccessible(page)
 })
+
+// Seleção de vários convites (02/10), no padrão de "Seus eventos": excluir em lote, com confirmação.
+test('selecionar vários convites e excluir de uma vez', async ({ page }) => {
+  const calls: Record<string, unknown>[] = []
+  await backend(page, ({ body }) => {
+    calls.push(body)
+    return body.p_action === 'delete_many' ? { status: 200, json: { ids: (body.p_payload as { ids: string[] }).ids, old_previews: [] } } : { status: 200, json: full }
+  })
+  await page.goto(`/eventos/${eventId}/convites`)
+  const toggle = page.getByRole('button', { name: 'Selecionar', exact: true })
+  await toggle.click()
+  await expect(page.getByRole('button', { name: 'Cancelar seleção' })).toHaveAttribute('aria-pressed', 'true')
+  const bar = page.getByRole('region', { name: 'Seleção de convites' })
+  await expect(bar).toContainText('Nenhum selecionado')
+  await expect(bar.getByRole('button', { name: 'Excluir selecionados' })).toBeDisabled()
+  // Na seleção, as ações do card viram a caixa de marcar.
+  await expect(page.getByRole('button', { name: /Editar convite de/ })).toHaveCount(0)
+  await page.getByRole('checkbox', { name: 'Selecionar Convidado fictício 1' }).check()
+  await page.getByRole('checkbox', { name: 'Selecionar Convidado fictício 3' }).check()
+  await expect(bar).toContainText('2 selecionados')
+  expect(await bar.getByRole('checkbox', { name: 'Selecionar todos' }).evaluate(el => (el as HTMLInputElement).indeterminate)).toBe(true)
+  await bar.getByRole('button', { name: 'Excluir selecionados' }).click()
+  await expect(bar.getByText('Excluir 2 convites? Os convites, as respostas e os presentes escolhidos serão apagados', { exact: false })).toBeFocused()
+  await expectAccessible(page)
+  await bar.getByRole('button', { name: 'Sim, excluir 2 convites' }).click()
+  await expect(page.getByRole('region', { name: 'Convidados' }).locator('.guests-feedback').getByRole('status'))
+    .toHaveText('2 convites excluídos. As respostas e os presentes escolhidos por eles foram apagados.')
+  expect(calls.filter(body => body.p_action === 'delete_many')).toEqual([{ p_event_id: eventId, p_action: 'delete_many', p_payload: { ids: [full.invitations[0].id, full.invitations[2].id] } }])
+  // A seleção fecha depois de excluir.
+  await expect(bar).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Selecionar', exact: true })).toHaveAttribute('aria-pressed', 'false')
+})
+
+test('selecionar todos marca todos os convites e cancelar a confirmação não exclui', async ({ page }) => {
+  const calls: Record<string, unknown>[] = []
+  await backend(page, ({ body }) => { calls.push(body); return { status: 200, json: full } })
+  await page.goto(`/eventos/${eventId}/convites`)
+  await page.getByRole('button', { name: 'Selecionar', exact: true }).click()
+  const bar = page.getByRole('region', { name: 'Seleção de convites' })
+  await bar.getByRole('checkbox', { name: 'Selecionar todos' }).check()
+  await expect(bar).toContainText(`${full.invitations.length} selecionados`)
+  for (const inv of full.invitations) await expect(page.getByRole('checkbox', { name: `Selecionar ${inv.name}` })).toBeChecked()
+  await bar.getByRole('button', { name: 'Excluir selecionados' }).click()
+  await bar.getByRole('button', { name: 'Cancelar' }).click()
+  expect(calls.filter(body => body.p_action === 'delete_many')).toHaveLength(0)
+  await bar.getByRole('checkbox', { name: 'Selecionar todos' }).uncheck()
+  await expect(bar).toContainText('Nenhum selecionado')
+})

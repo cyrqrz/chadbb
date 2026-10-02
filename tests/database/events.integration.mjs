@@ -1527,3 +1527,43 @@ test('excluir convite: apaga respostas, reservas, sessões e lembrete; presentes
   const closed = await transition(other.event, 'closed')
   await assert.rejects(organizerAction(closed, 'delete', { id: other.invite.id }), /EVENT_NOT_PUBLISHED/)
 })
+
+test('excluir vários convites: tudo ou nada, presentes liberados e uma auditoria só com contagens', async () => {
+  const f = await familyFixture()
+  const item = f.snapshot.items.find(i => i.diaper_size === 'M')
+  await guestAction(f.token, 'reserve', request({ item_id: item.id, quantity: 3, version: null }))
+  const second = await organizerAction(f.event, 'create', { name: 'Segundo', kind: 'individual', capacity: 1 })
+  const keep = await organizerAction(f.event, 'create', { name: 'Fica', kind: 'individual', capacity: 1 })
+  const other = await familyFixture()
+  // Um id de outro evento derruba o lote inteiro: nada é apagado.
+  await assert.rejects(organizerAction(f.event, 'delete_many', { ids: [f.invite.id, other.invite.id] }), /INVITATION_NOT_FOUND/)
+  assert.equal((await organizerAction(f.event, 'list')).invitations.length, 3)
+  for (const ids of [[], 'x', null]) await assert.rejects(organizerAction(f.event, 'delete_many', { ids }), /INVALID_PAYLOAD/)
+  await assert.rejects(organizerAction(f.event, 'delete_many', { ids: [f.invite.id] }, bob), /EVENT_NOT_FOUND/)
+  // Ids repetidos contam uma vez.
+  const deleted = await organizerAction(f.event, 'delete_many', { ids: [f.invite.id, second.id, f.invite.id] })
+  assert.deepEqual([...deleted.ids].sort(), [f.invite.id, second.id].sort()); assert.deepEqual(deleted.old_previews, [])
+  const panel = await organizerAction(f.event, 'list')
+  assert.deepEqual(panel.invitations.map(i => i.id), [keep.id])
+  assert.equal(panel.items.find(i => i.id === item.id).committed, 0)
+  await assert.rejects(guestAction(f.token, 'read'), /GUEST_SESSION_INVALID/)
+  const audit = (await admin.query("select * from private.retention_audit where event_id=$1 and status='invitation_erased' order by id desc limit 1", [f.event.id])).rows[0]
+  assert.deepEqual([audit.invitations_removed, audit.reservations_removed], [2, 1])
+  // Evento encerrado não aceita lote.
+  const closed = await transition(other.event, 'closed')
+  await assert.rejects(organizerAction(closed, 'delete_many', { ids: [other.invite.id] }), /EVENT_NOT_PUBLISHED/)
+})
+
+test('dois lotes ao mesmo tempo com convites em comum não travam: um apaga, o outro não acha', async () => {
+  const f = await familyFixture()
+  const b = await organizerAction(f.event, 'create', { name: 'B', kind: 'individual', capacity: 1 })
+  const c = await organizerAction(f.event, 'create', { name: 'C', kind: 'individual', capacity: 1 })
+  const results = await Promise.allSettled([
+    organizerAction(f.event, 'delete_many', { ids: [c.id, b.id, f.invite.id] }),
+    organizerAction(f.event, 'delete_many', { ids: [f.invite.id, b.id] }),
+  ])
+  assert.equal(results.filter(r => r.status === 'fulfilled').length, 1)
+  const rejected = results.find(r => r.status === 'rejected')
+  assert.match(String(rejected.reason?.message), /INVITATION_NOT_FOUND/)
+  assert.equal((await organizerAction(f.event, 'list')).invitations.length, results[0].status === 'fulfilled' ? 0 : 1)
+})

@@ -78,6 +78,13 @@ para o painel apagar a arte. Erros: `EVENT_NOT_FOUND`, `INVITATION_NOT_FOUND`, `
 Ordem: evento `FOR SHARE` → convite `FOR UPDATE`; o convidado que estava no convite recebe
 `GUEST_SESSION_INVALID`. Diferente de revogar, que só tira o acesso e mantém respostas e presentes.
 
+Excluir vários convites (migration `20261002032000`): `p_action='delete_many'` com
+`{ "ids": [uuid, ...] }` (1 a 500, repetidos contam uma vez). Tudo ou nada: se algum id não for
+convite do evento, nada é apagado (`INVITATION_NOT_FOUND`); `INVALID_PAYLOAD` para lista vazia ou
+não-lista. Convites travados em ordem de id (dois lotes ao mesmo tempo não se travam; o segundo
+recebe `INVITATION_NOT_FOUND`). Mesma limpeza do `delete`, uma linha de auditoria com as contagens
+do lote. Devolve `{ ids, old_previews }`.
+
 Prévia por convite (migration `20261002020000`, decisão do titular em 02/10, com aviso em
 `/privacidade`): cada convite tem `preview_id` (uuid público, não é credencial) e `preview_path`.
 O link passa a ser `/c/<evento>/<preview_id>#token`; links antigos `/c/<evento>#token` continuam
