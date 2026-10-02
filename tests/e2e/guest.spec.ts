@@ -354,6 +354,22 @@ test.describe('G3 · convite', () => {
     await expectAccessible(page)
   })
 
+  // N2: o servidor informa `started`; publicado, mas já começou, trava como o encerrado.
+  test('evento já iniciado trava presença e novas reservas e mantém as ações da reserva', async ({ page }) => {
+    const mine: GuestItem = { ...diaper, committed: 2, own: { id: 'r1', quantity: 2, version: 1, status: 'reserved' } }
+    await backend(page, { items: [mine, full], event: { status: 'published', started: true } })
+    await page.goto(`/convite#${token}`)
+    await expect(page.getByText('O evento já começou: presença e reservas não podem mais ser alteradas.', { exact: false })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Responder ao convite' })).toHaveCount(0)
+    const presence = page.getByRole('region', { name: 'Podemos contar com você?' })
+    await expect(presence.getByRole('radio')).toHaveCount(0)
+    const p = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Fraldas tamanho P' }) })
+    await expect(p.getByRole('spinbutton')).toHaveCount(0)
+    await expect(p.getByRole('button', { name: 'Já comprei' })).toBeEnabled()
+    await expect(p.getByRole('button', { name: 'Cancelar reserva' })).toBeEnabled()
+    await expectAccessible(page)
+  })
+
   test('menos e mais não soltam o foco nos limites e campo vazio volta ao mínimo', async ({ page }) => {
     await backend(page, { items: [{ ...diaper, committed: 4 }] })
     await page.goto(`/convite#${token}`)

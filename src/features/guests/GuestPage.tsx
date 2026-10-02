@@ -124,7 +124,9 @@ export function GuestEvent({ access, preview = false }: { access: { token: strin
   if (expired || query.error instanceof GuestError && query.error.status === 401) return <section className="page"><p className="eyebrow">Seu convite</p><h1 className="page-title">Reabra seu convite</h1><div className="mt-6"><ErrorState message={guestMessage(new GuestError('GUEST_SESSION_INVALID', 401))} /></div></section>
   const data = preview ? access.snapshot : query.data
   const { event, invitation } = data
-  const closed = event.status === 'closed'
+  // `started` vem do servidor: a partir do início, presença e reservas travam como no encerrado.
+  const ended = event.status === 'closed'
+  const closed = ended || event.started === true
   const answered = invitation.response !== 'pending'
   const feedback = (area: string) => feedbackAt === area && <>
     {notice && (notice.ok ? <SuccessMessage>{notice.text}</SuccessMessage> : <p role="status" className="state state-warning">{notice.text}</p>)}
@@ -162,7 +164,7 @@ export function GuestEvent({ access, preview = false }: { access: { token: strin
       </div>
     </header>
 
-    {closed && <p className="state state-warning mt-8">O evento foi encerrado. Você ainda pode consultar suas escolhas, cancelar ou informar uma compra enquanto seu convite estiver válido.</p>}
+    {closed && <p className="state state-warning mt-8">{ended ? 'O evento foi encerrado.' : 'O evento já começou: presença e reservas não podem mais ser alteradas.'} Você ainda pode consultar suas escolhas, cancelar ou informar uma compra enquanto seu convite estiver válido.</p>}
     <RefreshStatus fetching={query.isFetching} failed={query.isError} onRetry={() => void query.refetch()} label="Atualizando informações…" />
 
     {event.description && <section className="invite-message" aria-label="Mensagem do convite"><p>{event.description}</p></section>}

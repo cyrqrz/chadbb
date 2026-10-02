@@ -11,7 +11,7 @@ export type RsvpPolicy = { maybe_allowed: boolean; maybe_closes_at: string; conf
 export type Snapshot = {
   rsvp: RsvpPolicy
   invitation: { name: string; kind: 'individual' | 'family'; capacity: number; response: ResponseChoice; attending: number; version: number }
-  event: { id: string; title: string; description: string; starts_at: string; address: string; instructions: string; cover_path: string | null; status: string }
+  event: { id: string; title: string; description: string; starts_at: string; address: string; instructions: string; cover_path: string | null; status: string; started?: boolean }
   items: GuestItem[]
 }
 export type Invitation = Snapshot['invitation'] & { id: string; revoked: boolean; expires_at: string; auto_declined: boolean }
