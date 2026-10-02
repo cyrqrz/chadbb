@@ -90,7 +90,7 @@ export function HomePage() {
     <section aria-labelledby="duvidas" className="home-section">
       <h2 id="duvidas" tabIndex={-1} className="home-title">Tire suas <span className="title-accent">dúvidas</span>, estamos aqui para ajudar</h2>
       <div className="faq-list">{faq.map(([question, answer]) =>
-        <details key={question} className="faq-item"><summary>{question}</summary><div className="faq-answer">{answer}</div></details>)}
+        <details key={question} className="faq-item"><summary>{question}<span className="faq-icon" aria-hidden="true" /></summary><div className="faq-answer">{answer}</div></details>)}
       </div>
       <p className="faq-more"><Link className="text-link" to="/privacidade#contato">Ainda com dúvidas? Fale com a gente</Link></p>
     </section>

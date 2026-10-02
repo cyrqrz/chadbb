@@ -1,6 +1,6 @@
 import { SiteFooter } from './SiteFooter'
-import { useState } from 'react'
-import { Link, Outlet, useLocation } from 'react-router-dom'
+import { useLayoutEffect, useState } from 'react'
+import { Link, Outlet, useLocation, useNavigationType } from 'react-router-dom'
 import { useAuth } from '../features/auth/context'
 import { supabase } from '../lib/supabase'
 import { useOnline } from '../lib/useOnline'
@@ -9,7 +9,14 @@ import { ErrorState } from './States'
 export function Layout() {
   const { session } = useAuth()
   const online = useOnline()
-  const { pathname } = useLocation()
+  const { pathname, hash } = useLocation()
+  const navigation = useNavigationType()
+  // O roteador não rola ao trocar de página: a nova abria na altura em que a
+  // anterior estava (no celular, a política abria já no rodapé e parecia que o
+  // link não funcionava). Link novo começa no topo; com âncora, a própria página
+  // rola até a seção; “voltar” do navegador (POP) mantém a posição. `instant`
+  // porque o CSS rola suave: a página nova apareceria no rodapé subindo animada.
+  useLayoutEffect(() => { if (navigation !== 'POP' && !hash) window.scrollTo({ top: 0, left: 0, behavior: 'instant' }) }, [pathname, hash, navigation])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(false)
   async function signOut() {

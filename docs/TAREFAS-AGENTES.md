@@ -1,5 +1,47 @@
 # Tarefas e combinados entre agentes
 
+## Em andamento — 2026-10-01
+
+**Retomada (Claude, fim de 01/10) — comece por aqui.**
+
+Feito e em produção (`chadbb.pages.dev` / `chadbb.online`):
+- PR #43: tema bebê (vinho + creme, Fraunces SOFT, motivos), botão `advance`,
+  README atualizado.
+- PR #44: home a partir das referências do titular (etapas em nuvens,
+  benefícios, perguntas frequentes, rodapé com links úteis e barra vinho; no
+  convite só a barra), atalhos nos cards de evento ("Editar dados", "Excluir")
+  com **Desfazer por 10 s**, `AGENTS.md` com clone único.
+- Commit `2bde09f` na `clone-main`, **sem push**: navegação começa no topo (o
+  link de privacidade "não fazia nada" no celular) e perguntas frequentes mais
+  legíveis. Validado: check + e2e completo 559/559.
+
+Revisões: `docs/reviews/2026-10-01-*.md`.
+
+**Pendente, aprovado pelo titular, na ordem:**
+1. Push de `2bde09f` + PR + merge (merge só com "pode mergear" do titular).
+2. Cards de "Seus eventos": "Editar dados" como botão com contorno e ícone de
+   lápis; "Excluir" com ícone de lixeira à direita.
+3. **"Encerrar e excluir" no evento publicado** (decisão do titular): a
+   confirmação no card avisa que os convites deixam de funcionar e que encerrar
+   não tem volta; encerra (`transitionEvent(event, 'closed')`) e agenda a
+   exclusão com os 10 s de Desfazer (desfazer mantém o evento, encerrado; o
+   aviso diz isso). Mock de teste: rota `/rest/v1/rpc/transition_event`.
+4. **Seleção de vários eventos** para excluir de uma vez, com um único
+   "Desfazer" para o grupo (publicados selecionados passam pelo mesmo aviso de
+   "encerrar e excluir"). Hoje `EventsPage` tem uma exclusão pendente por vez
+   (`pendingRef`): generalizar para lote.
+5. **Prévias do WhatsApp:** fase 1 de
+   [PLANO-CONVITE-WHATSAPP.md](PLANO-CONVITE-WHATSAPP.md) — a home sai hoje com
+   prévia de convite; separar `index.html` (produto) e `convite.html` (convite).
+   Fase 2 (prévia por evento) depende de duas decisões abertas no plano.
+6. Antes de cada commit, o titular quer **ver os diffs numa página HTML lado a
+   lado** (diff2html), agrupados por commit, com capturas de tela.
+
+Lembretes: congelamento a partir de 05/10 (só correções até 01/11); envio dos
+convites da Liz até 08/10; ensaio com a família (T7) segue pendente do titular.
+Não criar/apagar arquivos na pasta durante o e2e (o Vite recarrega e derruba
+testes).
+
 ## Em andamento — 2026-09-30
 
 **Retomada (Claude, fim de 30/09) — comece por aqui.**

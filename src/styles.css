@@ -623,13 +623,19 @@
   .benefit-icon { width: 2.25rem; height: 2.25rem; color: var(--color-brand); }
   .benefit-title { font-weight: 700; color: var(--color-ink); }
   .faq-list { display: grid; gap: 0.75rem; margin-inline: auto; max-width: 42rem; }
-  .faq-item { border: 1px solid var(--color-line-strong); border-radius: var(--radius-surface); background: var(--color-surface); }
-  .faq-item[open] { border-color: var(--color-brand); }
-  .faq-item > summary { display: flex; min-height: var(--touch-min); cursor: pointer; align-items: center; justify-content: space-between; gap: 1rem; border-radius: var(--radius-surface); padding: 0.875rem 1.25rem; font-weight: 650; list-style: none; }
+  /* Pergunta fechada: cartão claro com seta num círculo. Aberta: cabeçalho rosado,
+     divisor e resposta na cor do texto (não em cinza, que lia como desabilitado). */
+  .faq-item { overflow: hidden; border: 1px solid var(--color-line); border-radius: var(--radius-surface); background: var(--color-surface); box-shadow: var(--shadow-sm); transition: border-color var(--duration-fast) var(--ease-standard); }
+  .faq-item:hover, .faq-item[open] { border-color: var(--color-brand); }
+  .faq-item > summary { display: flex; min-height: var(--touch-min); cursor: pointer; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.875rem 1rem 0.875rem 1.25rem; color: var(--color-ink); font-weight: 650; list-style: none; }
   .faq-item > summary::-webkit-details-marker { display: none; }
-  .faq-item > summary::after { content: ""; width: 1rem; height: 1rem; flex-shrink: 0; background: var(--color-brand); mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 9 7 7 7-7'/%3E%3C/svg%3E") center / contain no-repeat; transition: transform var(--duration-fast) var(--ease-standard); }
-  .faq-item[open] > summary::after { transform: rotate(180deg); }
-  .faq-answer { padding: 0 1.25rem 1rem; color: var(--color-muted); }
+  .faq-item > summary:focus-visible { outline-offset: -3px; }
+  .faq-item[open] > summary { border-bottom: 1px solid var(--color-line); background: var(--color-brand-soft); color: var(--color-brand-hover); }
+  /* Ícone: círculo rosado com a seta pintada pela cor atual (máscara), que vira vinho ao abrir. */
+  .faq-icon { display: grid; place-items: center; width: 1.75rem; height: 1.75rem; flex-shrink: 0; border-radius: var(--radius-pill); background: var(--color-brand-soft); color: var(--color-brand); transition: transform var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard); }
+  .faq-icon::after { content: ""; width: 1rem; height: 1rem; background: currentColor; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E") center / contain no-repeat; }
+  .faq-item[open] .faq-icon { transform: rotate(180deg); background: var(--color-brand); color: white; }
+  .faq-answer { padding: 1rem 1.25rem 1.25rem; color: var(--color-ink); line-height: 1.6; }
   .faq-more { margin-top: 1.5rem; text-align: center; font-weight: 650; }
   @media (min-width: 640px) {
     .benefit-grid { grid-template-columns: repeat(2, 1fr); }
@@ -644,10 +650,11 @@
   @media (forced-colors: active) {
     .step-cloud { fill: Canvas; stroke: CanvasText; }
     .home-step::after { display: none; }
-    .faq-item > summary::after { forced-color-adjust: none; background: CanvasText; }
+    .faq-icon { border: 1px solid CanvasText; }
+    .faq-icon::after { forced-color-adjust: none; background: CanvasText; }
     .faq-item, .benefit-card { border-color: CanvasText; }
   }
-  @media (prefers-reduced-motion: reduce) { .faq-item > summary::after { transition: none; } }
+  @media (prefers-reduced-motion: reduce) { .faq-icon { transition: none; } }
 
   /* Rodapé: colunas na largura do conteúdo e barra vinho de ponta a ponta. */
   .site-footer { margin-top: var(--theme-space-lg); border-top: 1px solid var(--color-line); background: var(--color-surface); color: var(--color-muted); font-size: var(--text-body-sm); }
