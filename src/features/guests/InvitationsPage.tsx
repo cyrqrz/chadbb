@@ -15,6 +15,7 @@ import type { StatusTone } from '../../components/ui'
 import { EventNotFound } from '../events/EventLayout'
 import { bySize } from '../../lib/diapers'
 import { StepCompletion } from '../events/SetupDock'
+import { inviteMessage, shareInvite, withLink } from './inviteMessage'
 
 export function InvitationsPage() {
   const { id = '' } = useParams()
@@ -31,6 +32,8 @@ export function InvitationsPage() {
   const [kind, setKind] = useState('individual')
   const [capacity, setCapacity] = useState('2')
   const [link, setLink] = useState('')
+  // Mensagem sugerida para o WhatsApp, com o nome de quem recebe o link novo; o organizador pode editar.
+  const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
   const [copyFailed, setCopyFailed] = useState(false)
@@ -59,7 +62,12 @@ export function InvitationsPage() {
     setBusy(true); setError(''); setNotice(''); setCopyFailed(false); setFeedbackAt(action === 'update' ? 'edit' : 'create')
     try {
       const result = await invitations(id, action, payload)
-      if (result.token) { setCopied(false); setLink(`${window.location.origin}/c/${id}#${result.token}`); setNotice('Convite pronto. Copie o link e envie pelo WhatsApp.') }
+      if (result.token) {
+        const url = `${window.location.origin}/c/${id}#${result.token}`
+        const who = action === 'create' ? name : query.data?.invitations.find(inv => inv.id === payload.id)?.name ?? ''
+        setCopied(false); setLink(url); setDraft(inviteMessage(who, event.data?.title ?? '', url))
+        setNotice('Convite pronto. Envie pelo WhatsApp: a mensagem já leva o nome e o link.')
+      }
       else if (action === 'update') { setNotice('Convite atualizado.'); setEditing(null) }
       else setNotice('Convite revogado. O acesso anterior não funciona mais; as respostas e escolhas foram preservadas.')
       if (action === 'create') { setName(''); setInviting(false) }
@@ -83,8 +91,17 @@ export function InvitationsPage() {
   // O aviso fica junto do que o provocou: formulário de convite, edição ou a lista.
   const feedbackPlace = editing && feedbackAt === 'edit' ? 'edit' : formOpen && feedbackAt === 'create' ? 'create' : 'list'
   function doCloseForm(fromInside: boolean) {
-    setInviting(false); setLink(''); setNotice(''); setError(''); setCopied(false)
+    setInviting(false); setLink(''); setDraft(''); setNotice(''); setError(''); setCopied(false)
     refocus.current = fromInside
+  }
+  const message = link ? withLink(draft, link) : ''
+  function sent(text: string) { setCopyFailed(false); setCopied(true); setError(''); setFeedbackAt('create'); setNotice(text) }
+  async function send() {
+    try {
+      const result = await shareInvite(message)
+      if (result === 'shared') sent('Convite enviado pelo menu de compartilhar.')
+      else if (result === 'copied') sent('Mensagem copiada. Cole no WhatsApp da pessoa.')
+    } catch { setNotice(''); setCopyFailed(true) }
   }
   function closeForm(fromInside = false) {
     if (link && !copied) { setConfirmClose({ fromInside }); return }
@@ -119,7 +136,12 @@ export function InvitationsPage() {
         <label className="field">Tipo de convite<select value={kind} disabled={busy || !ready} onChange={e => setKind(e.target.value)}><option value="individual">Individual</option><option value="family">Família</option></select></label>
         {kind === 'family' && <label className="field">Máximo de pessoas neste convite<input type="number" min={1} max={50} required value={capacity} disabled={busy || !ready} onChange={e => setCapacity(e.target.value)} /></label>}
         <button className="button justify-center" disabled={busy || !ready}>{busy ? 'Aguarde…' : 'Criar convite'}</button></form>
-        {link && <div className="notice mt-5"><label className="field">Link para compartilhar<input ref={linkField} readOnly value={link} onFocus={e => e.target.select()} /></label><p className="hint mt-2">Guarde este link. Por segurança, ele só aparece na emissão.</p>{copyFailed && <p role="status" className="mt-2 font-semibold">Não foi possível copiar. Selecione o campo do link e copie manualmente.</p>}<button className="secondary mt-3" onClick={() => void navigator.clipboard.writeText(link).then(() => { setCopyFailed(false); setCopied(true); setError(''); setFeedbackAt('create'); setNotice('Link copiado.') }).catch(() => { setNotice(''); setCopyFailed(true) })}>Copiar convite</button></div>}
+        {link && <div className="notice mt-5"><label className="field">Link para compartilhar<input ref={linkField} readOnly value={link} onFocus={e => e.target.select()} /></label><p className="hint mt-2">Guarde este link. Por segurança, ele só aparece na emissão.</p>
+          <label className="field mt-4">Mensagem para o WhatsApp<textarea rows={6} value={draft} aria-describedby={`${formId}-message-hint`} onChange={e => setDraft(e.target.value)} /></label>
+          <p id={`${formId}-message-hint`} className="hint mt-2">Sugestão: pode editar o texto. Se o link sair da mensagem, ele volta no fim ao enviar.</p>
+          {copyFailed && <p role="status" className="mt-2 font-semibold">Não foi possível copiar. Selecione a mensagem ou o link e copie manualmente.</p>}
+          <div className="mt-3 flex flex-wrap gap-3"><Button onClick={() => void send()}>Enviar pelo WhatsApp</Button>
+            <Button variant="secondary" onClick={() => void navigator.clipboard.writeText(message).then(() => sent('Mensagem copiada.')).catch(() => { setNotice(''); setCopyFailed(true) })}>Copiar mensagem</Button></div></div>}
         {feedbackPlace === 'create' && feedback}
         <Button variant="ghost" size="sm" className="mt-4" disabled={busy} onClick={() => closeForm(true)}>Fechar</Button>
       </section>}

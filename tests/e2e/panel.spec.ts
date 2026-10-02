@@ -5,6 +5,7 @@ import AxeBuilder from '@axe-core/playwright'
 import type { EventRecord } from '../../src/features/events/model'
 import type { Dashboard, DashboardReservation, Invitation } from '../../src/features/guests/api'
 import { session, userId } from './session'
+import { inviteMessage } from '../../src/features/guests/inviteMessage'
 
 // O convite carrega o mapa do Google em iframe: nos testes ele é simulado, sem rede externa.
 test.beforeEach(async ({ page }) => {
@@ -387,7 +388,7 @@ test('reemitir link com edição aberta mostra o aviso junto do link novo', asyn
   await backend(page, actions({ rotate: { status: 200, json: rotated } }))
   const { create, edit } = await openEdit(page)
   await confirmAnd(page, 'Convidado fictício 3', 'Reemitir link')
-  await expect(create.getByRole('status')).toHaveText('Convite pronto. Copie o link e envie pelo WhatsApp.')
+  await expect(create.getByRole('status')).toHaveText('Convite pronto. Envie pelo WhatsApp: a mensagem já leva o nome e o link.')
   await expect(create.getByLabel('Link para compartilhar')).toBeFocused()
   await expect(edit.getByRole('status')).toHaveCount(0)
   await expect(edit).toBeVisible()
@@ -431,9 +432,10 @@ test('erro ao salvar fica na edição, não muda de lugar ao copiar e some ao ca
   await expect(create.getByRole('alert')).toHaveCount(0)
   await expectAccessible(page)
 
-  await create.getByRole('button', { name: 'Copiar convite' }).click()
-  await expect(create.getByRole('status')).toHaveText('Link copiado.')
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(`${new URL(page.url()).origin}/c/${eventId}#${rotated.token}`)
+  await create.getByRole('button', { name: 'Copiar mensagem' }).click()
+  await expect(create.getByRole('status')).toHaveText('Mensagem copiada.')
+  // Reemitir também leva o nome de quem recebe o link novo.
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(inviteMessage('Convidado fictício 3', 'Chá de teste', `${new URL(page.url()).origin}/c/${eventId}#${rotated.token}`))
   await expect(page.getByRole('alert')).toHaveCount(0)
   await expect(edit.getByRole('status')).toHaveCount(0)
 
@@ -2010,8 +2012,8 @@ test.describe('G4 · painel do evento', () => {
     await expect(dialog).toContainText('O link deste convite não aparece de novo')
     await dialog.getByRole('button', { name: 'Cancelar' }).click()
     await expect(form).toBeVisible()
-    await form.getByRole('button', { name: 'Copiar convite' }).click()
-    await expect(form.getByRole('status')).toHaveText('Link copiado.')
+    await form.getByRole('button', { name: 'Copiar mensagem' }).click()
+    await expect(form.getByRole('status')).toHaveText('Mensagem copiada.')
     await form.getByRole('button', { name: 'Fechar' }).click()
     await expect(form).toHaveCount(0)
     await expect(dialog).toHaveCount(0)
@@ -2237,4 +2239,69 @@ test('painel lista as fraldas do menor ao maior tamanho, mesmo vindo em ordem al
   await backend(page, () => ({ status: 200, json: { ...full, items: [diaper(1, 'G', 19, 0), diaper(2, 'M', 19, 0), diaper(3, 'P', 6, 0), diaper(4, 'XG', 6, 0), ...full.items.filter(item => item.category === 'mimo')] } }))
   await page.goto(`/eventos/${eventId}/convites`)
   await expect(page.getByRole('region', { name: 'Fraldas por tamanho' }).getByRole('heading', { level: 3 })).toHaveText(['Tamanho P', 'Tamanho M', 'Tamanho G', 'Tamanho XG'])
+})
+
+// O nome do convidado vai no texto da mensagem; o envio usa o menu de compartilhar do
+// aparelho (nada passa por wa.me) e, sem ele, copia a mensagem para colar no WhatsApp.
+test.describe('enviar o convite pelo WhatsApp', () => {
+  async function created(page: Page) {
+    await backend(page, actions({ create: { status: 200, json: { id: 'novo', token: 'token-ficticio' } } }))
+    await page.goto(`/eventos/${eventId}`)
+    await page.getByRole('button', { name: 'Convidar alguém' }).click()
+    const form = page.getByRole('region', { name: 'Convide alguém especial' })
+    await form.getByLabel('Nome da pessoa ou família').fill('Família Fictícia')
+    await form.getByRole('button', { name: 'Criar convite' }).click()
+    const expected = inviteMessage('Família Fictícia', 'Chá de teste', `${new URL(page.url()).origin}/c/${eventId}#token-ficticio`)
+    await expect(form.getByLabel('Mensagem para o WhatsApp')).toHaveValue(expected)
+    return { form, expected }
+  }
+
+  test('com menu de compartilhar, envia a mensagem com o nome e o link', async ({ page }) => {
+    await page.addInitScript(() => {
+      const shared: unknown[] = []
+      Object.defineProperty(window, '__shared', { value: shared })
+      Object.defineProperty(navigator, 'share', { configurable: true, value: async (data: unknown) => { shared.push(data) } })
+    })
+    const { form, expected } = await created(page)
+    await form.getByRole('button', { name: 'Enviar pelo WhatsApp' }).click()
+    await expect(form.getByRole('status')).toHaveText('Convite enviado pelo menu de compartilhar.')
+    expect(await page.evaluate(() => (window as unknown as { __shared: unknown[] }).__shared)).toEqual([{ text: expected }])
+    // Enviado conta como copiado: fechar não pede confirmação.
+    await form.getByRole('button', { name: 'Fechar' }).click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expectAccessible(page)
+  })
+
+  test('cancelar o menu não avisa nada nem marca como enviado', async ({ page }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'share', { configurable: true, value: async () => { throw new DOMException('cancelado', 'AbortError') } })
+    })
+    const { form } = await created(page)
+    await form.getByRole('button', { name: 'Enviar pelo WhatsApp' }).click()
+    await expect(form.getByRole('status')).toHaveText('Convite pronto. Envie pelo WhatsApp: a mensagem já leva o nome e o link.')
+    await form.getByRole('button', { name: 'Fechar' }).click()
+    await expect(page.getByRole('dialog')).toContainText('O link deste convite não aparece de novo')
+  })
+
+  test('a mensagem é só sugestão: o organizador reescreve e o link volta se for apagado', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+    const { form } = await created(page)
+    const message = form.getByLabel('Mensagem para o WhatsApp')
+    await expect(message).toHaveAccessibleDescription('Sugestão: pode editar o texto. Se o link sair da mensagem, ele volta no fim ao enviar.')
+    await message.fill('Oi, Família Fictícia! Contamos com vocês no chá.')
+    await form.getByRole('button', { name: 'Copiar mensagem' }).click()
+    await expect(form.getByRole('status')).toHaveText('Mensagem copiada.')
+    expect(await page.evaluate(() => navigator.clipboard.readText()))
+      .toBe(`Oi, Família Fictícia! Contamos com vocês no chá.\n${new URL(page.url()).origin}/c/${eventId}#token-ficticio`)
+    await expect(message).toHaveValue('Oi, Família Fictícia! Contamos com vocês no chá.')
+  })
+
+  test('sem menu de compartilhar, copia a mensagem para colar', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+    await page.addInitScript(() => { Object.defineProperty(navigator, 'share', { configurable: true, value: undefined }) })
+    const { form, expected } = await created(page)
+    await form.getByRole('button', { name: 'Enviar pelo WhatsApp' }).click()
+    await expect(form.getByRole('status')).toHaveText('Mensagem copiada. Cole no WhatsApp da pessoa.')
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(expected)
+  })
 })
